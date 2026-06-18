@@ -1,0 +1,8 @@
+Model:      FaceNet512 (TFLite, FP16)
+Source:     https://github.com/shubham0204/OnDevice-Face-Recognition-Android
+File:       app/src/main/assets/facenet_512.tflite
+Origin:     DeepFace library (https://github.com/serengil/deepface)
+Updated:    2025-12
+Embedding:  512-dimensional float vector
+Input:      160x160 RGB, standardized (x' = (x - mean) / std_dev)
+License:    MIT (shubham0204 repo), Apache 2.0 (DeepFace)

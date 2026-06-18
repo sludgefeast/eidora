@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Faces</string>
+
+    <!-- Navigation -->
+    <string name="nav_persons">Personen</string>
+    <string name="nav_photos">Fotos</string>
+
+    <!-- Persons screen -->
+    <string name="section_suggestions">Vorschläge</string>
+    <string name="section_confirmed">Bestätigt</string>
+    <string name="virtual_person_unknown">Unbekannt</string>
+    <string name="virtual_person_ignored">Ignoriert</string>
+    <string name="hint_enter_name">Namen eingeben…</string>
+
+    <!-- Face actions -->
+    <string name="action_confirm">Bestätigen</string>
+    <string name="action_ignore">Ignorieren</string>
+    <string name="action_unignore">Nicht ignorieren</string>
+    <string name="action_remove_from_person">Von Person entfernen</string>
+    <string name="action_redetect">Gesichter neu bestimmen</string>
+    <string name="action_assign_to_person">Person zuordnen</string>
+    <string name="action_merge">Zusammenführen</string>
+    <string name="action_rename">Umbenennen</string>
+    <string name="action_cancel">Abbrechen</string>
+    <string name="action_confirm_ok">Bestätigen</string>
+
+    <!-- Assign to person sheet -->
+    <string name="sheet_assign_title">Person zuordnen</string>
+    <string name="hint_search_person">Suchen oder neu anlegen…</string>
+    <string name="create_new_person">Neu anlegen: %1$s</string>
+
+    <!-- Merge sheet -->
+    <string name="sheet_merge_title">Welchen Namen behalten?</string>
+
+    <!-- Rename sheet -->
+    <string name="sheet_rename_title">Person umbenennen</string>
+
+    <!-- Fullscreen -->
+    <string name="action_redetect_faces">Gesichter neu bestimmen</string>
+
+    <!-- Sync notification -->
+    <string name="notification_channel_sync">Synchronisierung</string>
+    <string name="notification_sync_title">Faces-Synchronisierung</string>
+    <string name="notification_sync_running">Fotos werden synchronisiert…</string>
+    <string name="notification_sync_done">Synchronisierung abgeschlossen</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Ein Fehler ist aufgetreten</string>
+</resources>

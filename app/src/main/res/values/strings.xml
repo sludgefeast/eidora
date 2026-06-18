@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Faces</string>
+
+    <!-- Navigation -->
+    <string name="nav_persons">People</string>
+    <string name="nav_photos">Photos</string>
+
+    <!-- Persons screen -->
+    <string name="section_suggestions">Suggestions</string>
+    <string name="section_confirmed">Confirmed</string>
+    <string name="virtual_person_unknown">Unknown</string>
+    <string name="virtual_person_ignored">Ignored</string>
+    <string name="hint_enter_name">Enter name…</string>
+
+    <!-- Face actions -->
+    <string name="action_confirm">Confirm</string>
+    <string name="action_ignore">Ignore</string>
+    <string name="action_unignore">Don\'t ignore</string>
+    <string name="action_remove_from_person">Remove from person</string>
+    <string name="action_redetect">Re-detect faces</string>
+    <string name="action_assign_to_person">Assign to person</string>
+    <string name="action_merge">Merge</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_confirm_ok">Confirm</string>
+
+    <!-- Assign to person sheet -->
+    <string name="sheet_assign_title">Assign to person</string>
+    <string name="hint_search_person">Search or create…</string>
+    <string name="create_new_person">Create new: %1$s</string>
+
+    <!-- Merge sheet -->
+    <string name="sheet_merge_title">Keep which name?</string>
+
+    <!-- Rename sheet -->
+    <string name="sheet_rename_title">Rename person</string>
+
+    <!-- Fullscreen -->
+    <string name="action_redetect_faces">Re-detect faces</string>
+
+    <!-- Sync notification -->
+    <string name="notification_channel_sync">Sync</string>
+    <string name="notification_sync_title">Faces sync</string>
+    <string name="notification_sync_running">Syncing photos…</string>
+    <string name="notification_sync_done">Sync complete</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Something went wrong</string>
+</resources>
