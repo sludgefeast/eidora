@@ -2,7 +2,8 @@ package de.sebastian.faces.worker
 
 import android.content.Context
 import androidx.work.*
-import de.sebastian.faces.data.db.FacesDatabase
+import de.sebastian.faces.data.db.DatabaseProvider
+import de.sebastian.faces.data.db.FaceRegionEntity
 import de.sebastian.faces.ml.FaceNetModel
 import de.sebastian.faces.util.ThumbnailHelper
 import de.sebastian.faces.util.toFaceRegionCoords
@@ -14,18 +15,20 @@ class EmbeddingWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val db = FacesDatabase.getInstance(applicationContext)
+        val db = DatabaseProvider.getInstance(applicationContext)
         val faceDao = db.faceRegionDao()
         val photoDao = db.photoDao()
 
         val model = FaceNetModel(applicationContext)
         return try {
-            val pending = faceDao.findWithoutEmbedding()
+            val pending: List<FaceRegionEntity> = faceDao.findWithoutEmbedding()
             pending.forEachIndexed { index, face ->
-                setProgress(workDataOf(
-                    PhotoSyncWorker.KEY_PROGRESS to ((index + 1) * 100) / pending.size,
-                    PhotoSyncWorker.KEY_STATUS to "Computing embeddings…"
-                ))
+                setProgress(
+                    workDataOf(
+                        PhotoSyncWorker.KEY_PROGRESS to ((index + 1) * 100) / pending.size,
+                        PhotoSyncWorker.KEY_STATUS to "Computing embeddings…"
+                    )
+                )
 
                 val photo = photoDao.findById(face.photoId) ?: return@forEachIndexed
                 val photoFile = File(photo.path)

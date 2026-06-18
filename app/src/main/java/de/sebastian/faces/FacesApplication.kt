@@ -4,12 +4,11 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
-import de.sebastian.faces.data.db.FacesDatabase
-import de.sebastian.faces.data.db.getOrCreate
+import de.sebastian.faces.data.db.DatabaseProvider
 
 class FacesApplication : Application() {
 
-    val database: FacesDatabase by lazy { FacesDatabase.getOrCreate(this) }
+    val database by lazy { DatabaseProvider.getInstance(this) }
 
     override fun onCreate() {
         super.onCreate()
@@ -23,8 +22,8 @@ class FacesApplication : Application() {
                 getString(R.string.notification_channel_sync),
                 NotificationManager.IMPORTANCE_LOW
             )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java)
+                .createNotificationChannel(channel)
         }
     }
 

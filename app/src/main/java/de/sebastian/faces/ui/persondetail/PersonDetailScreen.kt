@@ -3,8 +3,10 @@ package de.sebastian.faces.ui.persondetail
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,7 +23,7 @@ import de.sebastian.faces.R
 import de.sebastian.faces.data.db.FaceRegionWithPhoto
 import de.sebastian.faces.util.ThumbnailHelper
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PersonDetailScreen(
     viewModel: PersonDetailViewModel,
@@ -50,64 +52,64 @@ fun PersonDetailScreen(
             contentPadding = PaddingValues(
                 top = padding.calculateTopPadding() + 8.dp,
                 bottom = padding.calculateBottomPadding() + 8.dp,
-                start = 8.dp, end = 8.dp
+                start = 8.dp,
+                end = 8.dp
             ),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Unconfirmed faces
             if (state.unconfirmedFaces.isNotEmpty()) {
                 items(state.unconfirmedFaces, key = { it.faceRegion.id }) { faceWithPhoto ->
                     FaceGridItem(
                         face = faceWithPhoto,
                         isSelected = state.selectedFaceIds.contains(faceWithPhoto.faceRegion.id),
                         borderColor = Color(0xFF4CAF50),
-                        isMultiSelectActive = state.isMultiSelectActive,
                         onTap = {
-                            if (state.isMultiSelectActive) {
+                            if (state.isMultiSelectActive)
                                 viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id)
-                            } else {
+                            else
                                 viewModel.showFaceActions(faceWithPhoto.faceRegion.id)
-                            }
                         },
                         onLongPress = { viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id) },
-                        onImageTap = { onFaceClick(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId) }
+                        onImageTap = {
+                            onFaceClick(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId)
+                        }
                     )
                 }
             }
 
-            // Divider before confirmed faces
             if (state.confirmedFaces.isNotEmpty()) {
                 item(span = { GridItemSpan(3) }) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    Text(
-                        text = stringResource(R.string.section_confirmed),
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
-                    )
+                    Column {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        Text(
+                            text = stringResource(R.string.section_confirmed),
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                        )
+                    }
                 }
                 items(state.confirmedFaces, key = { it.faceRegion.id }) { faceWithPhoto ->
                     FaceGridItem(
                         face = faceWithPhoto,
                         isSelected = state.selectedFaceIds.contains(faceWithPhoto.faceRegion.id),
                         borderColor = null,
-                        isMultiSelectActive = state.isMultiSelectActive,
                         onTap = {
-                            if (state.isMultiSelectActive) {
+                            if (state.isMultiSelectActive)
                                 viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id)
-                            } else {
+                            else
                                 viewModel.showFaceActions(faceWithPhoto.faceRegion.id)
-                            }
                         },
                         onLongPress = { viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id) },
-                        onImageTap = { onFaceClick(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId) }
+                        onImageTap = {
+                            onFaceClick(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId)
+                        }
                     )
                 }
             }
         }
     }
 
-    // Single face actions bottom sheet
     state.actionFaceId?.let { faceId ->
         FaceActionsSheet(
             onConfirm = { viewModel.confirmFace(faceId) },
@@ -119,7 +121,6 @@ fun PersonDetailScreen(
         )
     }
 
-    // Assign to person sheet
     if (state.showAssignSheet) {
         AssignToPersonSheet(
             viewModel = viewModel,
@@ -134,7 +135,6 @@ private fun FaceGridItem(
     face: FaceRegionWithPhoto,
     isSelected: Boolean,
     borderColor: Color?,
-    isMultiSelectActive: Boolean,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
     onImageTap: () -> Unit
@@ -147,19 +147,26 @@ private fun FaceGridItem(
             .size(108.dp)
             .combinedClickable(onClick = onTap, onLongClick = onLongPress)
     ) {
+        val imageModifier = if (borderColor != null) {
+            Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+                .background(borderColor, CircleShape)
+                .padding(3.dp)
+                .clip(CircleShape)
+        } else {
+            Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+        }
+
         AsyncImage(
             model = thumbnailFile,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(CircleShape)
-                .then(
-                    if (borderColor != null) Modifier.background(borderColor, CircleShape)
-                    else Modifier
-                )
-                .combinedClickable(onClick = onImageTap)
+            modifier = imageModifier.combinedClickable(onClick = onImageTap)
         )
+
         if (isSelected) {
             Box(
                 modifier = Modifier
@@ -167,6 +174,34 @@ private fun FaceGridItem(
                     .clip(CircleShape)
                     .background(Color(0x660D47A1))
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+private fun FaceActionsSheet(
+    onConfirm: () -> Unit,
+    onIgnore: () -> Unit,
+    onRemove: () -> Unit,
+    onRedetect: () -> Unit,
+    onAssign: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(bottom = 32.dp)) {
+            listOf(
+                stringResource(R.string.action_confirm) to onConfirm,
+                stringResource(R.string.action_ignore) to onIgnore,
+                stringResource(R.string.action_remove_from_person) to onRemove,
+                stringResource(R.string.action_redetect) to onRedetect,
+                stringResource(R.string.action_assign_to_person) to onAssign
+            ).forEach { (label, action) ->
+                ListItem(
+                    headlineContent = { Text(label) },
+                    modifier = Modifier.combinedClickable(onClick = { action(); onDismiss() })
+                )
+            }
         }
     }
 }
@@ -192,33 +227,6 @@ private fun MultiSelectActionBar(
             TextButton(onClick = onRemove) { Text(stringResource(R.string.action_remove_from_person)) }
             TextButton(onClick = onRedetect) { Text(stringResource(R.string.action_redetect)) }
             TextButton(onClick = onAssign) { Text(stringResource(R.string.action_assign_to_person)) }
-        }
-    }
-}
-
-@Composable
-private fun FaceActionsSheet(
-    onConfirm: () -> Unit,
-    onIgnore: () -> Unit,
-    onRemove: () -> Unit,
-    onRedetect: () -> Unit,
-    onAssign: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(bottom = 32.dp)) {
-            listOf(
-                stringResource(R.string.action_confirm) to onConfirm,
-                stringResource(R.string.action_ignore) to onIgnore,
-                stringResource(R.string.action_remove_from_person) to onRemove,
-                stringResource(R.string.action_redetect) to onRedetect,
-                stringResource(R.string.action_assign_to_person) to onAssign
-            ).forEach { (label, action) ->
-                ListItem(
-                    headlineContent = { Text(label) },
-                    modifier = Modifier.combinedClickable(onClick = { action(); onDismiss() })
-                )
-            }
         }
     }
 }

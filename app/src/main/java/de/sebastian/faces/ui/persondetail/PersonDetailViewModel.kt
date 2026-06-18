@@ -3,9 +3,8 @@ package de.sebastian.faces.ui.persondetail
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import de.sebastian.faces.data.db.DatabaseProvider
 import de.sebastian.faces.data.db.FaceRegionWithPhoto
-import de.sebastian.faces.data.db.FacesDatabase
-import de.sebastian.faces.data.db.PersonEntity
 import de.sebastian.faces.data.db.PersonWithCount
 import de.sebastian.faces.data.repository.FaceRepository
 import de.sebastian.faces.worker.SyncPipeline
@@ -27,7 +26,7 @@ data class PersonDetailUiState(
 
 class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val db = FacesDatabase.getInstance(app)
+    private val db = DatabaseProvider.getInstance(app)
     private val repo = FaceRepository(app, db)
     private val faceDao = db.faceRegionDao()
     private val personDao = db.personDao()
@@ -43,17 +42,21 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
             val person = personDao.findById(personId)
             _uiState.update { it.copy(personName = person?.name ?: "") }
 
-            faceDao.observeByPersonId(personId).collect { faces ->
+            faceDao.observeByPersonId(personId).collect { faces: List<FaceRegionWithPhoto> ->
                 _uiState.update {
                     it.copy(
-                        unconfirmedFaces = faces.filter { f -> f.faceRegion.name == null && !f.faceRegion.ignored },
-                        confirmedFaces = faces.filter { f -> f.faceRegion.name != null && !f.faceRegion.ignored }
+                        unconfirmedFaces = faces.filter { f ->
+                            f.faceRegion.name == null && !f.faceRegion.ignored
+                        },
+                        confirmedFaces = faces.filter { f ->
+                            f.faceRegion.name != null && !f.faceRegion.ignored
+                        }
                     )
                 }
             }
         }
         viewModelScope.launch {
-            repo.observePersonsWithCount().collect { persons ->
+            repo.observePersonsWithCount().collect { persons: List<PersonWithCount> ->
                 _uiState.update { it.copy(allPersons = persons) }
             }
         }
@@ -61,12 +64,11 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadUnknown() {
         viewModelScope.launch {
-            repo.observeUnknownFaces().collect { faces ->
+            repo.observeUnknownFaces().collect { faces: List<FaceRegionWithPhoto> ->
                 _uiState.update {
                     it.copy(
-                        personName = getApplication<Application>().getString(
-                            de.sebastian.faces.R.string.virtual_person_unknown
-                        ),
+                        personName = getApplication<Application>()
+                            .getString(de.sebastian.faces.R.string.virtual_person_unknown),
                         unconfirmedFaces = faces,
                         confirmedFaces = emptyList()
                     )
@@ -77,12 +79,11 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadIgnored() {
         viewModelScope.launch {
-            repo.observeIgnoredFaces().collect { faces ->
+            repo.observeIgnoredFaces().collect { faces: List<FaceRegionWithPhoto> ->
                 _uiState.update {
                     it.copy(
-                        personName = getApplication<Application>().getString(
-                            de.sebastian.faces.R.string.virtual_person_ignored
-                        ),
+                        personName = getApplication<Application>()
+                            .getString(de.sebastian.faces.R.string.virtual_person_ignored),
                         unconfirmedFaces = faces,
                         confirmedFaces = emptyList()
                     )
@@ -91,14 +92,11 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Selection
-    // -----------------------------------------------------------------------
-
     fun toggleFaceSelection(faceId: String) {
         _uiState.update { state ->
             val newSelected = state.selectedFaceIds.toMutableSet()
-            if (newSelected.contains(faceId)) newSelected.remove(faceId) else newSelected.add(faceId)
+            if (newSelected.contains(faceId)) newSelected.remove(faceId)
+            else newSelected.add(faceId)
             state.copy(
                 selectedFaceIds = newSelected,
                 isMultiSelectActive = newSelected.isNotEmpty()
@@ -110,10 +108,6 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
         _uiState.update { it.copy(selectedFaceIds = emptySet(), isMultiSelectActive = false) }
     }
 
-    // -----------------------------------------------------------------------
-    // Single face actions
-    // -----------------------------------------------------------------------
-
     fun showFaceActions(faceId: String) {
         _uiState.update { it.copy(actionFaceId = faceId) }
     }
@@ -124,9 +118,7 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun confirmFace(faceId: String) {
         val personId = currentPersonId ?: return
-        viewModelScope.launch {
-            repo.confirmFace(faceId, personId)
-        }
+        viewModelScope.launch { repo.confirmFace(faceId, personId) }
     }
 
     fun ignoreFace(faceId: String) {
@@ -144,10 +136,6 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
             SyncPipeline.enqueueReSyncPhoto(getApplication(), face.photoId)
         }
     }
-
-    // -----------------------------------------------------------------------
-    // Multi-select actions
-    // -----------------------------------------------------------------------
 
     fun confirmSelected() {
         val personId = currentPersonId ?: return
@@ -186,10 +174,6 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Assign sheet
-    // -----------------------------------------------------------------------
-
     fun showAssignSheet(faceId: String? = null) {
         val targets = faceId?.let { setOf(it) } ?: _uiState.value.selectedFaceIds
         _uiState.update { it.copy(showAssignSheet = true, assignTargetFaceIds = targets) }
@@ -197,10 +181,6 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissAssignSheet() {
         _uiState.update { it.copy(showAssignSheet = false, assignTargetFaceIds = emptySet()) }
-    }
-
-    fun updatePersonSearch(query: String) {
-        _uiState.update { it.copy(personSearchQuery = query) }
     }
 
     fun filteredPersons(): List<PersonWithCount> {

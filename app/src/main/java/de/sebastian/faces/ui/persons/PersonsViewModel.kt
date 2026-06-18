@@ -3,7 +3,7 @@ package de.sebastian.faces.ui.persons
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import de.sebastian.faces.data.db.FacesDatabase
+import de.sebastian.faces.data.db.DatabaseProvider
 import de.sebastian.faces.data.db.PersonWithCount
 import de.sebastian.faces.data.repository.FaceRepository
 import kotlinx.coroutines.flow.*
@@ -28,7 +28,7 @@ data class PersonsUiState(
 
 class PersonsViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val db = FacesDatabase.getInstance(app)
+    private val db = DatabaseProvider.getInstance(app)
     private val repo = FaceRepository(app, db)
     private val faceDao = db.faceRegionDao()
     private val personDao = db.personDao()
@@ -38,13 +38,14 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            repo.observePersonsWithCount().collect { allPersons ->
-                val confirmed = allPersons.filter { it.confirmedCount > 0 || it.person.representativeFaceId != null }
-                // Suggestions: persons where no face has a confirmed name
+            repo.observePersonsWithCount().collect { allPersons: List<PersonWithCount> ->
+                val confirmed = allPersons.filter { pwc ->
+                    pwc.confirmedCount > 0 || pwc.person.representativeFaceId != null
+                }
                 val suggestions = allPersons
                     .filter { pwc ->
                         val faces = faceDao.findByPersonId(pwc.person.id)
-                        faces.isNotEmpty() && faces.all { it.name == null && !it.ignored }
+                        faces.isNotEmpty() && faces.all { f -> f.name == null && !f.ignored }
                     }
                     .map { pwc ->
                         PersonSuggestionUi(
@@ -125,7 +126,6 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
             val targetPersonId = existing?.id ?: personId
 
             if (existing != null && existing.id != personId) {
-                // Merge suggestion person into existing person
                 repo.mergePersons(listOf(personId, existing.id), existing.id)
             }
             faces.forEach { face ->

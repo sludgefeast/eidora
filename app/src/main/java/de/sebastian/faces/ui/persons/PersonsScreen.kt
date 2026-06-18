@@ -27,7 +27,7 @@ import de.sebastian.faces.data.db.PersonWithCount
 import de.sebastian.faces.util.ThumbnailHelper
 import androidx.compose.ui.platform.LocalContext
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PersonsScreen(
     viewModel: PersonsViewModel,
