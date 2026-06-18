@@ -91,6 +91,9 @@ dependencies {
     // Coroutines + Play Services (for ML Kit await())
     implementation(libs.kotlinx.coroutines.play.services)
 
+    // AppCompat (required for Theme.AppCompat)
+    implementation(libs.androidx.appcompat)
+
     // Core KTX
     implementation(libs.androidx.core.ktx)
 }

@@ -19,7 +19,12 @@ kotlinx-serialization = "1.7.3"
 kotlinx-coroutines = "1.9.0"
 core-ktx = "1.15.0"
 
+appcompat = "1.7.0"
+
 [libraries]
+# AppCompat
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+
 # Compose
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }
