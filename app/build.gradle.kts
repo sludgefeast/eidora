@@ -79,8 +79,8 @@ dependencies {
     // ExifInterface for XMP
     implementation(libs.androidx.exifinterface)
 
-    // Adobe XMP Core
-    implementation(libs.xmpcore)
+    // Ashampoo XMP (Kotlin-native XMP Core port)
+    implementation(libs.ashampoo.xmp)
 
     // Coil for image loading
     implementation(libs.coil.compose)

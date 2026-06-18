@@ -198,6 +198,7 @@ private fun PersonGridItem(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun VirtualPersonItem(
     label: String,
@@ -233,6 +234,7 @@ private fun VirtualPersonItem(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SuggestionRow(
     suggestion: PersonSuggestionUi,

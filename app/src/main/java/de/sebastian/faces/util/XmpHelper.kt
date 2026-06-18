@@ -2,10 +2,10 @@ package de.sebastian.faces.util
 
 import android.util.Log
 import androidx.exifinterface.media.ExifInterface
-import com.adobe.xmp.XMPMeta
-import com.adobe.xmp.XMPMetaFactory
-import com.adobe.xmp.options.PropertyOptions
-import com.adobe.xmp.options.SerializeOptions
+import com.ashampoo.xmp.XMPMeta
+import com.ashampoo.xmp.XMPMetaFactory
+import com.ashampoo.xmp.options.PropertyOptions
+import com.ashampoo.xmp.options.SerializeOptions
 import de.sebastian.faces.domain.model.FaceRegionCoords
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -25,9 +25,9 @@ data class XmpFaceRegion(
 object XmpHelper {
 
     init {
-        XMPMetaFactory.getSchemaRegistry().registerNamespace(NS_MWG_RS, "mwg-rs")
-        XMPMetaFactory.getSchemaRegistry().registerNamespace(NS_IPTC_EXT, "Iptc4xmpExt")
-        XMPMetaFactory.getSchemaRegistry().registerNamespace(NS_DC, "dc")
+        XMPMetaFactory.schemaRegistry.registerNamespace(NS_MWG_RS, "mwg-rs")
+        XMPMetaFactory.schemaRegistry.registerNamespace(NS_IPTC_EXT, "Iptc4xmpExt")
+        XMPMetaFactory.schemaRegistry.registerNamespace(NS_DC, "dc")
     }
 
     fun readFaceRegions(file: File): List<XmpFaceRegion> {
@@ -56,7 +56,7 @@ object XmpHelper {
 
                 regions.add(
                     XmpFaceRegion(
-                        name = name?.takeIf { it.isNotBlank() },
+                        name = name?.takeIf { n -> n.isNotBlank() },
                         coords = FaceRegionCoords(x, y, w, h)
                     )
                 )
@@ -80,23 +80,29 @@ object XmpHelper {
             xmp.deleteProperty(NS_MWG_RS, "mwg-rs:Regions")
 
             if (regions.isNotEmpty()) {
-                val structOpts = PropertyOptions().setStruct(true)
-                val arrayOpts = PropertyOptions().setArray(true).setArrayOrdered(true)
+                val structOpts = PropertyOptions().apply { isStruct = true }
+                val arrayOpts = PropertyOptions().apply {
+                    isArray = true
+                    isArrayOrdered = true
+                }
 
                 xmp.setProperty(NS_MWG_RS, "mwg-rs:Regions", null, structOpts)
                 xmp.setProperty(NS_MWG_RS, "mwg-rs:Regions/mwg-rs:RegionList", null, arrayOpts)
 
                 regions.forEachIndexed { index, region ->
-                    val prefix = "mwg-rs:Regions/mwg-rs:RegionList[${index + 1}]/mwg-rs:RegionExtensions"
-                    xmp.setProperty(NS_MWG_RS, "mwg-rs:Regions/mwg-rs:RegionList[${index + 1}]", null, structOpts)
-                    xmp.setProperty(NS_MWG_RS, "$prefix/mwg-rs:Type", "Face", null)
-                    region.name?.let { xmp.setProperty(NS_MWG_RS, "$prefix/mwg-rs:Name", it, null) }
-                    xmp.setProperty(NS_MWG_RS, "$prefix/mwg-rs:Area", null, structOpts)
-                    xmp.setProperty(NS_MWG_RS, "$prefix/mwg-rs:Area/stArea:x", region.coords.x.toString(), null)
-                    xmp.setProperty(NS_MWG_RS, "$prefix/mwg-rs:Area/stArea:y", region.coords.y.toString(), null)
-                    xmp.setProperty(NS_MWG_RS, "$prefix/mwg-rs:Area/stArea:w", region.coords.w.toString(), null)
-                    xmp.setProperty(NS_MWG_RS, "$prefix/mwg-rs:Area/stArea:h", region.coords.h.toString(), null)
-                    xmp.setProperty(NS_MWG_RS, "$prefix/mwg-rs:Area/stArea:unit", "normalized", null)
+                    val item = "mwg-rs:Regions/mwg-rs:RegionList[${index + 1}]"
+                    val ext = "$item/mwg-rs:RegionExtensions"
+                    xmp.setProperty(NS_MWG_RS, item, null, structOpts)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Type", "Face", null)
+                    region.name?.let { n ->
+                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Name", n, null)
+                    }
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area", null, structOpts)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:x", region.coords.x.toString(), null)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:y", region.coords.y.toString(), null)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:w", region.coords.w.toString(), null)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:h", region.coords.h.toString(), null)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:unit", "normalized", null)
                 }
             }
 
@@ -128,7 +134,10 @@ object XmpHelper {
     }
 
     private fun writePersonTags(xmp: XMPMeta, names: List<String>) {
-        val bagOpts = PropertyOptions().setArray(true).setArrayUnordered(true)
+        val bagOpts = PropertyOptions().apply {
+            isArray = true
+            isArrayUnordered = true
+        }
 
         xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
         names.forEach { name ->

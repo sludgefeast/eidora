@@ -10,7 +10,7 @@ import androidx.room.RoomDatabase
         FaceRegionEntity::class
     ],
     version = 1,
-    exportSchema = true
+    exportSchema = false
 )
 abstract class FacesDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
