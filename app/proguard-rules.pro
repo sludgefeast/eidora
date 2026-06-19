@@ -1,6 +1,12 @@
 # TFLite
 -keep class org.tensorflow.lite.** { *; }
 -keep class org.tensorflow.lite.gpu.** { *; }
+-keep class org.tensorflow.lite.gpu.GpuDelegate { *; }
+-keep class org.tensorflow.lite.gpu.GpuDelegate$Options { *; }
+-keep class org.tensorflow.lite.gpu.GpuDelegateFactory { *; }
+-keep class org.tensorflow.lite.gpu.GpuDelegateFactory$Options { *; }
+-keep class org.tensorflow.lite.gpu.GpuDelegateFactory$Options$GpuBackend { *; }
+-dontwarn org.tensorflow.lite.gpu.**
 -keepclassmembers class * {
     @org.tensorflow.lite.annotations.UsedByReflection *;
 }
