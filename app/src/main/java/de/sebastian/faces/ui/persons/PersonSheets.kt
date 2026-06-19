@@ -101,7 +101,7 @@ fun MergePersonsSheet(
                                     .clip(CircleShape)
                             )
                         },
-                        headlineContent = { Text(personWithCount.person.name) },
+                        headlineContent = { Text(personWithCount.person.name ?: "") },
                         supportingContent = { Text("${personWithCount.confirmedCount} confirmed") },
                         modifier = Modifier.combinedClickable(onClick = {
                             onConfirm(personWithCount.person.id)

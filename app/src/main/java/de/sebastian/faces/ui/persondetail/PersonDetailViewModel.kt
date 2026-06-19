@@ -186,7 +186,7 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
     fun filteredPersons(): List<PersonWithCount> {
         val q = _uiState.value.personSearchQuery.trim().lowercase()
         return if (q.isEmpty()) _uiState.value.allPersons
-        else _uiState.value.allPersons.filter { it.person.name.lowercase().contains(q) }
+        else _uiState.value.allPersons.filter { it.person.name?.lowercase()?.contains(q) == true }
     }
 
     fun assignToExistingPerson(personId: String) {

@@ -186,7 +186,7 @@ private fun PersonGridItem(
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = personWithCount.person.name,
+            text = personWithCount.person.name ?: "",
             style = MaterialTheme.typography.labelMedium,
             textAlign = TextAlign.Center,
             maxLines = 2,

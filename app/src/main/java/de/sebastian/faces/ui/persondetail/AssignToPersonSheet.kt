@@ -35,11 +35,11 @@ fun AssignToPersonSheet(
     val filtered = remember(query, state.allPersons) {
         val q = query.trim().lowercase()
         if (q.isEmpty()) state.allPersons
-        else state.allPersons.filter { it.person.name.lowercase().contains(q) }
+        else state.allPersons.filter { it.person.name?.lowercase()?.contains(q) == true }
     }
 
     val showCreate = query.isNotBlank() && filtered.none {
-        it.person.name.equals(query.trim(), ignoreCase = true)
+        it.person.name?.equals(query.trim(), ignoreCase = true) == true
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -112,7 +112,7 @@ private fun PersonListItem(
                     .clip(CircleShape)
             )
         },
-        headlineContent = { Text(personWithCount.person.name) },
+        headlineContent = { Text(personWithCount.person.name ?: "") },
         supportingContent = { Text("${personWithCount.confirmedCount} confirmed") },
         modifier = Modifier.combinedClickable(onClick = onClick)
     )
