@@ -23,7 +23,8 @@ class FaceRepository(
     suspend fun confirmFace(faceRegionId: String, personId: String) {
         val face = faceDao.findById(faceRegionId) ?: return
         val person = personDao.findById(personId) ?: return
-        faceDao.updatePersonAndName(faceRegionId, personId, person.name)
+        val personName = person.name ?: return // can't confirm to unnamed suggestion person
+        faceDao.updatePersonAndName(faceRegionId, personId, personName)
         rewriteXmpForPhoto(face.photoId)
         recomputeCentroid(personId)
     }
@@ -36,7 +37,10 @@ class FaceRepository(
         val face = faceDao.findById(faceRegionId) ?: return
         val previousPersonId = face.personId
         faceDao.setIgnored(faceRegionId)
-        previousPersonId?.let { recomputeCentroid(it) }
+        previousPersonId?.let {
+            recomputeCentroid(it)
+            deletePersonIfOrphaned(it)
+        }
     }
 
     suspend fun unignoreFace(faceRegionId: String) {
@@ -66,11 +70,14 @@ class FaceRepository(
         val face = faceDao.findById(faceRegionId) ?: return
         val previousPersonId = face.personId
         val person = personDao.findById(personId) ?: return
-        faceDao.updatePersonAndName(faceRegionId, personId, person.name)
+        val personName = person.name ?: return
+        faceDao.updatePersonAndName(faceRegionId, personId, personName)
         rewriteXmpForPhoto(face.photoId)
-        previousPersonId?.let { recomputeCentroid(it) }
+        previousPersonId?.let {
+            recomputeCentroid(it)
+            deletePersonIfOrphaned(it)
+        }
         recomputeCentroid(personId)
-        previousPersonId?.let { deletePersonIfOrphaned(it) }
     }
 
     suspend fun assignFaceToNewPerson(faceRegionId: String, name: String): PersonEntity {
@@ -89,7 +96,6 @@ class FaceRepository(
     suspend fun renamePerson(personId: String, newName: String) {
         personDao.updateName(personId, newName)
         faceDao.updateConfirmedNamesForPerson(personId, newName)
-        // Rewrite XMP for all photos of this person
         val faces = faceDao.findByPersonId(personId).filter { it.name != null }
         val photoIds = faces.map { it.photoId }.distinct()
         photoIds.forEach { rewriteXmpForPhoto(it) }
@@ -101,15 +107,13 @@ class FaceRepository(
 
     suspend fun mergePersons(sourceIds: List<String>, winnerId: String) {
         val winner = personDao.findById(winnerId) ?: return
+        val winnerName = winner.name ?: return
         sourceIds.filter { it != winnerId }.forEach { sourceId ->
-            // Reassign all faces
             faceDao.reassignPerson(sourceId, winnerId)
-            // Update confirmed names
-            faceDao.updateConfirmedNamesForPerson(winnerId, winner.name)
             personDao.deleteById(sourceId)
         }
+        faceDao.updateConfirmedNamesForPerson(winnerId, winnerName)
         recomputeCentroid(winnerId)
-        // Rewrite XMP for all affected photos
         val faces = faceDao.findByPersonId(winnerId)
         val photoIds = faces.map { it.photoId }.distinct()
         photoIds.forEach { rewriteXmpForPhoto(it) }
@@ -122,13 +126,9 @@ class FaceRepository(
     suspend fun resetPhotoFaces(photoId: String) {
         val photo = photoDao.findById(photoId) ?: return
         val file = File(photo.path)
-
-        // Delete all face regions and thumbnails
         val faces = faceDao.findByPhotoId(photoId)
         faces.forEach { ThumbnailHelper.deleteThumbnail(context, it.id) }
         faceDao.deleteByPhotoId(photoId)
-
-        // Clear XMP face data
         XmpHelper.clearFaceData(file)
         photoDao.updateModifiedAt(photoId, file.lastModified())
         photoDao.updateAnalyzed(photoId, false)
@@ -158,7 +158,6 @@ class FaceRepository(
         val photo = photoDao.findById(photoId) ?: return
         val file = File(photo.path)
         if (!file.exists()) return
-
         val faces = faceDao.findByPhotoId(photoId)
         val xmpRegions = faces.map { face ->
             XmpFaceRegion(
@@ -170,8 +169,9 @@ class FaceRepository(
         photoDao.updateModifiedAt(photoId, file.lastModified())
     }
 
-    private suspend fun recomputeCentroid(personId: String) {
-        val allFaces = faceDao.findByPersonId(personId).filter { !it.ignored && it.embedding != null }
+    suspend fun recomputeCentroid(personId: String) {
+        val allFaces = faceDao.findByPersonId(personId)
+            .filter { !it.ignored && it.embedding != null }
         if (allFaces.isEmpty()) {
             personDao.updateRepresentativeFace(personId, null)
             return
@@ -181,15 +181,16 @@ class FaceRepository(
         val embeddings = basisFaces.map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
         val centroid = FaceNetModel.centroid(embeddings)
         val representative = basisFaces.minByOrNull { face ->
-            FaceNetModel.cosineDistance(FaceNetModel.bytesToFloatArray(face.embedding!!), centroid)
+            FaceNetModel.cosineDistance(
+                FaceNetModel.bytesToFloatArray(face.embedding!!),
+                centroid
+            )
         }
         personDao.updateRepresentativeFace(personId, representative?.id)
     }
 
     private suspend fun deletePersonIfOrphaned(personId: String) {
         val remaining = faceDao.findByPersonId(personId)
-        if (remaining.isEmpty()) {
-            personDao.deleteById(personId)
-        }
+        if (remaining.isEmpty()) personDao.deleteById(personId)
     }
 }

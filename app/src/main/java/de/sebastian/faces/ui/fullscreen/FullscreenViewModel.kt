@@ -24,11 +24,17 @@ class FullscreenViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow(FullscreenUiState())
     val uiState: StateFlow<FullscreenUiState> = _uiState.asStateFlow()
 
+    // Fix 5: reactive Flow so UI updates after re-detect
     fun load(photoId: String) {
         viewModelScope.launch {
             val photo = photoDao.findById(photoId) ?: return@launch
-            val faces: List<FaceRegionEntity> = faceDao.findByPhotoId(photoId)
-            _uiState.update { it.copy(photoPath = photo.path, faceRegions = faces) }
+            _uiState.update { it.copy(photoPath = photo.path) }
+
+            // observeByPersonId watches all faces for this photo reactively
+            // We use a custom flow that watches all face regions for a photo
+            faceDao.observeByPhotoId(photoId).collect { faces: List<FaceRegionEntity> ->
+                _uiState.update { it.copy(faceRegions = faces) }
+            }
         }
     }
 

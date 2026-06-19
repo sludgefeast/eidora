@@ -37,27 +37,42 @@ class PhotoSyncWorker(
     }
 
     override suspend fun doWork(): Result {
+        // Fix 1: check for single-photo re-sync
+        val singlePhotoId = inputData.getString(KEY_PHOTO_ID)
+        return if (singlePhotoId != null) {
+            doSinglePhotoSync(singlePhotoId)
+        } else {
+            doFullSync()
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Full sync
+    // -----------------------------------------------------------------------
+
+    private suspend fun doFullSync(): Result {
         return try {
-            val dcim = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)
-            val jpegFiles = collectJpegs(dcim)
+            // Fix 2: only DCIM/Camera
+            val cameraDir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
+                "Camera"
+            )
+            val jpegFiles = collectJpegs(cameraDir)
 
             setProgress(workDataOf(KEY_STATUS to "Scanning files…"))
 
             val dbPaths = photoDao.getAllPaths().toSet()
             val fsPaths = jpegFiles.map { it.absolutePath }.toSet()
 
-            // 1. Delete photos whose files are gone
             val deleted = dbPaths - fsPaths
             deleted.forEach { path -> deletePhoto(path) }
 
-            // 2. Process each file on disk
             jpegFiles.forEachIndexed { index, file ->
                 val progress = ((index + 1) * 100) / jpegFiles.size
                 setProgress(workDataOf(KEY_PROGRESS to progress, KEY_STATUS to file.name))
                 processFile(file)
             }
 
-            // 3. Cleanup orphaned persons
             personDao.deleteOrphaned()
 
             setProgress(workDataOf(KEY_PROGRESS to 100, KEY_STATUS to "Done"))
@@ -68,6 +83,37 @@ class PhotoSyncWorker(
             detector.close()
         }
     }
+
+    // -----------------------------------------------------------------------
+    // Single photo re-sync (Fix 1)
+    // -----------------------------------------------------------------------
+
+    private suspend fun doSinglePhotoSync(photoId: String): Result {
+        return try {
+            val photo = photoDao.findById(photoId) ?: return Result.success()
+            val file = File(photo.path)
+            if (!file.exists()) {
+                // File gone – clean up
+                deleteFaceRegionsForPhoto(photoId)
+                photoDao.deleteById(photoId)
+                personDao.deleteOrphaned()
+                return Result.success()
+            }
+            // Reset was already done by FaceRepository.resetPhotoFaces before enqueue
+            // Just run import + analyze on the now-clean photo record
+            importXmpAndAnalyze(file, photoId)
+            personDao.deleteOrphaned()
+            Result.success()
+        } catch (e: Exception) {
+            Result.retry()
+        } finally {
+            detector.close()
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Shared helpers
+    // -----------------------------------------------------------------------
 
     private fun collectJpegs(root: File): List<File> {
         if (!root.exists()) return emptyList()
@@ -140,7 +186,9 @@ class PhotoSyncWorker(
         val faces = detector.process(inputImage).await()
 
         if (faces.isNotEmpty()) {
-            val bitmapOptions = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            val bitmapOptions = android.graphics.BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
             android.graphics.BitmapFactory.decodeFile(file.absolutePath, bitmapOptions)
             val imgW = bitmapOptions.outWidth.toFloat()
             val imgH = bitmapOptions.outHeight.toFloat()
@@ -205,9 +253,7 @@ class PhotoSyncWorker(
 
     private suspend fun deleteFaceRegionsForPhoto(photoId: String) {
         val faces = faceDao.findByPhotoId(photoId)
-        faces.forEach { face ->
-            ThumbnailHelper.deleteThumbnail(applicationContext, face.id)
-        }
+        faces.forEach { ThumbnailHelper.deleteThumbnail(applicationContext, it.id) }
         faceDao.deleteByPhotoId(photoId)
     }
 

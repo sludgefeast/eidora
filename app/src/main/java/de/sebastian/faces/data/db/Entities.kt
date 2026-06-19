@@ -20,7 +20,7 @@ data class PhotoEntity(
 )
 data class PersonEntity(
     @PrimaryKey val id: String,
-    val name: String,
+    val name: String?,  // null = clustering suggestion, not yet named by user
     val representativeFaceId: String? = null
 )
 

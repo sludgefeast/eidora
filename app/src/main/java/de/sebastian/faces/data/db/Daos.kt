@@ -13,6 +13,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE path = :path")
     suspend fun findByPath(path: String): PhotoEntity?
 
+    @Query("SELECT * FROM photos WHERE id = :id")
+    suspend fun findById(id: String): PhotoEntity?
+
     @Query("SELECT path FROM photos")
     suspend fun getAllPaths(): List<String>
 
@@ -34,9 +37,6 @@ interface PhotoDao {
     @Query("DELETE FROM photos WHERE id = :id")
     suspend fun deleteById(id: String)
 
-    @Query("SELECT * FROM photos WHERE id = :id")
-    suspend fun findById(id: String): PhotoEntity?
-
     @Query("SELECT * FROM photos")
     fun observeAll(): Flow<List<PhotoEntity>>
 }
@@ -51,23 +51,27 @@ interface PersonDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(person: PersonEntity): Long
 
+    // For inserting suggestion persons with null name (bypasses unique index on name)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWithNullableName(person: PersonEntity)
+
     @Query("SELECT * FROM persons WHERE name = :name LIMIT 1")
     suspend fun findByName(name: String): PersonEntity?
 
     @Query("SELECT * FROM persons WHERE id = :id")
     suspend fun findById(id: String): PersonEntity?
 
-    @Query("SELECT * FROM persons")
+    @Query("SELECT * FROM persons WHERE name IS NOT NULL")
     suspend fun getAll(): List<PersonEntity>
 
-    @Query("SELECT * FROM persons")
+    @Query("SELECT * FROM persons WHERE name IS NOT NULL")
     fun observeAll(): Flow<List<PersonEntity>>
 
     @Update
     suspend fun update(person: PersonEntity)
 
-    @Query("UPDATE persons SET representativeFaceId = :faceId WHERE id = :personId")
-    suspend fun updateRepresentativeFace(personId: String, faceId: String?)
+    @Query("UPDATE persons SET representativeFaceId = :faceId WHERE id = :id")
+    suspend fun updateRepresentativeFace(id: String, faceId: String?)
 
     @Query("UPDATE persons SET name = :name WHERE id = :id")
     suspend fun updateName(id: String, name: String)
@@ -75,7 +79,6 @@ interface PersonDao {
     @Query("DELETE FROM persons WHERE id = :id")
     suspend fun deleteById(id: String)
 
-    // Delete persons that have no face regions assigned (confirmed or unconfirmed)
     @Query("""
         DELETE FROM persons 
         WHERE id NOT IN (
@@ -84,15 +87,26 @@ interface PersonDao {
     """)
     suspend fun deleteOrphaned()
 
-    // Count confirmed faces per person for sorting
     @Query("""
-        SELECT p.*, COUNT(f.id) as confirmedCount
+        SELECT p.*, COUNT(CASE WHEN f.name IS NOT NULL AND f.ignored = 0 THEN 1 END) as confirmedCount
         FROM persons p
-        LEFT JOIN face_regions f ON f.personId = p.id AND f.name IS NOT NULL AND f.ignored = 0
+        LEFT JOIN face_regions f ON f.personId = p.id
+        WHERE p.name IS NOT NULL
         GROUP BY p.id
         ORDER BY confirmedCount DESC, p.name ASC
     """)
     fun observeAllWithConfirmedCount(): Flow<List<PersonWithCount>>
+
+    // Suggestion persons: have personId set on faces but no name yet
+    @Query("""
+        SELECT p.*
+        FROM persons p
+        WHERE p.name IS NULL
+        AND EXISTS (
+            SELECT 1 FROM face_regions f WHERE f.personId = p.id
+        )
+    """)
+    fun observeSuggestions(): Flow<List<PersonEntity>>
 
     @Query("""
         SELECT MAX(ph.takenAt) 
@@ -168,7 +182,6 @@ interface FaceRegionDao {
     """)
     fun observeByPersonId(personId: String): Flow<List<FaceRegionWithPhoto>>
 
-    // All unconfirmed (personId IS NULL, ignored = false) across all photos
     @Query("""
         SELECT f.*, ph.takenAt as photoTakenAt
         FROM face_regions f
@@ -178,7 +191,6 @@ interface FaceRegionDao {
     """)
     fun observeUnknown(): Flow<List<FaceRegionWithPhoto>>
 
-    // All ignored
     @Query("""
         SELECT f.*, ph.takenAt as photoTakenAt
         FROM face_regions f
@@ -193,6 +205,16 @@ interface FaceRegionDao {
 
     @Query("UPDATE face_regions SET personId = :targetPersonId WHERE personId = :sourcePersonId")
     suspend fun reassignPerson(sourcePersonId: String, targetPersonId: String)
+
+    @Query("SELECT COUNT(*) FROM face_regions WHERE personId IS NULL AND ignored = 0")
+    fun observeUnknownCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM face_regions WHERE ignored = 1")
+    fun observeIgnoredCount(): Flow<Int>
+
+    // Fix 5: reactive flow of all face regions for a single photo
+    @Query("SELECT * FROM face_regions WHERE photoId = :photoId")
+    fun observeByPhotoId(photoId: String): Flow<List<FaceRegionEntity>>
 }
 
 data class FaceRegionWithPhoto(

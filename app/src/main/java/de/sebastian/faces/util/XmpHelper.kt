@@ -41,10 +41,12 @@ object XmpHelper {
             val xmp: XMPMeta = XMPMetaFactory.parseFromString(xmpString)
 
             val regions = mutableListOf<XmpFaceRegion>()
-            val count = xmp.countArrayItems(NS_MWG_RS, "mwg-rs:RegionList")
+
+            // Fix 4: correct MWG path includes mwg-rs:Regions/ prefix
+            val count = xmp.countArrayItems(NS_MWG_RS, "mwg-rs:Regions/mwg-rs:RegionList")
 
             for (i in 1..count) {
-                val base = "mwg-rs:RegionList[$i]/mwg-rs:RegionExtensions"
+                val base = "mwg-rs:Regions/mwg-rs:RegionList[$i]/mwg-rs:RegionExtensions"
                 val type = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Type") ?: continue
                 if (type.lowercase() != "face") continue
 
@@ -168,8 +170,7 @@ object XmpHelper {
         val count = xmp.countArrayItems(NS_DC, "dc:subject")
         val toRemove = mutableListOf<Int>()
         for (i in 1..count) {
-            val item = xmp.getArrayItem(NS_DC, "dc:subject", i)
-            val value = item?.getValue() ?: continue
+            val value = xmp.getArrayItem(NS_DC, "dc:subject", i)?.getValue() ?: continue
             if (value.startsWith("People/")) toRemove.add(i)
         }
         toRemove.reversed().forEach { index ->

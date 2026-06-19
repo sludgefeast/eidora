@@ -59,12 +59,13 @@ class ClusteringWorker(
                     }
                 }
 
+                // Fix 3: new persons get NO name – they are pure suggestions (name = null)
                 val targetPerson: PersonEntity = bestPerson ?: run {
                     val newPerson = PersonEntity(
                         id = UUID.randomUUID().toString(),
-                        name = "Person_${UUID.randomUUID().toString().take(4)}"
+                        name = null  // will be set by user when confirming
                     )
-                    personDao.insert(newPerson)
+                    personDao.insertWithNullableName(newPerson)
                     newPerson
                 }
 

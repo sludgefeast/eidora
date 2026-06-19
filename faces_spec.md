@@ -57,7 +57,7 @@ Beim Build aus diesem SVG die komplette Android Icon-Familie erzeugen:
 | Feld | Typ | Beschreibung |
 |---|---|---|
 | id | UUID | Primärschlüssel |
-| name | String | Eindeutig |
+| name | String? | Eindeutig, nullable – null = Clustering-Vorschlag noch ohne Namen |
 | representativeFaceId | UUID? | FK → FaceRegion, nullable |
 
 ### FaceRegion
@@ -71,15 +71,9 @@ Beim Build aus diesem SVG die komplette Android Icon-Familie erzeugen:
 | embedding | BLOB? | FaceNet512 512-dim FloatArray, nullable |
 | ignored | Boolean | true = aus Clustering ausgeschlossen |
 
-### Zustände einer FaceRegion
-| personId | name | ignored | Bedeutung |
-|---|---|---|---|
-| null | null | false | Unbekannt, nicht geclustert |
-| gesetzt | null | false | Clustering-Vorschlag, unbestätigt |
-| gesetzt | gesetzt | false | Bestätigt |
-| null | null | true | Ignoriert |
-
 **Regel:** Eine ignorierte FaceRegion hat immer `personId = null` und `name = null`.
+
+**Vorschlag-Person:** Eine `Person` mit `name = null` ist eine reine Clustering-Gruppe ohne Nutzernamen. Sie erscheint in der Vorschlagsliste. Erst wenn der Nutzer einen Namen bestätigt, wird `Person.name` gesetzt und alle zugehörigen FaceRegions erhalten ebenfalls den Namen.
 
 ---
 
@@ -95,7 +89,7 @@ Drei verkettete WorkManager-WorkRequests, gestartet beim App-Start.
 
 ### Schritt 1 – Foto-Sync
 
-Abgleich Dateisystem ↔ DB für alle JPEG-Dateien im DCIM-Ordner.
+Abgleich Dateisystem ↔ DB für alle JPEG-Dateien in `DCIM/Camera` (nicht der gesamte DCIM-Ordner).
 
 | Fall | Aktion |
 |---|---|
@@ -106,7 +100,7 @@ Abgleich Dateisystem ↔ DB für alle JPEG-Dateien im DCIM-Ordner.
 | Nach jedem Durchlauf | verwaiste Persons löschen |
 
 **XMP einlesen (pro neuem/geändertem Foto):**
-- `mwg-rs:Regions` Typ `Face` → FaceRegion anlegen (name aus RegionName, nullable)
+- `mwg-rs:Regions/mwg-rs:RegionList` Typ `Face` → FaceRegion anlegen (name aus RegionName, nullable)
 - Pro benannter FaceRegion: Person suchen oder anlegen (by name)
 - `PersonInImage` + `People/`-Subjects neu berechnen und schreiben
 
@@ -140,8 +134,9 @@ Abgleich Dateisystem ↔ DB für alle JPEG-Dateien im DCIM-Ordner.
 ### Schritt 3 – Clustering (Chinese Whispers)
 
 - Clustert nur FaceRegions wo `personId IS NULL` und `ignored = false`
-- Ordnet ähnliche Gesichter bestehenden Persons zu oder schlägt neue Persons vor
-- Ergebnis: `FaceRegion.personId` gesetzt, `name` bleibt `null` (= Vorschlag)
+- Ordnet ähnliche Gesichter bestehenden benannten Persons zu oder legt neue Vorschlag-Persons an
+- Neue Vorschlag-Person: `Person.name = null` – erscheint in der Vorschlagsliste, nicht im Grid
+- Ergebnis: `FaceRegion.personId` gesetzt, `FaceRegion.name` bleibt `null` (= Vorschlag)
 - Centroid pro Person berechnen:
   - Bestätigte Gesichter vorhanden (`name IS NOT NULL`, `ignored = false`) → Centroid aus diesen
   - Keine bestätigten Gesichter → Centroid aus allen unbestätigten Gesichtern (`name IS NULL`, `ignored = false`)
@@ -191,6 +186,13 @@ Rein zur Laufzeit aus DB zusammengesucht, kein eigener DB-Eintrag.
 
 - Nicht löschbar, nicht umbenennbar
 - Erscheinen am Ende des Personen-Grids
+
+---
+
+## Bibliotheken
+
+### XMP-Metadaten
+`com.ashampoo:xmpcore-jvm` – Kotlin-nativer Port der Adobe XMP Core Java Bibliothek. Schreibt und liest XMP-Metadaten in JPEG-Dateien über `ExifInterface`. Vollständiger XMP-Pfad für MWG-Regionen: `mwg-rs:Regions/mwg-rs:RegionList[n]/mwg-rs:RegionExtensions`.
 
 ---
 
@@ -319,11 +321,7 @@ Tap auf Thumbnail → Foto-Vollbild
 2. `mwg-rs`-Regionen aus XMP entfernen
 3. `PersonInImage` + `People/`-Subjects aus XMP entfernen
 4. `analyzed = false` setzen
-5. ML Kit sofort ausführen
-6. Neue FaceRegions anlegen, Thumbnails erstellen
-7. Embeddings berechnen
-8. Clustering durchführen
-9. XMP neu schreiben
-10. `Photo.modifiedAt` aktualisieren
+5. WorkManager-Pipeline für dieses einzelne Foto starten (PhotoSync → Embedding → Clustering)
+6. Fortschritt in der Statusleiste
 
-Alles läuft im Hintergrund (WorkManager), Fortschritt in der Statusleiste.
+Der WorkManager-Job erkennt anhand von `KEY_PHOTO_ID` im InputData, dass nur ein einzelnes Foto verarbeitet werden soll, und überspringt den vollen DCIM/Camera-Scan.
