@@ -30,6 +30,10 @@ object XmpHelper {
         XMPMetaFactory.schemaRegistry.registerNamespace(NS_DC, "dc")
     }
 
+    // -----------------------------------------------------------------------
+    // Read
+    // -----------------------------------------------------------------------
+
     fun readFaceRegions(file: File): List<XmpFaceRegion> {
         return try {
             val exif = ExifInterface(file.absolutePath)
@@ -68,6 +72,10 @@ object XmpHelper {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Write
+    // -----------------------------------------------------------------------
+
     fun writeFaceRegions(file: File, regions: List<XmpFaceRegion>) {
         try {
             val exif = ExifInterface(file.absolutePath)
@@ -80,11 +88,9 @@ object XmpHelper {
             xmp.deleteProperty(NS_MWG_RS, "mwg-rs:Regions")
 
             if (regions.isNotEmpty()) {
-                val structOpts = PropertyOptions().apply { isStruct = true }
-                val arrayOpts = PropertyOptions().apply {
-                    isArray = true
-                    isArrayOrdered = true
-                }
+                val structOpts = PropertyOptions().setStruct(true)
+                val arrayOpts = PropertyOptions().setArray(true).setArrayOrdered(true)
+                val emptyOpts = PropertyOptions()
 
                 xmp.setProperty(NS_MWG_RS, "mwg-rs:Regions", null, structOpts)
                 xmp.setProperty(NS_MWG_RS, "mwg-rs:Regions/mwg-rs:RegionList", null, arrayOpts)
@@ -93,23 +99,26 @@ object XmpHelper {
                     val item = "mwg-rs:Regions/mwg-rs:RegionList[${index + 1}]"
                     val ext = "$item/mwg-rs:RegionExtensions"
                     xmp.setProperty(NS_MWG_RS, item, null, structOpts)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Type", "Face", null)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Type", "Face", emptyOpts)
                     region.name?.let { n ->
-                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Name", n, null)
+                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Name", n, emptyOpts)
                     }
                     xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area", null, structOpts)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:x", region.coords.x.toString(), null)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:y", region.coords.y.toString(), null)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:w", region.coords.w.toString(), null)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:h", region.coords.h.toString(), null)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:unit", "normalized", null)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:x", region.coords.x.toString(), emptyOpts)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:y", region.coords.y.toString(), emptyOpts)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:w", region.coords.w.toString(), emptyOpts)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:h", region.coords.h.toString(), emptyOpts)
+                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:unit", "normalized", emptyOpts)
                 }
             }
 
             val confirmedNames = regions.mapNotNull { it.name }.distinct()
             writePersonTags(xmp, confirmedNames)
 
-            val serialized = XMPMetaFactory.serializeToString(xmp, SerializeOptions())
+            val serialized = XMPMetaFactory.serializeToString(
+                xmp,
+                SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true)
+            )
             exif.setAttribute(ExifInterface.TAG_XMP, serialized)
             exif.saveAttributes()
         } catch (e: Exception) {
@@ -125,7 +134,10 @@ object XmpHelper {
             xmp.deleteProperty(NS_MWG_RS, "mwg-rs:Regions")
             xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
             clearPeopleSubjects(xmp)
-            val serialized = XMPMetaFactory.serializeToString(xmp, SerializeOptions())
+            val serialized = XMPMetaFactory.serializeToString(
+                xmp,
+                SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true)
+            )
             exif.setAttribute(ExifInterface.TAG_XMP, serialized)
             exif.saveAttributes()
         } catch (e: Exception) {
@@ -133,20 +145,22 @@ object XmpHelper {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Private helpers
+    // -----------------------------------------------------------------------
+
     private fun writePersonTags(xmp: XMPMeta, names: List<String>) {
-        val bagOpts = PropertyOptions().apply {
-            isArray = true
-            isArrayUnordered = true
-        }
+        val bagOpts = PropertyOptions().setArray(true).setArrayUnordered(true)
+        val emptyOpts = PropertyOptions()
 
         xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
         names.forEach { name ->
-            xmp.appendArrayItem(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage", bagOpts, name, null)
+            xmp.appendArrayItem(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage", bagOpts, name, emptyOpts)
         }
 
         clearPeopleSubjects(xmp)
         names.forEach { name ->
-            xmp.appendArrayItem(NS_DC, "dc:subject", bagOpts, "People/$name", null)
+            xmp.appendArrayItem(NS_DC, "dc:subject", bagOpts, "People/$name", emptyOpts)
         }
     }
 
@@ -154,7 +168,8 @@ object XmpHelper {
         val count = xmp.countArrayItems(NS_DC, "dc:subject")
         val toRemove = mutableListOf<Int>()
         for (i in 1..count) {
-            val value = xmp.getArrayItem(NS_DC, "dc:subject", i)?.value ?: continue
+            val item = xmp.getArrayItem(NS_DC, "dc:subject", i)
+            val value = item?.getValue() ?: continue
             if (value.startsWith("People/")) toRemove.add(i)
         }
         toRemove.reversed().forEach { index ->
