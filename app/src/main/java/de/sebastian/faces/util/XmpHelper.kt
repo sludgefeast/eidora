@@ -150,7 +150,7 @@ object XmpHelper {
     // -----------------------------------------------------------------------
 
     private fun writePersonTags(xmp: XMPMeta, names: List<String>) {
-        val bagOpts = PropertyOptions().setArray(true).setArrayUnordered(true)
+        val bagOpts = PropertyOptions().setArray(true)
         val emptyOpts = PropertyOptions()
 
         xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
