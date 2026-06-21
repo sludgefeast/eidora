@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Storage access for DCIM -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -11,6 +12,11 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
+    <!-- Android 11+ (API 30+): direct file read/write to DCIM/Camera via File/ExifInterface
+         requires All Files Access, since we bypass MediaStore for XMP write-back -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
 
     <!-- WorkManager foreground service for progress notification -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

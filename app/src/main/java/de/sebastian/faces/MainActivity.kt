@@ -1,16 +1,29 @@
 package de.sebastian.faces
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.padding
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -31,9 +44,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Trigger sync pipeline on every app start
-        SyncPipeline.enqueue(this)
-
         setContent {
             FacesTheme {
                 FacesApp()
@@ -42,9 +52,69 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Returns the correct media-read permission for the running Android version.
+ * Android 13+ (API 33+) uses READ_MEDIA_IMAGES, older versions use READ_EXTERNAL_STORAGE.
+ */
+private fun requiredMediaPermission(): String =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_IMAGES
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+
+private fun hasAllFilesAccess(): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FacesApp() {
+    val context = LocalContext.current
+    val permission = remember { requiredMediaPermission() }
+
+    var hasMediaPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var hasFilesAccess by remember { mutableStateOf(hasAllFilesAccess()) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasMediaPermission = granted
+    }
+
+    val manageStorageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        hasFilesAccess = hasAllFilesAccess()
+    }
+
+    val hasAllPermissions = hasMediaPermission && hasFilesAccess
+
+    LaunchedEffect(hasAllPermissions) {
+        if (hasAllPermissions) {
+            SyncPipeline.enqueue(context)
+        }
+    }
+
+    if (!hasAllPermissions) {
+        PermissionRequestScreen(
+            needsMediaPermission = !hasMediaPermission,
+            needsFilesAccess = !hasFilesAccess,
+            onRequestMediaPermission = { permissionLauncher.launch(permission) },
+            onRequestFilesAccess = {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    Uri.parse("package:${context.packageName}")
+                )
+                manageStorageLauncher.launch(intent)
+            }
+        )
+        return
+    }
+
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -126,8 +196,45 @@ fun FacesApp() {
             }
 
             composable("photos") {
-                // Photos tab placeholder
                 Text("Photos coming soon")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionRequestScreen(
+    needsMediaPermission: Boolean,
+    needsFilesAccess: Boolean,
+    onRequestMediaPermission: () -> Unit,
+    onRequestFilesAccess: () -> Unit
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Text(
+                text = "Faces needs access to your photos to detect and organize faces, " +
+                    "and file access to write face data back into your photos.",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            if (needsMediaPermission) {
+                Button(
+                    onClick = onRequestMediaPermission,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    Text("Grant photo access")
+                }
+            }
+            if (needsFilesAccess) {
+                Button(onClick = onRequestFilesAccess) {
+                    Text("Grant file access")
+                }
             }
         }
     }

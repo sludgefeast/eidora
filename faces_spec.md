@@ -42,6 +42,39 @@ Beim Build aus diesem SVG die komplette Android Icon-Familie erzeugen:
 
 ---
 
+## Berechtigungen
+
+Die App benötigt zwei Laufzeit-Berechtigungen, bevor die Sync-Pipeline gestartet werden darf:
+
+**1. Foto-Lesezugriff**
+- Android 13+ (API 33+): `READ_MEDIA_IMAGES`
+- Android < 13: `READ_EXTERNAL_STORAGE`
+- Wird über den Standard-Permission-Dialog angefragt
+
+**2. Datei-Schreibzugriff (All Files Access)**
+- Android 11+ (API 30+): `MANAGE_EXTERNAL_STORAGE`
+- Notwendig, da `XmpHelper` direkt über `File`/`ExifInterface` auf Dateien in `DCIM/Camera` zugreift statt über die `MediaStore`-API. Ohne diese Berechtigung verweigert Scoped Storage das Schreiben von XMP-Metadaten in fremde Mediendateien.
+- Kann nicht über den normalen Permission-Dialog gewährt werden, sondern nur über die Systemeinstellungen (`Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION`). Die App leitet den Nutzer dorthin weiter.
+- Android < 11: `WRITE_EXTERNAL_STORAGE` (bis API 29) reicht aus
+
+**Ablauf beim App-Start:**
+1. `MainActivity` prüft, ob beide Berechtigungen vorliegen.
+2. Fehlt eine Berechtigung, wird ein Permission-Screen mit entsprechenden Buttons angezeigt; die Sync-Pipeline startet nicht.
+3. Erst wenn beide Berechtigungen erteilt sind, wird `SyncPipeline.enqueue()` ausgelöst.
+
+---
+
+## Crash-Logging
+
+Da auf nicht gerooteten Geräten kein Zugriff auf System-Logcat für Drittanbieter-Apps möglich ist, schreibt die App unbehandelte Exceptions zusätzlich in eine eigene Log-Datei:
+
+- `FacesApplication.attachBaseContext()` installiert einen `Thread.UncaughtExceptionHandler`, der so früh wie möglich aktiv wird (auch vor `onCreate()`), um Abstürze während der Klassen-Initialisierung abzudecken.
+- Der vorherige System-Handler wird nach dem Logging weiterhin aufgerufen, damit der reguläre "App wurde beendet"-Dialog erscheint.
+- Log-Dateien werden mit Zeitstempel in mehreren Fallback-Verzeichnissen abgelegt (`getExternalFilesDir()/crash_logs/`, `filesDir/crash_logs/`, `cacheDir/crash_logs/`), da frühe Abstürze manche Verzeichnisse evtl. noch nicht verfügbar haben.
+- Dateien sind über einen normalen Dateimanager unter `Android/data/de.sebastian.faces/files/crash_logs/` einsehbar, ohne Root oder ADB.
+
+---
+
 ## Datenmodell
 
 ### Photo
