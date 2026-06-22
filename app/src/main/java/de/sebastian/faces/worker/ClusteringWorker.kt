@@ -1,6 +1,7 @@
 package de.sebastian.faces.worker
 
 import android.content.Context
+import android.util.Log
 import androidx.work.*
 import de.sebastian.faces.data.db.DatabaseProvider
 import de.sebastian.faces.data.db.FacesDatabase
@@ -8,6 +9,8 @@ import de.sebastian.faces.data.db.PersonEntity
 import de.sebastian.faces.ml.ChineseWhispers
 import de.sebastian.faces.ml.FaceNetModel
 import java.util.UUID
+
+private const val TAG = "ClusteringWorker"
 
 class ClusteringWorker(
     context: Context,
@@ -29,55 +32,64 @@ class ClusteringWorker(
 
             if (candidates.isEmpty()) return Result.success()
 
-            val clusterResults = ChineseWhispers.cluster(candidates)
-            val clusters = clusterResults.groupBy { it.clusterId }
+            val clusterResults = try {
+                ChineseWhispers.cluster(candidates)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Clustering algorithm failed", t)
+                return Result.failure()
+            }
 
-            clusters.forEach { (_, members) ->
+            clusterResults.groupBy { it.clusterId }.forEach { (_, members) ->
                 if (members.isEmpty()) return@forEach
-
-                val memberEmbeddings: List<FloatArray> = members.mapNotNull { result ->
-                    candidates.find { it.first == result.faceRegionId }?.second
-                }
-                val clusterCentroid = FaceNetModel.centroid(memberEmbeddings)
-
-                val existingPersons = personDao.getAll()
-                var bestPerson: PersonEntity? = null
-                var bestDistance = CLUSTER_MATCH_THRESHOLD
-
-                existingPersons.forEach { person ->
-                    val personFaces = faceDao.findByPersonId(person.id)
-                        .filter { it.embedding != null && !it.ignored }
-                    if (personFaces.isEmpty()) return@forEach
-
-                    val personEmbeddings: List<FloatArray> = personFaces
-                        .map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
-                    val personCentroid = FaceNetModel.centroid(personEmbeddings)
-                    val dist = FaceNetModel.cosineDistance(clusterCentroid, personCentroid)
-                    if (dist < bestDistance) {
-                        bestDistance = dist
-                        bestPerson = person
+                try {
+                    val memberEmbeddings: List<FloatArray> = members.mapNotNull { result ->
+                        candidates.find { it.first == result.faceRegionId }?.second
                     }
-                }
+                    val clusterCentroid = FaceNetModel.centroid(memberEmbeddings)
 
-                // Fix 3: new persons get NO name – they are pure suggestions (name = null)
-                val targetPerson: PersonEntity = bestPerson ?: run {
-                    val newPerson = PersonEntity(
-                        id = UUID.randomUUID().toString(),
-                        name = null  // will be set by user when confirming
-                    )
-                    personDao.insertWithNullableName(newPerson)
-                    newPerson
-                }
+                    var bestPerson: PersonEntity? = null
+                    var bestDistance = CLUSTER_MATCH_THRESHOLD
 
-                members.forEach { result ->
-                    faceDao.updatePersonId(result.faceRegionId, targetPerson.id)
+                    personDao.getAll().forEach { person ->
+                        try {
+                            val personFaces = faceDao.findByPersonId(person.id)
+                                .filter { it.embedding != null && !it.ignored }
+                            if (personFaces.isEmpty()) return@forEach
+                            val personEmbeddings: List<FloatArray> = personFaces
+                                .map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
+                            val dist = FaceNetModel.cosineDistance(
+                                clusterCentroid,
+                                FaceNetModel.centroid(personEmbeddings)
+                            )
+                            if (dist < bestDistance) { bestDistance = dist; bestPerson = person }
+                        } catch (t: Throwable) {
+                            Log.w(TAG, "Error comparing person ${person.id}", t)
+                        }
+                    }
+
+                    val targetPerson: PersonEntity = bestPerson ?: run {
+                        val newPerson = PersonEntity(id = UUID.randomUUID().toString(), name = null)
+                        personDao.insertWithNullableName(newPerson)
+                        newPerson
+                    }
+
+                    members.forEach { result ->
+                        try { faceDao.updatePersonId(result.faceRegionId, targetPerson.id) }
+                        catch (t: Throwable) { Log.w(TAG, "Failed to assign face ${result.faceRegionId}", t) }
+                    }
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to process cluster, skipping", t)
                 }
             }
 
-            recomputeAllCentroids(db)
+            try { recomputeAllCentroids(db) } catch (t: Throwable) {
+                Log.e(TAG, "Failed to recompute centroids", t)
+            }
+
             Result.success()
-        } catch (e: Exception) {
-            Result.retry()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Unhandled error in ClusteringWorker", t)
+            Result.failure()
         }
     }
 
@@ -86,29 +98,26 @@ class ClusteringWorker(
         val faceDao = db.faceRegionDao()
 
         personDao.getAll().forEach { person ->
-            val allFaces = faceDao.findByPersonId(person.id)
-                .filter { !it.ignored && it.embedding != null }
-            if (allFaces.isEmpty()) return@forEach
+            try {
+                val allFaces = faceDao.findByPersonId(person.id)
+                    .filter { !it.ignored && it.embedding != null }
+                if (allFaces.isEmpty()) return@forEach
 
-            val confirmedFaces = allFaces.filter { it.name != null }
-            val basisFaces = confirmedFaces.ifEmpty { allFaces }
+                val basisFaces = allFaces.filter { it.name != null }.ifEmpty { allFaces }
+                val embeddings: List<FloatArray> = basisFaces.map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
+                val centroid = FaceNetModel.centroid(embeddings)
 
-            val embeddings: List<FloatArray> = basisFaces
-                .map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
-            val centroid = FaceNetModel.centroid(embeddings)
-
-            val representative = basisFaces.minByOrNull { face ->
-                FaceNetModel.cosineDistance(
-                    FaceNetModel.bytesToFloatArray(face.embedding!!),
-                    centroid
-                )
+                val representative = basisFaces.minByOrNull { face ->
+                    FaceNetModel.cosineDistance(FaceNetModel.bytesToFloatArray(face.embedding!!), centroid)
+                }
+                personDao.updateRepresentativeFace(person.id, representative?.id)
+            } catch (t: Throwable) {
+                Log.w(TAG, "Failed to recompute centroid for person ${person.id}", t)
             }
-            personDao.updateRepresentativeFace(person.id, representative?.id)
         }
     }
 
     companion object {
-        const val WORK_NAME = "clustering"
         const val CLUSTER_MATCH_THRESHOLD = 0.40f
 
         fun buildRequest(): OneTimeWorkRequest =

@@ -25,58 +25,47 @@ data class XmpFaceRegion(
 object XmpHelper {
 
     init {
-        XMPMetaFactory.schemaRegistry.registerNamespace(NS_MWG_RS, "mwg-rs")
-        XMPMetaFactory.schemaRegistry.registerNamespace(NS_IPTC_EXT, "Iptc4xmpExt")
-        XMPMetaFactory.schemaRegistry.registerNamespace(NS_DC, "dc")
+        try {
+            XMPMetaFactory.schemaRegistry.registerNamespace(NS_MWG_RS, "mwg-rs")
+            XMPMetaFactory.schemaRegistry.registerNamespace(NS_IPTC_EXT, "Iptc4xmpExt")
+            XMPMetaFactory.schemaRegistry.registerNamespace(NS_DC, "dc")
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to register XMP namespaces", t)
+        }
     }
-
-    // -----------------------------------------------------------------------
-    // Read
-    // -----------------------------------------------------------------------
 
     fun readFaceRegions(file: File): List<XmpFaceRegion> {
         return try {
             val exif = ExifInterface(file.absolutePath)
             val xmpString = exif.getAttribute(ExifInterface.TAG_XMP) ?: return emptyList()
             val xmp: XMPMeta = XMPMetaFactory.parseFromString(xmpString)
-
             val regions = mutableListOf<XmpFaceRegion>()
-
-            // Fix 4: correct MWG path includes mwg-rs:Regions/ prefix
             val count = xmp.countArrayItems(NS_MWG_RS, "mwg-rs:Regions/mwg-rs:RegionList")
 
             for (i in 1..count) {
-                val base = "mwg-rs:Regions/mwg-rs:RegionList[$i]/mwg-rs:RegionExtensions"
-                val type = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Type") ?: continue
-                if (type.lowercase() != "face") continue
-
-                val x = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Area/stArea:x")
-                    ?.toFloatOrNull() ?: continue
-                val y = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Area/stArea:y")
-                    ?.toFloatOrNull() ?: continue
-                val w = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Area/stArea:w")
-                    ?.toFloatOrNull() ?: continue
-                val h = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Area/stArea:h")
-                    ?.toFloatOrNull() ?: continue
-                val name = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Name")
-
-                regions.add(
-                    XmpFaceRegion(
+                try {
+                    val base = "mwg-rs:Regions/mwg-rs:RegionList[$i]/mwg-rs:RegionExtensions"
+                    val type = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Type") ?: continue
+                    if (type.lowercase() != "face") continue
+                    val x = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Area/stArea:x")?.toFloatOrNull() ?: continue
+                    val y = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Area/stArea:y")?.toFloatOrNull() ?: continue
+                    val w = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Area/stArea:w")?.toFloatOrNull() ?: continue
+                    val h = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Area/stArea:h")?.toFloatOrNull() ?: continue
+                    val name = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Name")
+                    regions.add(XmpFaceRegion(
                         name = name?.takeIf { n -> n.isNotBlank() },
                         coords = FaceRegionCoords(x, y, w, h)
-                    )
-                )
+                    ))
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Failed to parse region $i in ${file.name}, skipping", t)
+                }
             }
             regions
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to read face regions from ${file.name}", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to read face regions from ${file.name}", t)
             emptyList()
         }
     }
-
-    // -----------------------------------------------------------------------
-    // Write
-    // -----------------------------------------------------------------------
 
     fun writeFaceRegions(file: File, regions: List<XmpFaceRegion>) {
         try {
@@ -98,33 +87,36 @@ object XmpHelper {
                 xmp.setProperty(NS_MWG_RS, "mwg-rs:Regions/mwg-rs:RegionList", null, arrayOpts)
 
                 regions.forEachIndexed { index, region ->
-                    val item = "mwg-rs:Regions/mwg-rs:RegionList[${index + 1}]"
-                    val ext = "$item/mwg-rs:RegionExtensions"
-                    xmp.setProperty(NS_MWG_RS, item, null, structOpts)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Type", "Face", emptyOpts)
-                    region.name?.let { n ->
-                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Name", n, emptyOpts)
+                    try {
+                        val item = "mwg-rs:Regions/mwg-rs:RegionList[${index + 1}]"
+                        val ext = "$item/mwg-rs:RegionExtensions"
+                        xmp.setProperty(NS_MWG_RS, item, null, structOpts)
+                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Type", "Face", emptyOpts)
+                        region.name?.let { n -> xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Name", n, emptyOpts) }
+                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area", null, structOpts)
+                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:x", region.coords.x.toString(), emptyOpts)
+                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:y", region.coords.y.toString(), emptyOpts)
+                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:w", region.coords.w.toString(), emptyOpts)
+                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:h", region.coords.h.toString(), emptyOpts)
+                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:unit", "normalized", emptyOpts)
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "Failed to write region $index, skipping", t)
                     }
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area", null, structOpts)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:x", region.coords.x.toString(), emptyOpts)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:y", region.coords.y.toString(), emptyOpts)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:w", region.coords.w.toString(), emptyOpts)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:h", region.coords.h.toString(), emptyOpts)
-                    xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:unit", "normalized", emptyOpts)
                 }
             }
 
             val confirmedNames = regions.mapNotNull { it.name }.distinct()
-            writePersonTags(xmp, confirmedNames)
+            try { writePersonTags(xmp, confirmedNames) } catch (t: Throwable) {
+                Log.e(TAG, "Failed to write person tags", t)
+            }
 
             val serialized = XMPMetaFactory.serializeToString(
-                xmp,
-                SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true)
+                xmp, SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true)
             )
             exif.setAttribute(ExifInterface.TAG_XMP, serialized)
             exif.saveAttributes()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to write face regions to ${file.name}", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to write face regions to ${file.name}", t)
         }
     }
 
@@ -135,31 +127,24 @@ object XmpHelper {
             val xmp: XMPMeta = XMPMetaFactory.parseFromString(xmpString)
             xmp.deleteProperty(NS_MWG_RS, "mwg-rs:Regions")
             xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
-            clearPeopleSubjects(xmp)
+            try { clearPeopleSubjects(xmp) } catch (t: Throwable) { Log.w(TAG, "clearPeopleSubjects failed", t) }
             val serialized = XMPMetaFactory.serializeToString(
-                xmp,
-                SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true)
+                xmp, SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true)
             )
             exif.setAttribute(ExifInterface.TAG_XMP, serialized)
             exif.saveAttributes()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to clear face data from ${file.name}", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to clear face data from ${file.name}", t)
         }
     }
-
-    // -----------------------------------------------------------------------
-    // Private helpers
-    // -----------------------------------------------------------------------
 
     private fun writePersonTags(xmp: XMPMeta, names: List<String>) {
         val bagOpts = PropertyOptions().setArray(true)
         val emptyOpts = PropertyOptions()
-
         xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
         names.forEach { name ->
             xmp.appendArrayItem(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage", bagOpts, name, emptyOpts)
         }
-
         clearPeopleSubjects(xmp)
         names.forEach { name ->
             xmp.appendArrayItem(NS_DC, "dc:subject", bagOpts, "People/$name", emptyOpts)
@@ -173,9 +158,7 @@ object XmpHelper {
             val value = xmp.getArrayItem(NS_DC, "dc:subject", i)?.getValue() ?: continue
             if (value.startsWith("People/")) toRemove.add(i)
         }
-        toRemove.reversed().forEach { index ->
-            xmp.deleteArrayItem(NS_DC, "dc:subject", index)
-        }
+        toRemove.reversed().forEach { xmp.deleteArrayItem(NS_DC, "dc:subject", it) }
     }
 }
 
