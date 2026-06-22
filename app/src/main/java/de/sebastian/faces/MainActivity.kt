@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -38,12 +39,11 @@ import de.sebastian.faces.ui.persons.PersonsScreen
 import de.sebastian.faces.ui.persons.PersonsViewModel
 import de.sebastian.faces.ui.theme.FacesTheme
 import de.sebastian.faces.worker.SyncPipeline
+import java.io.File
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContent {
             FacesTheme {
                 FacesApp()
@@ -52,16 +52,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * Returns the correct media-read permission for the running Android version.
- * Android 13+ (API 33+) uses READ_MEDIA_IMAGES, older versions use READ_EXTERNAL_STORAGE.
- */
 private fun requiredMediaPermission(): String =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
         Manifest.permission.READ_MEDIA_IMAGES
-    } else {
+    else
         Manifest.permission.READ_EXTERNAL_STORAGE
-    }
 
 private fun hasAllFilesAccess(): Boolean =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
@@ -80,22 +75,28 @@ fun FacesApp() {
     var hasFilesAccess by remember { mutableStateOf(hasAllFilesAccess()) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasMediaPermission = granted
-    }
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasMediaPermission = granted }
 
     val manageStorageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) {
-        hasFilesAccess = hasAllFilesAccess()
-    }
+        ActivityResultContracts.StartActivityForResult()
+    ) { hasFilesAccess = hasAllFilesAccess() }
 
     val hasAllPermissions = hasMediaPermission && hasFilesAccess
 
     LaunchedEffect(hasAllPermissions) {
         if (hasAllPermissions) {
-            SyncPipeline.enqueue(context)
+            try {
+                Log.d("FACESDIAG", "Enqueueing SyncPipeline...")
+                SyncPipeline.enqueue(context)
+                Log.d("FACESDIAG", "SyncPipeline enqueued successfully")
+            } catch (t: Throwable) {
+                Log.e("FACESDIAG", "SyncPipeline.enqueue failed", t)
+                try {
+                    File(context.filesDir, "diag_sync_crash.txt")
+                        .writeText("SyncPipeline.enqueue failed:\n${t.stackTraceToString()}")
+                } catch (e: Exception) { /* ignore */ }
+            }
         }
     }
 
@@ -146,13 +147,10 @@ fun FacesApp() {
                 val vm: PersonsViewModel = viewModel()
                 PersonsScreen(
                     viewModel = vm,
-                    onPersonClick = { personId ->
-                        navController.navigate("person_detail/$personId")
-                    },
-                    onPersonLongClick = { _ -> /* selection handled in VM */ }
+                    onPersonClick = { navController.navigate("person_detail/$it") },
+                    onPersonLongClick = { }
                 )
             }
-
             composable(
                 route = "person_detail/{personId}",
                 arguments = listOf(navArgument("personId") { type = NavType.StringType })
@@ -173,7 +171,6 @@ fun FacesApp() {
                     }
                 )
             }
-
             composable(
                 route = "fullscreen/{photoId}?faceId={faceId}",
                 arguments = listOf(
@@ -194,7 +191,6 @@ fun FacesApp() {
                     }
                 )
             }
-
             composable("photos") {
                 Text("Photos coming soon")
             }
@@ -209,17 +205,13 @@ private fun PermissionRequestScreen(
     onRequestMediaPermission: () -> Unit,
     onRequestFilesAccess: () -> Unit
 ) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(32.dp)
         ) {
             Text(
-                text = "Faces needs access to your photos to detect and organize faces, " +
-                    "and file access to write face data back into your photos.",
+                text = "Faces needs access to your photos and files to detect and organize faces.",
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -227,9 +219,7 @@ private fun PermissionRequestScreen(
                 Button(
                     onClick = onRequestMediaPermission,
                     modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    Text("Grant photo access")
-                }
+                ) { Text("Grant photo access") }
             }
             if (needsFilesAccess) {
                 Button(onClick = onRequestFilesAccess) {

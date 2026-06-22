@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import android.util.Log
+import de.sebastian.faces.data.db.DatabaseProvider
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -14,9 +15,8 @@ import java.util.Locale
 
 class FacesApplication : Application() {
 
-    // installCrashLogger() must run as the very first statement in attachBaseContext,
-    // before any other class is touched, so we catch crashes happening during
-    // static init / classloading too (these happen before onCreate()).
+    val database by lazy { DatabaseProvider.getInstance(this) }
+
     override fun attachBaseContext(base: android.content.Context?) {
         super.attachBaseContext(base)
         installCrashLogger()
@@ -24,19 +24,15 @@ class FacesApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        try {
-            createNotificationChannels()
-        } catch (t: Throwable) {
-            writeCrashLog(Thread.currentThread(), t, tag = "onCreate")
-        }
+        Log.d("FACESDIAG", "FacesApplication.onCreate() reached")
+        createNotificationChannels()
     }
 
     private fun installCrashLogger() {
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
-
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
-                writeCrashLog(thread, throwable, tag = "uncaught")
+                writeCrashLog(thread, throwable)
             } catch (e: Exception) {
                 Log.e("FACESCRASH", "Failed to write crash log", e)
             }
@@ -44,33 +40,25 @@ class FacesApplication : Application() {
         }
     }
 
-    private fun writeCrashLog(thread: Thread, throwable: Throwable, tag: String) {
+    private fun writeCrashLog(thread: Thread, throwable: Throwable) {
         val sw = StringWriter()
         throwable.printStackTrace(PrintWriter(sw))
-        Log.e("FACESCRASH", "[$tag] ${sw}")
+        Log.e("FACESCRASH", "CRASH in thread ${thread.name}:\n$sw")
 
-        // Try multiple locations in case one isn't ready yet this early in startup
+        val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+        val content = "Time: $timestamp\nThread: ${thread.name}\n\n$sw"
+
         val candidates = listOfNotNull(
             runCatching { File(getExternalFilesDir(null), "crash_logs") }.getOrNull(),
             runCatching { File(filesDir, "crash_logs") }.getOrNull(),
             runCatching { File(cacheDir, "crash_logs") }.getOrNull()
         )
-
-        val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
-        val content = buildString {
-            appendLine("Tag: $tag")
-            appendLine("Time: $timestamp")
-            appendLine("Thread: ${thread.name}")
-            appendLine("Exception:")
-            appendLine(sw.toString())
-        }
-
         for (dir in candidates) {
             try {
                 dir.mkdirs()
-                val logFile = File(dir, "crash_$timestamp.txt")
-                logFile.writeText(content)
-                Log.e("FACESCRASH", "Crash written to ${logFile.absolutePath}")
+                File(dir, "crash_$timestamp.txt").writeText(content)
+                Log.d("FACESCRASH", "Crash log written to ${dir.absolutePath}")
+                break
             } catch (e: Exception) {
                 Log.e("FACESCRASH", "Could not write to ${dir.absolutePath}", e)
             }
