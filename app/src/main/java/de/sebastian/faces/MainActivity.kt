@@ -23,17 +23,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
+import de.sebastian.faces.ui.persons.PersonsViewModel
 import de.sebastian.faces.ui.theme.FacesTheme
 import de.sebastian.faces.worker.SyncPipeline
 
-// DIAGNOSTIC STEP 6a: navigation only, no ViewModels, no custom screens
+// DIAGNOSTIC STEP 6b: add PersonsViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             FacesTheme {
-                Step6aApp()
+                Step6bApp()
             }
         }
     }
@@ -49,7 +51,7 @@ private fun hasAllFilesAccess() =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Step6aApp() {
+fun Step6bApp() {
     val context = LocalContext.current
     val permission = remember { requiredMediaPermission() }
 
@@ -108,13 +110,15 @@ fun Step6aApp() {
     ) { padding ->
         NavHost(navController, startDestination = "persons", modifier = Modifier.padding(padding)) {
             composable("persons") {
+                val vm: PersonsViewModel = viewModel()
+                val state by vm.uiState.collectAsState()
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Step 6a OK - Persons tab")
+                    Text("Step 6b OK - ${state.confirmedPersons.size} persons, ${state.unknownCount} unknown")
                 }
             }
             composable("photos") {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Step 6a OK - Photos tab")
+                    Text("Photos tab")
                 }
             }
         }
