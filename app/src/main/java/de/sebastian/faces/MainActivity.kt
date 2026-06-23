@@ -1,10 +1,13 @@
 package de.sebastian.faces
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,16 +21,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import de.sebastian.faces.data.db.DatabaseProvider
 import de.sebastian.faces.ui.theme.FacesTheme
+import de.sebastian.faces.worker.SyncPipeline
 
-// DIAGNOSTIC STEP 4: add Room database init
+// DIAGNOSTIC STEP 5: add WorkManager / SyncPipeline
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             FacesTheme {
-                Step4Screen()
+                Step5Screen()
             }
         }
     }
@@ -42,7 +45,7 @@ private fun hasAllFilesAccess() =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
 
 @Composable
-fun Step4Screen() {
+fun Step5Screen() {
     val context = LocalContext.current
     val permission = remember { requiredMediaPermission() }
 
@@ -50,20 +53,22 @@ fun Step4Screen() {
         mutableStateOf(ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED)
     }
     var hasFiles by remember { mutableStateOf(hasAllFilesAccess()) }
-    var dbStatus by remember { mutableStateOf("not initialized") }
+    var syncStatus by remember { mutableStateOf("not started") }
 
     val mediaLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         hasMedia = it
     }
+    val filesLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        hasFiles = hasAllFilesAccess()
+    }
 
     LaunchedEffect(hasMedia, hasFiles) {
         if (hasMedia && hasFiles) {
-            dbStatus = try {
-                val db = DatabaseProvider.getInstance(context)
-                val count = db.photoDao().getAllPaths().size
-                "OK - ${count} photos in DB"
+            syncStatus = try {
+                SyncPipeline.enqueue(context)
+                "enqueued OK"
             } catch (t: Throwable) {
-                Log.e("FACESDIAG", "DB init failed", t)
+                Log.e("FACESDIAG", "SyncPipeline failed", t)
                 "FAILED: ${t.message}"
             }
         }
@@ -72,13 +77,27 @@ fun Step4Screen() {
     Surface(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
-                Text("Step 4: Room DB")
+                Text("Step 5: WorkManager")
                 Spacer(Modifier.height(8.dp))
                 Text("Media: $hasMedia  |  Files: $hasFiles")
-                Text("DB: $dbStatus")
+                Text("Sync: $syncStatus")
                 Spacer(Modifier.height(16.dp))
                 if (!hasMedia) {
-                    Button(onClick = { mediaLauncher.launch(permission) }) { Text("Grant photo access") }
+                    Button(onClick = { mediaLauncher.launch(permission) }) {
+                        Text("Grant photo access")
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                if (!hasFiles) {
+                    Button(onClick = {
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                            Uri.parse("package:${context.packageName}")
+                        )
+                        filesLauncher.launch(intent)
+                    }) {
+                        Text("Grant file access")
+                    }
                 }
             }
         }
