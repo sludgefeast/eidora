@@ -13,6 +13,7 @@ import de.sebastian.faces.data.db.PersonEntity
 import de.sebastian.faces.data.db.PhotoEntity
 import de.sebastian.faces.domain.model.FaceRegionCoords
 import de.sebastian.faces.util.*
+import de.sebastian.faces.worker.NotificationHelper
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.util.UUID

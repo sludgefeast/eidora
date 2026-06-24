@@ -6,6 +6,7 @@ import androidx.work.*
 import de.sebastian.faces.data.db.DatabaseProvider
 import de.sebastian.faces.data.db.FaceRegionEntity
 import de.sebastian.faces.ml.FaceNetModel
+import de.sebastian.faces.worker.NotificationHelper
 import de.sebastian.faces.util.ThumbnailHelper
 import de.sebastian.faces.util.toFaceRegionCoords
 import java.io.File

@@ -5,17 +5,19 @@ import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
-import de.sebastian.faces.FacesApplication
 import de.sebastian.faces.R
 
 object NotificationHelper {
 
+    private const val CHANNEL_SYNC = "sync"
     private const val NOTIFICATION_ID_SYNC = 1001
     private const val NOTIFICATION_ID_EMBEDDING = 1002
     private const val NOTIFICATION_ID_CLUSTERING = 1003
 
     fun syncForegroundInfo(context: Context, progress: Int, status: String): ForegroundInfo {
-        val notification = buildNotification(context, context.getString(R.string.notification_sync_title), status, progress)
+        val notification = buildNotification(
+            context, context.getString(R.string.notification_sync_title), status, progress
+        )
         return ForegroundInfo(NOTIFICATION_ID_SYNC, notification)
     }
 
@@ -36,9 +38,11 @@ object NotificationHelper {
         nm.cancel(NOTIFICATION_ID_CLUSTERING)
     }
 
-    private fun buildNotification(context: Context, title: String, text: String, progress: Int): Notification {
-        val builder = NotificationCompat.Builder(context, FacesApplication.CHANNEL_SYNC)
-            .setSmallIcon(android.R.drawable.ic_popup_sync)
+    private fun buildNotification(
+        context: Context, title: String, text: String, progress: Int
+    ): Notification {
+        val builder = NotificationCompat.Builder(context, CHANNEL_SYNC)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(text)
             .setOngoing(true)
@@ -47,7 +51,7 @@ object NotificationHelper {
         if (progress >= 0) {
             builder.setProgress(100, progress, false)
         } else {
-            builder.setProgress(0, 0, true) // indeterminate
+            builder.setProgress(0, 0, true)
         }
 
         return builder.build()

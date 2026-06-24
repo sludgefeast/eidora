@@ -8,6 +8,7 @@ import de.sebastian.faces.data.db.FacesDatabase
 import de.sebastian.faces.data.db.PersonEntity
 import de.sebastian.faces.ml.ChineseWhispers
 import de.sebastian.faces.ml.FaceNetModel
+import de.sebastian.faces.worker.NotificationHelper
 import java.util.UUID
 
 private const val TAG = "ClusteringWorker"
