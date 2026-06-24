@@ -25,17 +25,18 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
+import de.sebastian.faces.ui.persons.PersonsScreen
 import de.sebastian.faces.ui.persons.PersonsViewModel
 import de.sebastian.faces.ui.theme.FacesTheme
 import de.sebastian.faces.worker.SyncPipeline
 
-// DIAGNOSTIC STEP 6b: add PersonsViewModel
+// DIAGNOSTIC STEP 6c: add PersonsScreen
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             FacesTheme {
-                Step6bApp()
+                Step6cApp()
             }
         }
     }
@@ -51,7 +52,7 @@ private fun hasAllFilesAccess() =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Step6bApp() {
+fun Step6cApp() {
     val context = LocalContext.current
     val permission = remember { requiredMediaPermission() }
 
@@ -80,7 +81,10 @@ fun Step6bApp() {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
                 if (!hasMedia) Button(onClick = { mediaLauncher.launch(permission) }) { Text("Grant photo access") }
                 if (!hasFiles) Button(onClick = {
-                    filesLauncher.launch(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${context.packageName}")))
+                    filesLauncher.launch(Intent(
+                        Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                        Uri.parse("package:${context.packageName}")
+                    ))
                 }) { Text("Grant file access") }
             }
         }
@@ -111,10 +115,11 @@ fun Step6bApp() {
         NavHost(navController, startDestination = "persons", modifier = Modifier.padding(padding)) {
             composable("persons") {
                 val vm: PersonsViewModel = viewModel()
-                val state by vm.uiState.collectAsState()
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Step 6b OK - ${state.confirmedPersons.size} persons, ${state.unknownCount} unknown")
-                }
+                PersonsScreen(
+                    viewModel = vm,
+                    onPersonClick = { },
+                    onPersonLongClick = { }
+                )
             }
             composable("photos") {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
