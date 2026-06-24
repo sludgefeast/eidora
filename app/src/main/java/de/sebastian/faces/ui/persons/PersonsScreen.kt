@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -15,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -25,6 +25,7 @@ import coil.compose.AsyncImage
 import de.sebastian.faces.R
 import de.sebastian.faces.data.db.PersonWithCount
 import de.sebastian.faces.util.ThumbnailHelper
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -35,60 +36,70 @@ fun PersonsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // Use LazyVerticalGrid as the single scrollable container.
-    // Suggestions and virtual persons are added as full-width span items.
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Confirmed persons
-        items(state.confirmedPersons, key = { it.person.id }) { personWithCount ->
-            PersonGridItem(
-                personWithCount = personWithCount,
-                isSelected = state.selectedPersonIds.contains(personWithCount.person.id),
-                onClick = {
-                    if (state.isMultiSelectActive) viewModel.toggleSelection(personWithCount.person.id)
-                    else onPersonClick(personWithCount.person.id)
-                },
-                onLongClick = {
-                    viewModel.toggleSelection(personWithCount.person.id)
-                    onPersonLongClick(personWithCount.person.id)
-                },
-                onNameClick = { viewModel.startRename(personWithCount.person.id) }
-            )
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+
+        // Confirmed persons grid
+        item {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(),
+                userScrollEnabled = false,
+                contentPadding = PaddingValues(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(state.confirmedPersons, key = { it.person.id }) { personWithCount ->
+                    PersonGridItem(
+                        personWithCount = personWithCount,
+                        isSelected = state.selectedPersonIds.contains(personWithCount.person.id),
+                        onClick = {
+                            if (state.isMultiSelectActive) {
+                                viewModel.toggleSelection(personWithCount.person.id)
+                            } else {
+                                onPersonClick(personWithCount.person.id)
+                            }
+                        },
+                        onLongClick = {
+                            viewModel.toggleSelection(personWithCount.person.id)
+                            onPersonLongClick(personWithCount.person.id)
+                        },
+                        onNameClick = { viewModel.startRename(personWithCount.person.id) }
+                    )
+                }
+
+                // Virtual persons at end of grid
+                item {
+                    VirtualPersonItem(
+                        label = stringResource(R.string.virtual_person_unknown),
+                        color = Color(0xFF9E9E9E),
+                        count = state.unknownCount,
+                        onClick = { onPersonClick(VIRTUAL_UNKNOWN) }
+                    )
+                }
+                item {
+                    VirtualPersonItem(
+                        label = stringResource(R.string.virtual_person_ignored),
+                        color = Color(0xFF616161),
+                        count = state.ignoredCount,
+                        onClick = { onPersonClick(VIRTUAL_IGNORED) }
+                    )
+                }
+            }
         }
 
-        // Virtual persons at end of grid
-        item {
-            VirtualPersonItem(
-                label = stringResource(R.string.virtual_person_unknown),
-                color = Color(0xFF9E9E9E),
-                count = state.unknownCount,
-                onClick = { onPersonClick(VIRTUAL_UNKNOWN) }
-            )
-        }
-        item {
-            VirtualPersonItem(
-                label = stringResource(R.string.virtual_person_ignored),
-                color = Color(0xFF616161),
-                count = state.ignoredCount,
-                onClick = { onPersonClick(VIRTUAL_IGNORED) }
-            )
-        }
-
-        // Suggestions header
+        // Suggestions section
         if (state.suggestions.isNotEmpty()) {
-            item(span = { GridItemSpan(3) }) {
+            item {
                 Text(
                     text = stringResource(R.string.section_suggestions),
                     style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
-            items(state.suggestions, key = { it.personId }, span = { GridItemSpan(3) }) { suggestion ->
+            items(state.suggestions.size) { index ->
+                val suggestion = state.suggestions[index]
                 SuggestionRow(
                     suggestion = suggestion,
                     onThumbnailClick = { onPersonClick(suggestion.personId) },
@@ -103,7 +114,9 @@ fun PersonsScreen(
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
             Surface(shadowElevation = 8.dp) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.Center
                 ) {
                     Button(onClick = { viewModel.startMerge() }) {
@@ -114,7 +127,7 @@ fun PersonsScreen(
         }
     }
 
-    // Rename sheet
+    // Rename dialog
     state.renamingPersonId?.let { personId ->
         RenamePersonSheet(
             currentName = state.confirmedPersons.find { it.person.id == personId }?.person?.name ?: "",
@@ -158,7 +171,9 @@ private fun PersonGridItem(
                 model = thumbnailFile,
                 contentDescription = personWithCount.person.name,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
             )
             if (isSelected) {
                 Box(
@@ -198,7 +213,10 @@ private fun VirtualPersonItem(
             .padding(4.dp)
     ) {
         Box(
-            modifier = Modifier.size(88.dp).clip(CircleShape).background(color),
+            modifier = Modifier
+                .size(88.dp)
+                .clip(CircleShape)
+                .background(color),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -230,7 +248,7 @@ private fun SuggestionRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
         val thumbnailFile = suggestion.representativeFaceId?.let {
             ThumbnailHelper.thumbnailFile(context, it)
