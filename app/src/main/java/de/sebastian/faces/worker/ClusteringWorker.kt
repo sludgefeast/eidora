@@ -23,6 +23,7 @@ class ClusteringWorker(
         val personDao = db.personDao()
 
         return try {
+            try { setForeground(NotificationHelper.clusteringForegroundInfo(applicationContext)) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
             setProgress(workDataOf(PhotoSyncWorker.KEY_STATUS to "Clustering faces…"))
 
             val candidates: List<Pair<String, FloatArray>> = faceDao

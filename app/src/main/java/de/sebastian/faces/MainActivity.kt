@@ -83,7 +83,7 @@ fun FacesApp() {
         hasNotifications = it
     }
 
-    val hasAllPermissions = hasMedia && hasFiles
+    val hasAllPermissions = hasMedia && hasFiles && hasNotifications
 
     LaunchedEffect(hasAllPermissions) {
         if (hasAllPermissions) {
@@ -93,7 +93,7 @@ fun FacesApp() {
         }
     }
 
-    if (!hasMedia || !hasFiles || !hasNotifications) {
+    if (!hasAllPermissions) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
                 Text(

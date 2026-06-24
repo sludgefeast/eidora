@@ -32,10 +32,12 @@ class EmbeddingWorker(
         return try {
             val pending: List<FaceRegionEntity> = faceDao.findWithoutEmbedding()
             pending.forEachIndexed { index, face ->
+                val progress = ((index + 1) * 100) / pending.size
                 setProgress(workDataOf(
-                    PhotoSyncWorker.KEY_PROGRESS to ((index + 1) * 100) / pending.size,
+                    PhotoSyncWorker.KEY_PROGRESS to progress,
                     PhotoSyncWorker.KEY_STATUS to "Computing embeddings…"
                 ))
+                try { setForeground(NotificationHelper.embeddingForegroundInfo(applicationContext, progress)) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
                 try {
                     val photo = photoDao.findById(face.photoId) ?: return@forEachIndexed
                     val photoFile = File(photo.path)

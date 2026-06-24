@@ -62,6 +62,7 @@ class PhotoSyncWorker(
     // -----------------------------------------------------------------------
 
     private suspend fun doFullSync(): Result {
+        try { setForeground(NotificationHelper.syncForegroundInfo(applicationContext, 0, "Starting…")) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
         val cameraDir = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
             "Camera"
@@ -87,6 +88,7 @@ class PhotoSyncWorker(
         jpegFiles.forEachIndexed { index, file ->
             val progress = ((index + 1) * 100) / jpegFiles.size
             setProgress(workDataOf(KEY_PROGRESS to progress, KEY_STATUS to file.name))
+            try { setForeground(NotificationHelper.syncForegroundInfo(applicationContext, progress, file.name)) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
             try {
                 processFile(file)
             } catch (t: Throwable) {
