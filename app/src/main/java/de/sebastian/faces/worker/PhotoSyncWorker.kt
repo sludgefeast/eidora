@@ -147,8 +147,8 @@ class PhotoSyncWorker(
             Log.w(TAG, "Could not read takenAt for ${file.name}"); null
         }
 
-        // DEBUG FILTER: only Jan–May 2026
-        if (!FileUtil.isInDebugDateRange(takenAt)) return
+        // DEBUG FILTER: only IMG_202601 to IMG_202605
+        if (!FileUtil.isInDebugDateRange(file)) return
 
         val existing = photoDao.findByPath(path)
         when {

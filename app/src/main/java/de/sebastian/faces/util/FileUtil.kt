@@ -35,13 +35,14 @@ object FileUtil {
     }
 
     /**
-     * DEBUG FILTER: Only process photos taken between January 2026 and May 2026 (inclusive).
+     * DEBUG FILTER: Only process photos with filename prefix IMG_202601 to IMG_202605.
      * Remove this filter for production builds.
      */
-    fun isInDebugDateRange(takenAt: Long?): Boolean {
-        takenAt ?: return false
-        val jan2026 = 1735689600000L  // 2026-01-01 00:00:00 UTC
-        val jun2026 = 1748736000000L  // 2026-06-01 00:00:00 UTC (exclusive)
-        return takenAt in jan2026 until jun2026
+    fun isInDebugDateRange(file: File): Boolean {
+        val name = file.name
+        return (1..5).any { month ->
+            val prefix = "IMG_20260${month}"
+            name.startsWith(prefix)
+        }
     }
 }
