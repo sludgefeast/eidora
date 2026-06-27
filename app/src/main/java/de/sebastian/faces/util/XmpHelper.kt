@@ -16,6 +16,9 @@ private const val TAG = "XmpHelper"
 private const val NS_MWG_RS = "http://www.metadataworkinggroup.com/schemas/regions/"
 private const val NS_IPTC_EXT = "http://iptc.org/std/Iptc4xmpExt/2008-02-29/"
 private const val NS_DC = "http://purl.adobe.com/dc/elements/1.1/"
+private const val NS_DIGIKAM = "http://www.digikam.org/ns/1.0/"
+private const val NS_LR = "http://ns.adobe.com/lightroom/1.0/"
+private const val NS_MWG_KW = "http://www.metadataworkinggroup.com/schemas/keywords/"
 
 data class XmpFaceRegion(
     val name: String?,
@@ -29,6 +32,8 @@ object XmpHelper {
             XMPMetaFactory.schemaRegistry.registerNamespace(NS_MWG_RS, "mwg-rs")
             XMPMetaFactory.schemaRegistry.registerNamespace(NS_IPTC_EXT, "Iptc4xmpExt")
             XMPMetaFactory.schemaRegistry.registerNamespace(NS_DC, "dc")
+            XMPMetaFactory.schemaRegistry.registerNamespace(NS_DIGIKAM, "digiKam")
+            XMPMetaFactory.schemaRegistry.registerNamespace(NS_LR, "lr")
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to register XMP namespaces", t)
         }
@@ -127,6 +132,8 @@ object XmpHelper {
             val xmp: XMPMeta = XMPMetaFactory.parseFromString(xmpString)
             xmp.deleteProperty(NS_MWG_RS, "mwg-rs:Regions")
             xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
+            xmp.deleteProperty(NS_DIGIKAM, "digiKam:TagsList")
+            xmp.deleteProperty(NS_LR, "lr:hierarchicalSubject")
             try { clearPeopleSubjects(xmp) } catch (t: Throwable) { Log.w(TAG, "clearPeopleSubjects failed", t) }
             val serialized = XMPMetaFactory.serializeToString(
                 xmp, SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true)
@@ -140,23 +147,61 @@ object XmpHelper {
 
     private fun writePersonTags(xmp: XMPMeta, names: List<String>) {
         val bagOpts = PropertyOptions().setArray(true)
+        val seqOpts = PropertyOptions().setArray(true).setArrayOrdered(true)
         val emptyOpts = PropertyOptions()
+
+        // 1. Iptc4xmpExt:PersonInImage – full names
         xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
         names.forEach { name ->
             xmp.appendArrayItem(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage", bagOpts, name, emptyOpts)
         }
+
+        // 2. dc:subject – leaf name only (DigiKam style: no prefix, just the name)
         clearPeopleSubjects(xmp)
         names.forEach { name ->
-            xmp.appendArrayItem(NS_DC, "dc:subject", bagOpts, "People/$name", emptyOpts)
+            xmp.appendArrayItem(NS_DC, "dc:subject", bagOpts, name, emptyOpts)
+        }
+
+        // 3. digiKam:TagsList – full hierarchical path with /
+        xmp.deleteProperty(NS_DIGIKAM, "digiKam:TagsList")
+        names.forEach { name ->
+            xmp.appendArrayItem(NS_DIGIKAM, "digiKam:TagsList", seqOpts, "People/$name", emptyOpts)
+        }
+
+        // 4. lr:hierarchicalSubject – full hierarchical path with |
+        xmp.deleteProperty(NS_LR, "lr:hierarchicalSubject")
+        names.forEach { name ->
+            xmp.appendArrayItem(NS_LR, "lr:hierarchicalSubject", bagOpts, "People|$name", emptyOpts)
         }
     }
 
+    /**
+     * Removes person-related entries from dc:subject.
+     * Since DigiKam writes only the leaf name (no prefix), we remove entries
+     * that match any name in digiKam:TagsList (stripping the "People/" prefix).
+     * If TagsList is not available, we cannot distinguish person tags from other
+     * subjects, so we leave dc:subject untouched.
+     */
     private fun clearPeopleSubjects(xmp: XMPMeta) {
+        // Collect current person names from TagsList
+        val personNames = mutableSetOf<String>()
+        try {
+            val count = xmp.countArrayItems(NS_DIGIKAM, "digiKam:TagsList")
+            for (i in 1..count) {
+                val value = xmp.getArrayItem(NS_DIGIKAM, "digiKam:TagsList", i)?.getValue() ?: continue
+                if (value.startsWith("People/")) {
+                    personNames.add(value.removePrefix("People/"))
+                }
+            }
+        } catch (t: Throwable) { /* TagsList may not exist yet */ }
+
+        if (personNames.isEmpty()) return
+
         val count = xmp.countArrayItems(NS_DC, "dc:subject")
         val toRemove = mutableListOf<Int>()
         for (i in 1..count) {
             val value = xmp.getArrayItem(NS_DC, "dc:subject", i)?.getValue() ?: continue
-            if (value.startsWith("People/")) toRemove.add(i)
+            if (value in personNames) toRemove.add(i)
         }
         toRemove.reversed().forEach { xmp.deleteArrayItem(NS_DC, "dc:subject", it) }
     }
