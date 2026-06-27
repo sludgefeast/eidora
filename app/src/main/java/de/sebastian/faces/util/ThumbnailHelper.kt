@@ -43,10 +43,19 @@ object ThumbnailHelper {
                 (cy + halfH + padY).coerceAtMost(imgH)
             )
 
+            // Make crop square (use the larger dimension, centered) to avoid distortion
+            val cropW = rect.width()
+            val cropH = rect.height()
+            val cropSize = maxOf(cropW, cropH)
+            val squareLeft = ((rect.left + rect.right) / 2f - cropSize / 2f).coerceAtLeast(0f)
+            val squareTop = ((rect.top + rect.bottom) / 2f - cropSize / 2f).coerceAtLeast(0f)
+            val squareRight = (squareLeft + cropSize).coerceAtMost(imgW)
+            val squareBottom = (squareTop + cropSize).coerceAtMost(imgH)
+
             val cropped = Bitmap.createBitmap(
                 original,
-                rect.left.toInt(), rect.top.toInt(),
-                rect.width().toInt(), rect.height().toInt()
+                squareLeft.toInt(), squareTop.toInt(),
+                (squareRight - squareLeft).toInt(), (squareBottom - squareTop).toInt()
             )
             val scaled = Bitmap.createScaledBitmap(cropped, THUMBNAIL_SIZE, THUMBNAIL_SIZE, true)
 
