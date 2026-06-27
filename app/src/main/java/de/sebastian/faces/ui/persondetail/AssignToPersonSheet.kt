@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import de.sebastian.faces.R
 import de.sebastian.faces.data.db.PersonWithCount
+import de.sebastian.faces.ui.common.CircleThumbnail
 import de.sebastian.faces.util.ThumbnailHelper
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -103,13 +104,10 @@ private fun PersonListItem(
     }
     ListItem(
         leadingContent = {
-            AsyncImage(
-                model = thumbnailFile,
+            CircleThumbnail(
+                file = thumbnailFile,
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
+                modifier = Modifier.size(44.dp)
             )
         },
         headlineContent = { Text(personWithCount.person.name ?: "") },

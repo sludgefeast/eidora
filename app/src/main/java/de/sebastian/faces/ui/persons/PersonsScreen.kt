@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import de.sebastian.faces.R
 import de.sebastian.faces.data.db.PersonWithCount
+import de.sebastian.faces.ui.common.CircleColorLabel
+import de.sebastian.faces.ui.common.CircleThumbnail
 import de.sebastian.faces.util.ThumbnailHelper
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -153,18 +155,15 @@ private fun PersonGridItem(
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(4.dp)
     ) {
-        Box(modifier = Modifier.size(88.dp)) {
-            AsyncImage(
-                model = thumbnailFile,
-                contentDescription = personWithCount.person.name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().clip(CircleShape)
-            )
+        CircleThumbnail(
+            file = thumbnailFile,
+            contentDescription = personWithCount.person.name,
+            modifier = Modifier.fillMaxWidth()
+        ) {
             if (isSelected) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(CircleShape)
                         .background(Color(0x660D47A1))
                 )
             }
@@ -197,16 +196,11 @@ private fun VirtualPersonItem(
             .combinedClickable(onClick = onClick)
             .padding(4.dp)
     ) {
-        Box(
-            modifier = Modifier.size(88.dp).clip(CircleShape).background(color),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = count.toString(),
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White
-            )
-        }
+        CircleColorLabel(
+            color = color,
+            label = count.toString(),
+            modifier = Modifier.fillMaxWidth()
+        )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,
@@ -236,31 +230,13 @@ private fun SuggestionRow(
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
-        Box(
+        CircleThumbnail(
+            file = thumbnailFile,
+            contentDescription = null,
             modifier = Modifier
                 .size(56.dp)
-                .clip(CircleShape)
                 .combinedClickable(onClick = onThumbnailClick)
-        ) {
-            if (thumbnailFile != null && thumbnailFile.exists()) {
-                AsyncImage(
-                    model = thumbnailFile,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().clip(CircleShape)
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(Color(0xFF9E9E9E)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("?", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                }
-            }
-        }
+        )
         Spacer(modifier = Modifier.width(12.dp))
         OutlinedTextField(
             value = text,
