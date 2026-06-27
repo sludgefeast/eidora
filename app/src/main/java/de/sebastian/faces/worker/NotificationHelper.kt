@@ -52,7 +52,7 @@ object NotificationHelper {
         context: Context, title: String, text: String, progress: Int
     ): Notification {
         val builder = NotificationCompat.Builder(context, CHANNEL_SYNC)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
             .setOngoing(true)
