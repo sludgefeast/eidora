@@ -226,24 +226,41 @@ private fun SuggestionRow(
     val context = LocalContext.current
     var text by remember { mutableStateOf("") }
 
+    // Use representativeFaceId if available, otherwise fall back to firstFaceId
+    val thumbnailId = suggestion.representativeFaceId ?: suggestion.firstFaceId
+    val thumbnailFile = thumbnailId?.let { ThumbnailHelper.thumbnailFile(context, it) }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
-        val thumbnailFile = suggestion.representativeFaceId?.let {
-            ThumbnailHelper.thumbnailFile(context, it)
-        }
-        AsyncImage(
-            model = thumbnailFile,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
+        Box(
             modifier = Modifier
                 .size(56.dp)
                 .clip(CircleShape)
                 .combinedClickable(onClick = onThumbnailClick)
-        )
+        ) {
+            if (thumbnailFile != null && thumbnailFile.exists()) {
+                AsyncImage(
+                    model = thumbnailFile,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(Color(0xFF9E9E9E)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("?", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        }
         Spacer(modifier = Modifier.width(12.dp))
         OutlinedTextField(
             value = text,

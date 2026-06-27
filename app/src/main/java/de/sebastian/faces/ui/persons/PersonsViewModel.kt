@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 data class PersonSuggestionUi(
     val personId: String,
     val representativeFaceId: String?,
+    val firstFaceId: String?,
     val faceCount: Int
 )
 
@@ -51,10 +52,12 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
                 ignoredCount: Int ->
 
                 val suggestionUis = suggestions.map { person ->
+                    val faces = faceDao.findByPersonId(person.id)
                     PersonSuggestionUi(
                         personId = person.id,
                         representativeFaceId = person.representativeFaceId,
-                        faceCount = 0 // loaded lazily in UI if needed
+                        firstFaceId = faces.firstOrNull()?.id,
+                        faceCount = faces.size
                     )
                 }
 
