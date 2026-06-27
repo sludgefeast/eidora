@@ -3,6 +3,8 @@ package de.sebastian.faces.worker
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.ServiceInfo
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
 import de.sebastian.faces.R
@@ -18,17 +20,17 @@ object NotificationHelper {
         val notification = buildNotification(
             context, context.getString(R.string.notification_sync_title), status, progress
         )
-        return ForegroundInfo(NOTIFICATION_ID_SYNC, notification)
+        return makeForegroundInfo(NOTIFICATION_ID_SYNC, notification)
     }
 
     fun embeddingForegroundInfo(context: Context, progress: Int): ForegroundInfo {
         val notification = buildNotification(context, "Computing embeddings", "$progress%", progress)
-        return ForegroundInfo(NOTIFICATION_ID_EMBEDDING, notification)
+        return makeForegroundInfo(NOTIFICATION_ID_EMBEDDING, notification)
     }
 
     fun clusteringForegroundInfo(context: Context): ForegroundInfo {
         val notification = buildNotification(context, "Clustering faces", "Running…", -1)
-        return ForegroundInfo(NOTIFICATION_ID_CLUSTERING, notification)
+        return makeForegroundInfo(NOTIFICATION_ID_CLUSTERING, notification)
     }
 
     fun cancelSync(context: Context) {
@@ -36,6 +38,14 @@ object NotificationHelper {
         nm.cancel(NOTIFICATION_ID_SYNC)
         nm.cancel(NOTIFICATION_ID_EMBEDDING)
         nm.cancel(NOTIFICATION_ID_CLUSTERING)
+    }
+
+    private fun makeForegroundInfo(id: Int, notification: Notification): ForegroundInfo {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ForegroundInfo(id, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(id, notification)
+        }
     }
 
     private fun buildNotification(
