@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import de.sebastian.faces.R
 import de.sebastian.faces.data.db.FaceRegionWithPhoto
+import de.sebastian.faces.ui.common.CircleThumbnail
 import de.sebastian.faces.util.ThumbnailHelper
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -144,36 +145,30 @@ private fun FaceGridItem(
 
     Box(
         modifier = Modifier
-            .size(108.dp)
+            .fillMaxWidth()
+            .aspectRatio(1f)
             .combinedClickable(onClick = onTap, onLongClick = onLongPress)
     ) {
-        val imageModifier = if (borderColor != null) {
-            Modifier
-                .fillMaxSize()
-                .clip(CircleShape)
-                .background(borderColor, CircleShape)
-                .padding(3.dp)
-                .clip(CircleShape)
-        } else {
-            Modifier
-                .fillMaxSize()
-                .clip(CircleShape)
-        }
-
-        AsyncImage(
-            model = thumbnailFile,
+        CircleThumbnail(
+            file = thumbnailFile,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = imageModifier.combinedClickable(onClick = onImageTap)
-        )
-
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .background(Color(0x660D47A1))
-            )
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (borderColor != null) Modifier
+                        .padding(3.dp)
+                        .background(borderColor, CircleShape)
+                    else Modifier
+                )
+                .combinedClickable(onClick = onImageTap)
+        ) {
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0x660D47A1))
+                )
+            }
         }
     }
 }
