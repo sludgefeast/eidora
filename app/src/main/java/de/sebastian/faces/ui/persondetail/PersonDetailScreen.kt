@@ -112,7 +112,12 @@ fun PersonDetailScreen(
     }
 
     state.actionFaceId?.let { faceId ->
+        val face = state.unconfirmedFaces.find { it.faceRegion.id == faceId }
+            ?: state.confirmedFaces.find { it.faceRegion.id == faceId }
         FaceActionsSheet(
+            onOpenPhoto = {
+                face?.let { onFaceClick(faceId, it.faceRegion.photoId) }
+            },
             onConfirm = { viewModel.confirmFace(faceId) },
             onIgnore = { viewModel.ignoreFace(faceId) },
             onRemove = { viewModel.removeFace(faceId) },
@@ -147,20 +152,20 @@ private fun FaceGridItem(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .combinedClickable(onClick = onTap, onLongClick = onLongPress)
+            .combinedClickable(
+                onClick = onTap,
+                onLongClick = onLongPress
+            )
     ) {
         CircleThumbnail(
             file = thumbnailFile,
             contentDescription = null,
-            modifier = Modifier
-                .fillMaxSize()
-                .then(
-                    if (borderColor != null) Modifier
-                        .padding(3.dp)
-                        .background(borderColor, CircleShape)
-                    else Modifier
-                )
-                .combinedClickable(onClick = onImageTap)
+            modifier = Modifier.fillMaxSize().then(
+                if (borderColor != null) Modifier
+                    .padding(3.dp)
+                    .background(borderColor, CircleShape)
+                else Modifier
+            )
         ) {
             if (isSelected) {
                 Box(
@@ -176,6 +181,7 @@ private fun FaceGridItem(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun FaceActionsSheet(
+    onOpenPhoto: () -> Unit,
     onConfirm: () -> Unit,
     onIgnore: () -> Unit,
     onRemove: () -> Unit,
@@ -186,6 +192,7 @@ private fun FaceActionsSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(bottom = 32.dp)) {
             listOf(
+                stringResource(R.string.action_open_photo) to onOpenPhoto,
                 stringResource(R.string.action_confirm) to onConfirm,
                 stringResource(R.string.action_ignore) to onIgnore,
                 stringResource(R.string.action_remove_from_person) to onRemove,

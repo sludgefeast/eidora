@@ -14,6 +14,7 @@
     <string name="hint_enter_name">Namen eingeben…</string>
 
     <!-- Face actions -->
+    <string name="action_open_photo">Foto öffnen</string>
     <string name="action_confirm">Bestätigen</string>
     <string name="action_ignore">Ignorieren</string>
     <string name="action_unignore">Nicht ignorieren</string>
