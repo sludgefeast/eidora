@@ -221,12 +221,33 @@ class PhotoSyncWorker(
                 photoDao.updateAnalyzed(photoId, true)
                 return
             }
-            val imgW = opts.outWidth.toFloat().takeIf { it > 0 } ?: run {
+            val rawW = opts.outWidth.toFloat().takeIf { it > 0 } ?: run {
                 Log.w(TAG, "Invalid image dimensions for ${file.name}")
                 photoDao.updateAnalyzed(photoId, true)
                 return
             }
-            val imgH = opts.outHeight.toFloat()
+            val rawH = opts.outHeight.toFloat()
+
+            // ML Kit rotates the image according to EXIF before detection.
+            // Coordinates are in the rotated image space, so we must use
+            // rotated dimensions for normalization.
+            val rotation = try {
+                androidx.exifinterface.media.ExifInterface(file.absolutePath)
+                    .getAttributeInt(
+                        androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+                        androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+                    )
+            } catch (t: Throwable) {
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+            }
+            val isRotated90or270 = rotation == androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90
+                || rotation == androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270
+                || rotation == androidx.exifinterface.media.ExifInterface.ORIENTATION_TRANSVERSE
+                || rotation == androidx.exifinterface.media.ExifInterface.ORIENTATION_TRANSPOSE
+
+            // Use rotated dimensions for coordinate normalization
+            val imgW = if (isRotated90or270) rawH else rawW
+            val imgH = if (isRotated90or270) rawW else rawH
 
             val xmpRegions = mutableListOf<XmpFaceRegion>()
             faces.forEach { face ->

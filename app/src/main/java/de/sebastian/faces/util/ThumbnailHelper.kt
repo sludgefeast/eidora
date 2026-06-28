@@ -3,7 +3,9 @@ package de.sebastian.faces.util
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.graphics.RectF
+import androidx.exifinterface.media.ExifInterface
 import de.sebastian.faces.domain.model.FaceRegionCoords
 import java.io.File
 
@@ -19,16 +21,44 @@ object ThumbnailHelper {
     }
 
     /**
+     * Loads a bitmap with EXIF rotation applied so pixel coordinates
+     * match the visually correct orientation.
+     */
+    private fun loadRotatedBitmap(file: File): Bitmap? {
+        val raw = BitmapFactory.decodeFile(file.absolutePath) ?: return null
+        val orientation = try {
+            ExifInterface(file.absolutePath).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+        } catch (e: Exception) {
+            ExifInterface.ORIENTATION_NORMAL
+        }
+        val degrees = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            ExifInterface.ORIENTATION_TRANSPOSE -> { /* flip + 90 handled below */ 90f }
+            ExifInterface.ORIENTATION_TRANSVERSE -> { /* flip + 270 handled below */ 270f }
+            else -> 0f
+        }
+        if (degrees == 0f) return raw
+        val matrix = Matrix().apply { postRotate(degrees) }
+        val rotated = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
+        raw.recycle()
+        return rotated
+    }
+
+    /**
      * Creates a 128x128 WebP thumbnail for the face region with 10% padding.
-     * Returns true on success.
+     * Coords are in the rotated (visually correct) image space.
      */
     fun createThumbnail(context: Context, photoFile: File, coords: FaceRegionCoords, faceRegionId: String): Boolean {
         return try {
-            val original = BitmapFactory.decodeFile(photoFile.absolutePath) ?: return false
+            val original = loadRotatedBitmap(photoFile) ?: return false
             val imgW = original.width.toFloat()
             val imgH = original.height.toFloat()
 
-            // Convert normalized center coords to pixel rect with padding
             val cx = coords.x * imgW
             val cy = coords.y * imgH
             val halfW = (coords.w * imgW) / 2f
@@ -43,10 +73,8 @@ object ThumbnailHelper {
                 (cy + halfH + padY).coerceAtMost(imgH)
             )
 
-            // Make crop square (use the larger dimension, centered) to avoid distortion
-            val cropW = rect.width()
-            val cropH = rect.height()
-            val cropSize = maxOf(cropW, cropH)
+            // Make crop square to avoid distortion
+            val cropSize = maxOf(rect.width(), rect.height())
             val squareLeft = ((rect.left + rect.right) / 2f - cropSize / 2f).coerceAtLeast(0f)
             val squareTop = ((rect.top + rect.bottom) / 2f - cropSize / 2f).coerceAtLeast(0f)
             val squareRight = (squareLeft + cropSize).coerceAtMost(imgW)
@@ -79,10 +107,11 @@ object ThumbnailHelper {
 
     /**
      * Crops the face region WITHOUT padding, scaled to 160x160 for FaceNet embedding input.
+     * Coords are in the rotated (visually correct) image space.
      */
     fun cropForEmbedding(photoFile: File, coords: FaceRegionCoords): Bitmap? {
         return try {
-            val original = BitmapFactory.decodeFile(photoFile.absolutePath) ?: return null
+            val original = loadRotatedBitmap(photoFile) ?: return null
             val imgW = original.width.toFloat()
             val imgH = original.height.toFloat()
 
