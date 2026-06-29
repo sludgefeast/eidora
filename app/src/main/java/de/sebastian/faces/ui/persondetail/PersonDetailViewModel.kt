@@ -11,18 +11,22 @@ import de.sebastian.faces.worker.SyncPipeline
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+import de.sebastian.faces.ui.common.MultiSelectState
+
 data class PersonDetailUiState(
     val personName: String = "",
     val unconfirmedFaces: List<FaceRegionWithPhoto> = emptyList(),
     val confirmedFaces: List<FaceRegionWithPhoto> = emptyList(),
-    val selectedFaceIds: Set<String> = emptySet(),
-    val isMultiSelectActive: Boolean = false,
+    val multiSelect: MultiSelectState<String> = MultiSelectState(),
     val actionFaceId: String? = null,
     val showAssignSheet: Boolean = false,
     val assignTargetFaceIds: Set<String> = emptySet(),
     val allPersons: List<PersonWithCount> = emptyList(),
     val personSearchQuery: String = ""
-)
+) {
+    val selectedFaceIds get() = multiSelect.selectedIds
+    val isMultiSelectActive get() = multiSelect.isActive
+}
 
 class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -93,20 +97,21 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun toggleFaceSelection(faceId: String) {
+        _uiState.update { it.copy(multiSelect = it.multiSelect.toggle(faceId)) }
+    }
+
+    fun rangeSelectFace(faceId: String) {
         _uiState.update { state ->
-            val newSelected = state.selectedFaceIds.toMutableSet()
-            if (newSelected.contains(faceId)) newSelected.remove(faceId)
-            else newSelected.add(faceId)
-            state.copy(
-                selectedFaceIds = newSelected,
-                isMultiSelectActive = newSelected.isNotEmpty()
-            )
+            val orderedIds = (state.unconfirmedFaces + state.confirmedFaces)
+                .map { it.faceRegion.id }
+            state.copy(multiSelect = state.multiSelect.rangeSelect(faceId, orderedIds))
         }
     }
 
     fun clearSelection() {
-        _uiState.update { it.copy(selectedFaceIds = emptySet(), isMultiSelectActive = false) }
+        _uiState.update { it.copy(multiSelect = it.multiSelect.clear()) }
     }
+
 
     fun showFaceActions(faceId: String) {
         _uiState.update { it.copy(actionFaceId = faceId) }

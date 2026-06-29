@@ -71,7 +71,12 @@ fun PersonDetailScreen(
                             else
                                 viewModel.showFaceActions(faceWithPhoto.faceRegion.id)
                         },
-                        onLongPress = { viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id) },
+                        onLongPress = {
+                            if (state.isMultiSelectActive)
+                                viewModel.rangeSelectFace(faceWithPhoto.faceRegion.id)
+                            else
+                                viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id)
+                        },
                         onImageTap = {
                             onFaceClick(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId)
                         }
@@ -101,7 +106,12 @@ fun PersonDetailScreen(
                             else
                                 viewModel.showFaceActions(faceWithPhoto.faceRegion.id)
                         },
-                        onLongPress = { viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id) },
+                        onLongPress = {
+                            if (state.isMultiSelectActive)
+                                viewModel.rangeSelectFace(faceWithPhoto.faceRegion.id)
+                            else
+                                viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id)
+                        },
                         onImageTap = {
                             onFaceClick(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId)
                         }

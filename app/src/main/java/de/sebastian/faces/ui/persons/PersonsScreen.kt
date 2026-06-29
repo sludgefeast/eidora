@@ -56,8 +56,12 @@ fun PersonsScreen(
                     else onPersonClick(personWithCount.person.id)
                 },
                 onLongClick = {
-                    viewModel.toggleSelection(personWithCount.person.id)
-                    onPersonLongClick(personWithCount.person.id)
+                    if (state.isMultiSelectActive)
+                        viewModel.rangeSelectPerson(personWithCount.person.id)
+                    else {
+                        viewModel.toggleSelection(personWithCount.person.id)
+                        onPersonLongClick(personWithCount.person.id)
+                    }
                 },
                 onNameClick = { viewModel.startRename(personWithCount.person.id) }
             )

@@ -7,6 +7,7 @@ import de.sebastian.faces.data.db.DatabaseProvider
 import de.sebastian.faces.data.db.PersonEntity
 import de.sebastian.faces.data.db.PersonWithCount
 import de.sebastian.faces.data.repository.FaceRepository
+import de.sebastian.faces.ui.common.MultiSelectState
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -22,11 +23,13 @@ data class PersonsUiState(
     val suggestions: List<PersonSuggestionUi> = emptyList(),
     val unknownCount: Int = 0,
     val ignoredCount: Int = 0,
-    val selectedPersonIds: Set<String> = emptySet(),
-    val isMultiSelectActive: Boolean = false,
+    val multiSelect: MultiSelectState<String> = MultiSelectState(),
     val renamingPersonId: String? = null,
     val showMergeSheet: Boolean = false
-)
+) {
+    val selectedPersonIds get() = multiSelect.selectedIds
+    val isMultiSelectActive get() = multiSelect.isActive
+}
 
 class PersonsViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -39,7 +42,6 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
     val uiState: StateFlow<PersonsUiState> = _uiState.asStateFlow()
 
     init {
-        // Fix 2: use reactive count flows instead of suspend calls inside collect
         viewModelScope.launch {
             combine(
                 repo.observePersonsWithCount(),
@@ -66,26 +68,22 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
                     suggestions = suggestionUis,
                     unknownCount = unknownCount,
                     ignoredCount = ignoredCount,
-                    selectedPersonIds = _uiState.value.selectedPersonIds,
-                    isMultiSelectActive = _uiState.value.isMultiSelectActive,
+                    multiSelect = _uiState.value.multiSelect,
                     renamingPersonId = _uiState.value.renamingPersonId,
                     showMergeSheet = _uiState.value.showMergeSheet
                 )
-            }.collect { newState ->
-                _uiState.value = newState
-            }
+            }.collect { newState -> _uiState.value = newState }
         }
     }
 
     fun toggleSelection(personId: String) {
+        _uiState.update { it.copy(multiSelect = it.multiSelect.toggle(personId)) }
+    }
+
+    fun rangeSelectPerson(personId: String) {
         _uiState.update { state ->
-            val newSelected = state.selectedPersonIds.toMutableSet()
-            if (newSelected.contains(personId)) newSelected.remove(personId)
-            else newSelected.add(personId)
-            state.copy(
-                selectedPersonIds = newSelected,
-                isMultiSelectActive = newSelected.isNotEmpty()
-            )
+            val orderedIds = state.confirmedPersons.map { it.person.id }
+            state.copy(multiSelect = state.multiSelect.rangeSelect(personId, orderedIds))
         }
     }
 
@@ -118,9 +116,8 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
             repo.mergePersons(sourceIds, winnerId)
             _uiState.update {
                 it.copy(
-                    showMergeSheet = false,
-                    selectedPersonIds = emptySet(),
-                    isMultiSelectActive = false
+                    multiSelect = it.multiSelect.clear(),
+                    showMergeSheet = false
                 )
             }
         }
@@ -128,13 +125,10 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun confirmSuggestion(personId: String, name: String) {
         viewModelScope.launch {
-            // Check if a person with this name already exists
             val existing = personDao.findByName(name)
             if (existing != null && existing.id != personId) {
-                // Merge suggestion into existing named person
                 repo.mergePersons(listOf(personId, existing.id), existing.id)
             } else {
-                // Name the suggestion person and confirm all its faces
                 personDao.updateName(personId, name)
                 val faces = faceDao.findByPersonId(personId)
                 faces.filter { it.name == null }.forEach { face ->
