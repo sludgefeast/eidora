@@ -136,7 +136,7 @@ class PhotoSyncWorker(
     private fun collectJpegs(root: File): List<File> {
         if (!root.exists()) return emptyList()
         return root.walkTopDown()
-            .filter { it.isFile && FileUtil.isJpeg(it) }
+            .filter { it.isFile && FileUtil.isJpeg(it) && FileUtil.isInDebugDateRange(it) }
             .toList()
     }
 
@@ -146,9 +146,6 @@ class PhotoSyncWorker(
         val takenAt = try { FileUtil.readTakenAt(file) } catch (t: Throwable) {
             Log.w(TAG, "Could not read takenAt for ${file.name}"); null
         }
-
-        // DEBUG FILTER: only IMG_202601 to IMG_202605
-        if (!FileUtil.isInDebugDateRange(file)) return
 
         val existing = photoDao.findByPath(path)
         when {
