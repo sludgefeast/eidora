@@ -8,10 +8,15 @@ import de.sebastian.faces.data.db.FacesDatabase
 import de.sebastian.faces.data.db.PersonEntity
 import de.sebastian.faces.ml.ChineseWhispers
 import de.sebastian.faces.ml.FaceNetModel
-import de.sebastian.faces.worker.NotificationHelper
 import java.util.UUID
 
 private const val TAG = "ClusteringWorker"
+
+// Fix 1: lower threshold for fewer false positives
+private const val CLUSTER_MATCH_THRESHOLD = 0.30f
+
+// Fix 2: minimum cluster size to create a suggestion
+private const val MIN_CLUSTER_SIZE = 2
 
 class ClusteringWorker(
     context: Context,
@@ -24,8 +29,21 @@ class ClusteringWorker(
         val personDao = db.personDao()
 
         return try {
-            try { setForeground(NotificationHelper.clusteringForegroundInfo(applicationContext)) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
+            try {
+                setForeground(NotificationHelper.clusteringForegroundInfo(applicationContext))
+            } catch (t: Throwable) {
+                Log.w(TAG, "setForeground failed", t)
+            }
             setProgress(workDataOf(PhotoSyncWorker.KEY_STATUS to "Clustering faces…"))
+
+            // Fix 4: abort if any faces still lack embeddings – they haven't been
+            // processed by EmbeddingWorker yet. Retry later instead of clustering
+            // on incomplete data.
+            val pendingEmbeddings = faceDao.findWithoutEmbedding()
+            if (pendingEmbeddings.isNotEmpty()) {
+                Log.w(TAG, "${pendingEmbeddings.size} faces still missing embeddings – retrying later")
+                return Result.retry()
+            }
 
             val candidates: List<Pair<String, FloatArray>> = faceDao
                 .findUnclusteredAndNotIgnored()
@@ -43,6 +61,14 @@ class ClusteringWorker(
 
             clusterResults.groupBy { it.clusterId }.forEach { (_, members) ->
                 if (members.isEmpty()) return@forEach
+
+                // Fix 2: skip singleton clusters – leave them as Unknown until
+                // more evidence accumulates in future syncs
+                if (members.size < MIN_CLUSTER_SIZE) {
+                    Log.d(TAG, "Skipping singleton cluster (${members.size} face)")
+                    return@forEach
+                }
+
                 try {
                     val memberEmbeddings: List<FloatArray> = members.mapNotNull { result ->
                         candidates.find { it.first == result.faceRegionId }?.second
@@ -106,11 +132,15 @@ class ClusteringWorker(
                 if (allFaces.isEmpty()) return@forEach
 
                 val basisFaces = allFaces.filter { it.name != null }.ifEmpty { allFaces }
-                val embeddings: List<FloatArray> = basisFaces.map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
+                val embeddings: List<FloatArray> = basisFaces
+                    .map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
                 val centroid = FaceNetModel.centroid(embeddings)
 
                 val representative = basisFaces.minByOrNull { face ->
-                    FaceNetModel.cosineDistance(FaceNetModel.bytesToFloatArray(face.embedding!!), centroid)
+                    FaceNetModel.cosineDistance(
+                        FaceNetModel.bytesToFloatArray(face.embedding!!),
+                        centroid
+                    )
                 }
                 personDao.updateRepresentativeFace(person.id, representative?.id)
             } catch (t: Throwable) {
@@ -120,9 +150,9 @@ class ClusteringWorker(
     }
 
     companion object {
-        const val CLUSTER_MATCH_THRESHOLD = 0.40f
-
         fun buildRequest(): OneTimeWorkRequest =
-            OneTimeWorkRequestBuilder<ClusteringWorker>().build()
+            OneTimeWorkRequestBuilder<ClusteringWorker>()
+                .setBackoffCriteria(BackoffPolicy.LINEAR, 30_000L, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .build()
     }
 }

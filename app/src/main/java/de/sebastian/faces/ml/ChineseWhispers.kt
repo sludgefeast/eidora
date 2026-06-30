@@ -11,7 +11,7 @@ import kotlin.random.Random
  */
 object ChineseWhispers {
 
-    private const val EDGE_THRESHOLD = 0.40f  // cosine distance; lower = more similar
+    private const val EDGE_THRESHOLD = 0.30f  // cosine distance; lower = more similar, fewer false positives
     private const val MAX_ITERATIONS = 100
 
     data class ClusterResult(
