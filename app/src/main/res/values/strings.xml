@@ -48,4 +48,5 @@
 
     <!-- Errors -->
     <string name="error_generic">Something went wrong</string>
+    <string name="label_no_date">No date</string>
 </resources>

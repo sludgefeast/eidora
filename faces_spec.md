@@ -358,3 +358,30 @@ Tap auf Thumbnail → Foto-Vollbild
 6. Fortschritt in der Statusleiste
 
 Der WorkManager-Job erkennt anhand von `KEY_PHOTO_ID` im InputData, dass nur ein einzelnes Foto verarbeitet werden soll, und überspringt den vollen DCIM/Camera-Scan.
+
+---
+
+### Screen: Fotos
+
+**Layout**
+- Grid mit 2 Fotos pro Zeile
+- Jedes Foto als Quadrat (mittiger Ausschnitt, `ContentScale.Crop`)
+- Sortierung: Aufnahmedatum absteigend (jüngstes zuerst), Fotos ohne Datum ganz am Ende
+
+**Monats-Trenner**
+- Zwischen Fotos verschiedener Monate erscheint ein voller Trenner über die Bildschirmbreite
+- Format: „Januar 2026" (lokalisiert)
+
+**Jahreszahl beim Scrollen**
+- Während des Scrollens wird die aktuelle Jahreszahl als semitransparenter Overlay oben rechts eingeblendet
+- Verschwindet nach kurzem Stillstand wieder
+
+**Multiselect**
+- Erster LongPress aktiviert Multiselect, weiterer LongPress selektiert Bereich (wie im Gesichter-Screen)
+- Selektierte Fotos: blauer transparenter Overlay
+- Aktionsleiste am unteren Rand: „Gesichter neu bestimmen"
+- Gesichter neu bestimmen: wie im Vollbild-Screen, für alle selektierten Fotos
+
+**Interaktionen**
+- Einfacher Tap → Foto-Vollbild (ohne aktuelles Gesicht, alle Rahmen grün/grau)
+- LongPress → Multiselect aktivieren

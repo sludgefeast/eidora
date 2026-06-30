@@ -36,6 +36,8 @@ import de.sebastian.faces.ui.persons.VIRTUAL_IGNORED
 import de.sebastian.faces.ui.persons.VIRTUAL_UNKNOWN
 import de.sebastian.faces.ui.persons.PersonsScreen
 import de.sebastian.faces.ui.persons.PersonsViewModel
+import de.sebastian.faces.ui.photos.PhotosScreen
+import de.sebastian.faces.ui.photos.PhotosViewModel
 import de.sebastian.faces.ui.theme.FacesTheme
 import de.sebastian.faces.worker.SyncPipeline
 
@@ -194,9 +196,13 @@ fun FacesApp() {
                 }
             }
             composable("photos") {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Photos coming soon")
-                }
+                val vm: PhotosViewModel = viewModel()
+                PhotosScreen(
+                    viewModel = vm,
+                    onPhotoClick = { photoId ->
+                        navController.navigate("fullscreen/$photoId")
+                    }
+                )
             }
         }
     }
