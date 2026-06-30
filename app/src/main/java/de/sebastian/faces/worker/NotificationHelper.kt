@@ -2,11 +2,14 @@ package de.sebastian.faces.worker
 
 import android.app.Notification
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
+import de.sebastian.faces.MainActivity
 import de.sebastian.faces.R
 
 object NotificationHelper {
@@ -48,6 +51,18 @@ object NotificationHelper {
         }
     }
 
+    private fun contentIntent(context: Context): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        return PendingIntent.getActivity(context, 0, intent, flags)
+    }
+
     private fun buildNotification(
         context: Context, title: String, text: String, progress: Int
     ): Notification {
@@ -55,6 +70,7 @@ object NotificationHelper {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
+            .setContentIntent(contentIntent(context))
             .setOngoing(true)
             .setSilent(true)
 
