@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "de.sebastian.faces"
+    namespace = "de.sebastian.eidora"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "de.sebastian.faces"
+        applicationId = "de.sebastian.eidora"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

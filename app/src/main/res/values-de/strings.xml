@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Faces</string>
+    <string name="app_name">Eidora</string>
 
     <!-- Navigation -->
     <string name="nav_persons">Personen</string>
@@ -42,7 +42,7 @@
 
     <!-- Sync notification -->
     <string name="notification_channel_sync">Synchronisierung</string>
-    <string name="notification_sync_title">Faces-Synchronisierung</string>
+    <string name="notification_sync_title">Eidora-Synchronisierung</string>
     <string name="notification_sync_running">Fotos werden synchronisiert…</string>
     <string name="notification_sync_done">Synchronisierung abgeschlossen</string>
 
@@ -50,7 +50,4 @@
     <string name="error_generic">Ein Fehler ist aufgetreten</string>
     <string name="label_no_date">Kein Datum</string>
     <string name="notification_download_model">Gesichtserkennungsmodell wird heruntergeladen…</string>
-    <string name="merge_conflict_title">Name schon vergeben</string>
-    <string name="merge_conflict_message">Eine Person mit dem Namen \"%1$s\" existiert bereits. In die bestehende Person zusammenführen?</string>
-    <string name="action_merge_into_existing">Zusammenführen</string>
 </resources>
