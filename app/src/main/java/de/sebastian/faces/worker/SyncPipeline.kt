@@ -9,7 +9,8 @@ object SyncPipeline {
 
     fun enqueue(context: Context) {
         WorkManager.getInstance(context)
-            .beginWith(PhotoSyncWorker.buildRequest())
+            .beginWith(ModelDownloadWorker.buildRequest())
+            .then(PhotoSyncWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())
             .then(ClusteringWorker.buildRequest())
             .enqueue()
@@ -26,7 +27,8 @@ object SyncPipeline {
             .setInputData(workDataOf(PhotoSyncWorker.KEY_PHOTO_ID to photoId))
             .build()
         WorkManager.getInstance(context)
-            .beginWith(syncRequest)
+            .beginWith(ModelDownloadWorker.buildRequest())
+            .then(syncRequest)
             .then(EmbeddingWorker.buildRequest())
             .then(ClusteringWorker.buildRequest())
             .enqueue()

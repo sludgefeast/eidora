@@ -237,13 +237,19 @@ Rein zur Laufzeit aus DB zusammengesucht, kein eigener DB-Eintrag.
 
 ### FaceNet512 (TFLite)
 - Embedding-Berechnung
-- Ablage: `app/src/main/assets/facenet_512.tflite`
-- Begleitdatei: `app/src/main/assets/facenet_512_model_info.txt`
+- Wird beim ersten App-Start heruntergeladen (nicht im APK enthalten)
+- Ablage nach Download: `context.filesDir/facenet_512.tflite` (~90 MB)
+- Quelle: `https://github.com/shubham0204/OnDevice-Face-Recognition-Android`
+- `ModelDownloadWorker` läuft als erster Schritt der Sync-Pipeline und lädt das Modell falls noch nicht vorhanden
+- Fortschritt erscheint als Benachrichtigung in der Statusleiste
+- Bei Netzwerkfehler retry mit LinearBackoff (30s)
+- Erforderliche Berechtigung: `INTERNET`
 
 ```
 Model:      FaceNet512 (TFLite, FP16)
 Source:     https://github.com/shubham0204/OnDevice-Face-Recognition-Android
-File:       app/src/main/assets/facenet_512.tflite
+URL:        https://github.com/shubham0204/OnDevice-Face-Recognition-Android/raw/main/app/src/main/assets/facenet_512.tflite
+Local:      context.filesDir/facenet_512.tflite (after download)
 Origin:     DeepFace library (https://github.com/serengil/deepface)
 Updated:    2025-12
 Embedding:  512-dimensional float vector

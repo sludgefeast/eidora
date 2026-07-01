@@ -49,4 +49,5 @@
     <!-- Errors -->
     <string name="error_generic">Ein Fehler ist aufgetreten</string>
     <string name="label_no_date">Kein Datum</string>
+    <string name="notification_download_model">Gesichtserkennungsmodell wird heruntergeladen…</string>
 </resources>

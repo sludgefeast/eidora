@@ -3,14 +3,15 @@ package de.sebastian.faces.ml
 import android.content.Context
 import android.graphics.Bitmap
 import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.support.common.FileUtil
 import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.image.ops.ResizeOp
 import java.io.Closeable
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.channels.FileChannel
 import kotlin.math.max
 import kotlin.math.sqrt
 
@@ -20,11 +21,19 @@ class FaceNetModel(context: Context) : Closeable {
     private val imageProcessor: ImageProcessor
 
     init {
-        val model = FileUtil.loadMappedFile(context, "facenet_512.tflite")
-        val options = Interpreter.Options().apply {
-            numThreads = 4
+        val modelFile = ModelDownloader.modelFile(context)
+        if (!modelFile.exists()) {
+            throw IllegalStateException(
+                "FaceNet model not found at ${modelFile.absolutePath}. " +
+                    "Call ModelDownloader.download() first."
+            )
         }
-        interpreter = Interpreter(model, options)
+
+        val mappedBuffer = RandomAccessFile(modelFile, "r").use { raf ->
+            raf.channel.map(FileChannel.MapMode.READ_ONLY, 0, raf.length())
+        }
+        val options = Interpreter.Options().apply { numThreads = 4 }
+        interpreter = Interpreter(mappedBuffer, options)
 
         imageProcessor = ImageProcessor.Builder()
             .add(ResizeOp(160, 160, ResizeOp.ResizeMethod.BILINEAR))

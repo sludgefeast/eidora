@@ -18,6 +18,7 @@ object NotificationHelper {
     private const val NOTIFICATION_ID_SYNC = 1001
     private const val NOTIFICATION_ID_EMBEDDING = 1002
     private const val NOTIFICATION_ID_CLUSTERING = 1003
+    private const val NOTIFICATION_ID_DOWNLOAD = 1004
 
     fun syncForegroundInfo(context: Context, progress: Int, status: String): ForegroundInfo {
         val notification = buildNotification(
@@ -34,6 +35,16 @@ object NotificationHelper {
     fun clusteringForegroundInfo(context: Context): ForegroundInfo {
         val notification = buildNotification(context, "Clustering faces", "Running…", -1)
         return makeForegroundInfo(NOTIFICATION_ID_CLUSTERING, notification)
+    }
+
+    fun modelDownloadForegroundInfo(context: Context, progress: Int): ForegroundInfo {
+        val notification = buildNotification(
+            context,
+            context.getString(R.string.notification_download_model),
+            "$progress%",
+            progress
+        )
+        return makeForegroundInfo(NOTIFICATION_ID_DOWNLOAD, notification)
     }
 
     fun cancelSync(context: Context) {
