@@ -44,7 +44,7 @@ Beim Build aus diesem SVG die komplette Android Icon-Familie erzeugen:
 
 ## Berechtigungen
 
-Die App benötigt zwei Laufzeit-Berechtigungen, bevor die Sync-Pipeline gestartet werden darf:
+Die App benötigt drei Laufzeit-Berechtigungen, bevor die Sync-Pipeline gestartet werden darf:
 
 **1. Foto-Lesezugriff**
 - Android 13+ (API 33+): `READ_MEDIA_IMAGES`
@@ -57,10 +57,19 @@ Die App benötigt zwei Laufzeit-Berechtigungen, bevor die Sync-Pipeline gestarte
 - Kann nicht über den normalen Permission-Dialog gewährt werden, sondern nur über die Systemeinstellungen (`Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION`). Die App leitet den Nutzer dorthin weiter.
 - Android < 11: `WRITE_EXTERNAL_STORAGE` (bis API 29) reicht aus
 
+**3. Benachrichtigungen**
+- Android 13+ (API 33+): `POST_NOTIFICATIONS`
+- Wird über den Standard-Permission-Dialog angefragt
+- Auf älteren Versionen automatisch verfügbar
+
+**Weitere Manifest-Berechtigungen (ohne Runtime-Dialog):**
+- `INTERNET` – für den einmaligen Download des ML-Modells
+- `FOREGROUND_SERVICE` und `FOREGROUND_SERVICE_DATA_SYNC` – für Fortschrittsbenachrichtigungen der Hintergrundverarbeitung
+
 **Ablauf beim App-Start:**
-1. `MainActivity` prüft, ob beide Berechtigungen vorliegen.
+1. `MainActivity` prüft, ob alle drei Berechtigungen vorliegen.
 2. Fehlt eine Berechtigung, wird ein Permission-Screen mit entsprechenden Buttons angezeigt; die Sync-Pipeline startet nicht.
-3. Erst wenn beide Berechtigungen erteilt sind, wird `SyncPipeline.enqueue()` ausgelöst.
+3. Erst wenn alle Berechtigungen erteilt sind, wird `SyncPipeline.enqueue()` ausgelöst.
 
 ---
 
@@ -118,11 +127,22 @@ Nur JPEG. Erkennung über Magic Bytes (erste 3 Bytes: `FF D8 FF`), nicht über D
 
 ## Hintergrundverarbeitung
 
-Drei verkettete WorkManager-WorkRequests, gestartet beim App-Start.
+Vier verkettete WorkManager-WorkRequests, gestartet beim App-Start.
+
+### Schritt 0 – Modell-Download
+
+- `ModelDownloadWorker` prüft ob `facenet_512.tflite` bereits in `context.filesDir` liegt
+- Falls nicht: Download vom offiziellen Repository (siehe Sektion ML-Modell)
+- Netzwerk-Constraint: erst bei Verbindung
+- Fortschritt als Foreground-Notification
+- Retry mit LinearBackoff (30s) bei Netzwerkfehler
+- Blockiert nachfolgende Schritte bis das Modell verfügbar ist
 
 ### Schritt 1 – Foto-Sync
 
 Abgleich Dateisystem ↔ DB für alle JPEG-Dateien in `DCIM/Camera` (nicht der gesamte DCIM-Ordner).
+
+**Debug-Filter:** Aktuell werden nur Dateien mit Namensschema `IMG_202601*` bis `IMG_202605*` verarbeitet. Der Filter greift direkt beim Sammeln der Dateien in `collectJpegs()`, nicht-passende Dateien werden gar nicht erst geladen.
 
 | Fall | Aktion |
 |---|---|
@@ -148,9 +168,16 @@ Abgleich Dateisystem ↔ DB für alle JPEG-Dateien in `DCIM/Camera` (nicht der g
 
 **Thumbnail-Erzeugung (pro FaceRegion):**
 - Zuschnitt: regionJson-Koordinaten + 10% Padding auf Originalbild
+- Vor dem Skalieren: Ausschnitt auf Quadrat erweitern (größere Dimension, zentriert), um Verzerrung zu vermeiden
 - Format: WebP, 128×128px
 - Dateiname: `<faceRegionId>.webp`
 - Ablage: `filesDir/thumbnails/`
+
+**EXIF-Rotationsbehandlung:**
+- `ThumbnailHelper.loadRotatedBitmap()` liest den EXIF-Orientation-Tag und rotiert das Bitmap per `Matrix.postRotate()` bevor Koordinaten angewendet werden
+- ML Kit erhält die `InputImage` inklusive Rotation → gelieferte Koordinaten sind im rotierten Bildraum
+- Beim Normalisieren der ML-Kit-Koordinaten in `PhotoSyncWorker.runMlKit()`: `imgW` und `imgH` werden bei 90°/270°-Rotation vertauscht, damit die normalisierten MWG-Werte konsistent zum sichtbaren Bild sind
+- Fullscreen-Rendering nutzt Coil, das die Rotation automatisch anwendet – die `intrinsicSize` aus `onSuccess` ist bereits die rotierte Größe
 
 **Beim Löschen einer FaceRegion:**
 1. Thumbnail-Datei löschen
@@ -166,7 +193,11 @@ Abgleich Dateisystem ↔ DB für alle JPEG-Dateien in `DCIM/Camera` (nicht der g
 
 ### Schritt 3 – Clustering (Chinese Whispers)
 
+**Vorbedingung:** Der Worker prüft zu Beginn ob noch FaceRegions ohne Embedding existieren. Falls ja, wird `Result.retry()` zurückgegeben und der Worker läuft nach 30s erneut. So wird sichergestellt, dass Clustering nie auf unvollständigen Daten läuft.
+
 - Clustert nur FaceRegions wo `personId IS NULL` und `ignored = false`
+- **Threshold: 0.30** (Cosine Distance) – konservativ gewählt, um False Positives zu vermeiden
+- **Mindestgröße Cluster: 2** – Singleton-Cluster werden nicht als Vorschlag angelegt, sondern bleiben als „Unbekannt" bis bei weiteren Foto-Syncs mehr Belege für diese Person auftauchen
 - Ordnet ähnliche Gesichter bestehenden benannten Persons zu oder legt neue Vorschlag-Persons an
 - Neue Vorschlag-Person: `Person.name = null` – erscheint in der Vorschlagsliste, nicht im Grid
 - Ergebnis: `FaceRegion.personId` gesetzt, `FaceRegion.name` bleibt `null` (= Vorschlag)
@@ -181,15 +212,28 @@ Abgleich Dateisystem ↔ DB für alle JPEG-Dateien in `DCIM/Camera` (nicht der g
 
 ## XMP-Schreibkonventionen
 
-| Tag | Inhalt | Wann |
-|---|---|---|
-| `mwg-rs:Regions` Typ Face | Gesichtsregion ohne Namen (ML Kit) oder mit Namen (bestätigt) | Beim Sync + bei Bestätigung |
-| `Iptc4xmpExt:PersonInImage` | Alle bestätigten Namen des Fotos, dedupliziert | Beim Sync + bei Bestätigung |
-| `dc:subject` `People/[Name]` | Analog PersonInImage | Beim Sync + bei Bestätigung |
+Die App schreibt Personen-Tags im **DigiKam-kompatiblen Format**, sodass die Daten mit DigiKam, Lightroom und Aves kompatibel sind:
+
+| Feld | Format | Beispiel | Zweck |
+|---|---|---|---|
+| `mwg-rs:Regions/mwg-rs:RegionList` | strukturiertes Array, Typ `Face` | Bounding Box + optionaler Name | MWG-Standard für Gesichtsregionen |
+| `Iptc4xmpExt:PersonInImage` | Bag von Strings | `Max` | Semantisch korrekt: benannte Personen |
+| `dc:subject` | Bag von Strings, **nur Blattname** | `Max` | Aves zeigt als Tag, DigiKam als flacher Tag |
+| `digiKam:TagsList` | Seq von Strings, **Pfad mit `/`** | `People/Max` | DigiKam Hierarchie-Format |
+| `lr:hierarchicalSubject` | Bag von Strings, **Pfad mit `\|`** | `People\|Max` | Lightroom/Darktable Hierarchie |
 
 **Regel:** Nach jedem XMP-Schreibvorgang `Photo.modifiedAt` neu aus `File.lastModified()` lesen und in DB aktualisieren.
 
-**PersonInImage und People/-Subjects** werden immer frisch aus den bestätigten FaceRegions des Fotos berechnet, nie direkt aus der DB gelesen.
+**PersonInImage, dc:subject, digiKam:TagsList und lr:hierarchicalSubject** werden immer frisch aus den bestätigten FaceRegions des Fotos berechnet, nie direkt aus der DB gelesen.
+
+**Nicht-Personen-Tags bleiben unangetastet:** Beim Bereinigen von `dc:subject` werden nur die Einträge entfernt, die aktuell auch in `digiKam:TagsList` unter `People/` stehen. Ein Tag wie `Urlaub` bleibt so erhalten.
+
+**Namespaces:**
+- `mwg-rs` → `http://www.metadataworkinggroup.com/schemas/regions/`
+- `Iptc4xmpExt` → `http://iptc.org/std/Iptc4xmpExt/2008-02-29/`
+- `dc` → `http://purl.adobe.com/dc/elements/1.1/`
+- `digiKam` → `http://www.digikam.org/ns/1.0/`
+- `lr` → `http://ns.adobe.com/lightroom/1.0/`
 
 ---
 
@@ -259,6 +303,71 @@ License:    MIT (shubham0204 repo), Apache 2.0 (DeepFace)
 
 ---
 
+## Robustheit
+
+Die App ist so ausgelegt, dass externe Fehler (fehlerhafte JPEGs, fehlerhafte XMP-Metadaten, ML Kit Failures, Netzwerkfehler) niemals zum Absturz führen:
+
+- Jeder externe Aufruf (`ExifInterface`, `ML Kit`, `XMPMetaFactory`, `BitmapFactory`, `FaceNetModel`) ist in einem eigenen `try-catch(Throwable)` gekapselt
+- Fehler bei einer einzelnen Datei oder Region überspringen nur diese, nicht den ganzen Job
+- WorkManager gibt `Result.failure()` oder `Result.retry()` bei unbehandelbaren Fehlern zurück, aber nie einen ungefangenen Crash
+- Der `detector` in `PhotoSyncWorker` ist nullable – wenn ML Kit nicht initialisiert werden kann, wird der Schritt übersprungen statt zu crashen
+- `setForeground()`-Aufrufe sind in try-catch eingewickelt – falls die Benachrichtigung nicht angezeigt werden kann (z.B. fehlender Kanal), läuft der Worker trotzdem weiter
+
+---
+
+## Wiederverwendbare UI-Komponenten
+
+### `MultiSelectState<T>` (`ui/common/`)
+Generische, in beliebige ViewModel-States einbettbare Klasse für Mehrfachselektion:
+- `selectedIds: Set<T>` – aktuell selektierte IDs
+- `lastSelectedId: T?` – zuletzt selektiertes Item (Basis für Range-Select)
+- `isActive: Boolean` – ob Multiselect aktiv ist
+- Methoden: `toggle(id)`, `rangeSelect(id, orderedIds)`, `clear()`
+- Wird verwendet in `PersonsViewModel`, `PersonDetailViewModel` und `PhotosViewModel`
+
+### `CircleThumbnail` (`ui/common/`)
+Kreisförmiges Thumbnail mit garantiertem 1:1-Seitenverhältnis via `Modifier.aspectRatio(1f)`. Wird überall dort verwendet, wo runde Gesichts- oder Personen-Thumbnails erscheinen (Grid, Bottom Sheets, Dialog).
+
+### `CircleColorLabel` (`ui/common/`)
+Farbiger Kreis mit zentriertem Text-Label. Wird für virtuelle Personen (Unbekannt/Ignoriert) verwendet.
+
+### `MergeConfirmDialog` (`ui/common/`)
+AlertDialog mit runder Vorschau der Zielperson und deren Name. Wird angezeigt wenn der Nutzer einen Namen wählt, der bereits einer anderen Person zugeordnet ist. Zwei Optionen: „Zusammenführen" oder „Abbrechen".
+
+---
+
+## Namenskonflikte
+
+Wenn beim Bestätigen eines Vorschlags oder beim Umbenennen einer Person ein Name gewählt wird, der bereits einer anderen Person zugeordnet ist, öffnet sich `MergeConfirmDialog` mit dem repräsentativen Gesicht und Namen der bestehenden Person. Der Nutzer kann bestätigen (dann werden die Personen zusammengeführt) oder abbrechen (dann bleibt der Zustand unverändert).
+
+**Betroffene Flows:**
+- Vorschlag mit Namen bestätigen (`PersonsViewModel.confirmSuggestion`)
+- Person umbenennen (`PersonsViewModel.renamePerson`)
+
+**Nicht betroffen:**
+- „Zu Person zuordnen" (AssignToPersonSheet) – hier ist die Semantik gerade eine bewusste Zuordnung zu bestehenden Personen; ein Konflikt-Dialog wäre redundant.
+
+---
+
+## Benachrichtigungen
+
+Die App zeigt Fortschritt der Hintergrundverarbeitung als System-Benachrichtigungen:
+
+- **Modell-Download** – Fortschrittsbalken in %
+- **Foto-Sync** – aktueller Dateiname + Fortschritt in %
+- **Embedding-Berechnung** – Fortschritt in %
+- **Clustering** – unbestimmter Fortschritt (indeterminate)
+
+**Icon:** `res/drawable-*/ic_notification.png` – einfarbig weiß auf transparent (Android-Standard für Notification-Icons).
+
+**Kanal:** `sync` (`IMPORTANCE_LOW`, kein Sound).
+
+**Tap-Verhalten:** Ein `PendingIntent` öffnet `MainActivity` (`FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TOP`), sodass die App in den Vordergrund kommt bzw. gestartet wird.
+
+**Foreground Service:** WorkManager läuft als `SystemForegroundService` mit `foregroundServiceType="dataSync"` (ab Android 14 Pflicht). Bei fehlgeschlagenem `setForeground()` läuft der Worker trotzdem weiter (Fallback, umschlossen mit try-catch).
+
+---
+
 ## UI / Screens
 
 ### Navigation
@@ -286,6 +395,7 @@ Bottom Navigation mit zwei Tabs: Personen und Fotos.
 **Interaktionen:**
 - Einfacher Tap auf Thumbnail → Screen Person-Detail
 - Longpress auf Person → Multiselect-Modus aktivieren
+- Weiterer Longpress im aktiven Multiselect → Range-Select (alle Personen zwischen dem zuletzt selektierten und dem aktuellen)
 - Multiselect → Aktion: Zusammenführen
 
 **Person umbenennen:**
@@ -325,11 +435,14 @@ Einfacher Tap → Bottom Sheet mit Aktionen:
 - Zu Person zuordnen (Bottom Sheet Personenliste)
 
 Longpress → Multiselect-Modus:
-- Erstes Gesicht per Longpress, weitere per Tap
+- Erster Longpress aktiviert Multiselect, weitere Taps toggeln einzelne Gesichter
+- Weiterer Longpress im aktiven Multiselect: **Range-Select** – alle Gesichter zwischen dem zuletzt selektierten und dem aktuellen Item werden selektiert
 - Selektierte Gesichter: blauer transparenter Overlay
 - Aktionsleiste am unteren Rand mit denselben Aktionen wie Einzel-Tap
 
-Tap auf Thumbnail → Foto-Vollbild
+Foto öffnen: Über die Aktion „Foto öffnen" im Bottom Sheet.
+
+Range-Select-Reihenfolge: unbestätigte Gesichter zuerst, dann bestätigte – analog zur Darstellung im Grid.
 
 ---
 
