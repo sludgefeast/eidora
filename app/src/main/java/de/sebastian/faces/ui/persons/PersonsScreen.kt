@@ -26,6 +26,7 @@ import de.sebastian.faces.R
 import de.sebastian.faces.data.db.PersonWithCount
 import de.sebastian.faces.ui.common.CircleColorLabel
 import de.sebastian.faces.ui.common.CircleThumbnail
+import de.sebastian.faces.ui.common.MergeConfirmDialog
 import de.sebastian.faces.util.ThumbnailHelper
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -135,6 +136,20 @@ fun PersonsScreen(
             persons = state.confirmedPersons.filter { state.selectedPersonIds.contains(it.person.id) },
             onConfirm = { winnerId -> viewModel.mergePersons(winnerId) },
             onDismiss = { viewModel.cancelMerge() }
+        )
+    }
+
+    // Merge conflict dialog (name already exists)
+    state.mergeConflict?.let { conflict ->
+        val context = LocalContext.current
+        val thumbnail = conflict.targetRepresentativeFaceId?.let {
+            ThumbnailHelper.thumbnailFile(context, it)
+        }
+        MergeConfirmDialog(
+            existingPersonName = conflict.targetPersonName,
+            existingRepresentativeThumbnail = thumbnail,
+            onConfirmMerge = { viewModel.confirmMergeConflict() },
+            onCancel = { viewModel.cancelMergeConflict() }
         )
     }
 }

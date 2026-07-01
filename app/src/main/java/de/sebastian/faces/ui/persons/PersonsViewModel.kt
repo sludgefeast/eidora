@@ -25,11 +25,22 @@ data class PersonsUiState(
     val ignoredCount: Int = 0,
     val multiSelect: MultiSelectState<String> = MultiSelectState(),
     val renamingPersonId: String? = null,
-    val showMergeSheet: Boolean = false
+    val showMergeSheet: Boolean = false,
+    val mergeConflict: MergeConflict? = null
 ) {
     val selectedPersonIds get() = multiSelect.selectedIds
     val isMultiSelectActive get() = multiSelect.isActive
 }
+
+/**
+ * Represents a pending merge decision when the user picked a name that already exists.
+ */
+data class MergeConflict(
+    val sourcePersonId: String,
+    val targetPersonId: String,
+    val targetPersonName: String,
+    val targetRepresentativeFaceId: String?
+)
 
 class PersonsViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -70,7 +81,8 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
                     ignoredCount = ignoredCount,
                     multiSelect = _uiState.value.multiSelect,
                     renamingPersonId = _uiState.value.renamingPersonId,
-                    showMergeSheet = _uiState.value.showMergeSheet
+                    showMergeSheet = _uiState.value.showMergeSheet,
+                    mergeConflict = _uiState.value.mergeConflict
                 )
             }.collect { newState -> _uiState.value = newState }
         }
@@ -97,7 +109,27 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun renamePerson(personId: String, newName: String) {
         viewModelScope.launch {
-            repo.renamePerson(personId, newName)
+            val trimmed = newName.trim()
+            if (trimmed.isBlank()) {
+                _uiState.update { it.copy(renamingPersonId = null) }
+                return@launch
+            }
+            val existing = personDao.findByName(trimmed)
+            if (existing != null && existing.id != personId) {
+                _uiState.update {
+                    it.copy(
+                        renamingPersonId = null,
+                        mergeConflict = MergeConflict(
+                            sourcePersonId = personId,
+                            targetPersonId = existing.id,
+                            targetPersonName = trimmed,
+                            targetRepresentativeFaceId = existing.representativeFaceId
+                        )
+                    )
+                }
+                return@launch
+            }
+            repo.renamePerson(personId, trimmed)
             _uiState.update { it.copy(renamingPersonId = null) }
         }
     }
@@ -125,16 +157,42 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun confirmSuggestion(personId: String, name: String) {
         viewModelScope.launch {
-            val existing = personDao.findByName(name)
+            val trimmed = name.trim()
+            if (trimmed.isBlank()) return@launch
+            val existing = personDao.findByName(trimmed)
             if (existing != null && existing.id != personId) {
-                repo.mergePersons(listOf(personId, existing.id), existing.id)
-            } else {
-                personDao.updateName(personId, name)
-                val faces = faceDao.findByPersonId(personId)
-                faces.filter { it.name == null }.forEach { face ->
-                    repo.confirmFace(face.id, personId)
+                _uiState.update {
+                    it.copy(
+                        mergeConflict = MergeConflict(
+                            sourcePersonId = personId,
+                            targetPersonId = existing.id,
+                            targetPersonName = trimmed,
+                            targetRepresentativeFaceId = existing.representativeFaceId
+                        )
+                    )
                 }
+                return@launch
+            }
+            personDao.updateName(personId, trimmed)
+            val faces = faceDao.findByPersonId(personId)
+            faces.filter { it.name == null }.forEach { face ->
+                repo.confirmFace(face.id, personId)
             }
         }
+    }
+
+    fun confirmMergeConflict() {
+        val conflict = _uiState.value.mergeConflict ?: return
+        viewModelScope.launch {
+            repo.mergePersons(
+                listOf(conflict.sourcePersonId, conflict.targetPersonId),
+                conflict.targetPersonId
+            )
+            _uiState.update { it.copy(mergeConflict = null) }
+        }
+    }
+
+    fun cancelMergeConflict() {
+        _uiState.update { it.copy(mergeConflict = null) }
     }
 }

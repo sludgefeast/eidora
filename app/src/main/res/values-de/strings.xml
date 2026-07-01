@@ -50,4 +50,7 @@
     <string name="error_generic">Ein Fehler ist aufgetreten</string>
     <string name="label_no_date">Kein Datum</string>
     <string name="notification_download_model">Gesichtserkennungsmodell wird heruntergeladen…</string>
+    <string name="merge_conflict_title">Name schon vergeben</string>
+    <string name="merge_conflict_message">Eine Person mit dem Namen \"%1$s\" existiert bereits. In die bestehende Person zusammenführen?</string>
+    <string name="action_merge_into_existing">Zusammenführen</string>
 </resources>
