@@ -11,8 +11,8 @@
     @org.tensorflow.lite.annotations.UsedByReflection *;
 }
 
-# Adobe XMP Core
--keep class com.adobe.xmp.** { *; }
+# Ashampoo XMP Core
+-keep class com.ashampoo.** { *; }
 
 # ML Kit
 -keep class com.google.mlkit.** { *; }
@@ -23,13 +23,17 @@
 -keep @androidx.room.Entity class *
 -keep @androidx.room.Dao interface *
 
+# Application classes (referenced from AndroidManifest.xml)
+-keep class de.sebastian.eidora.EidoraApplication { *; }
+-keep class de.sebastian.eidora.MainActivity { *; }
+
 # Kotlin serialization
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.AnnotationsKt
--keep,includedescriptorclasses class de.sebastian.faces.**$$serializer { *; }
--keepclassmembers class de.sebastian.faces.** {
+-keep,includedescriptorclasses class de.sebastian.eidora.**$$serializer { *; }
+-keepclassmembers class de.sebastian.eidora.** {
     *** Companion;
 }
--keepclasseswithmembers class de.sebastian.faces.** {
+-keepclasseswithmembers class de.sebastian.eidora.** {
     kotlinx.serialization.KSerializer serializer(...);
 }

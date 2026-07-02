@@ -1,0 +1,70 @@
+package de.sebastian.eidora.worker
+
+import android.content.Context
+import android.util.Log
+import androidx.work.*
+import de.sebastian.eidora.data.db.DatabaseProvider
+import de.sebastian.eidora.data.db.FaceRegionEntity
+import de.sebastian.eidora.ml.FaceNetModel
+import de.sebastian.eidora.worker.NotificationHelper
+import de.sebastian.eidora.util.ThumbnailHelper
+import de.sebastian.eidora.util.toFaceRegionCoords
+import java.io.File
+
+private const val TAG = "EmbeddingWorker"
+
+class EmbeddingWorker(
+    context: Context,
+    params: WorkerParameters
+) : CoroutineWorker(context, params) {
+
+    override suspend fun doWork(): Result {
+        val db = DatabaseProvider.getInstance(applicationContext)
+        val faceDao = db.faceRegionDao()
+        val photoDao = db.photoDao()
+
+        val model = try {
+            FaceNetModel(applicationContext)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to initialize FaceNet model", t)
+            return Result.failure()
+        }
+
+        return try {
+            val pending: List<FaceRegionEntity> = faceDao.findWithoutEmbedding()
+            pending.forEachIndexed { index, face ->
+                val progress = ((index + 1) * 100) / pending.size
+                setProgress(workDataOf(
+                    PhotoSyncWorker.KEY_PROGRESS to progress,
+                    PhotoSyncWorker.KEY_STATUS to "Computing embeddings…"
+                ))
+                try { setForeground(NotificationHelper.embeddingForegroundInfo(applicationContext, progress)) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
+                try {
+                    val photo = photoDao.findById(face.photoId) ?: return@forEachIndexed
+                    val photoFile = File(photo.path)
+                    if (!photoFile.exists()) return@forEachIndexed
+
+                    val coords = face.regionJson.toFaceRegionCoords()
+                    val bitmap = ThumbnailHelper.cropForEmbedding(photoFile, coords) ?: return@forEachIndexed
+
+                    val embedding = model.computeEmbedding(bitmap)
+                    bitmap.recycle()
+                    faceDao.updateEmbedding(face.id, FaceNetModel.floatArrayToBytes(embedding))
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to compute embedding for face ${face.id}, skipping", t)
+                }
+            }
+            Result.success()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Unhandled error in EmbeddingWorker", t)
+            Result.failure()
+        } finally {
+            try { model.close() } catch (t: Throwable) { Log.w(TAG, "Error closing model", t) }
+        }
+    }
+
+    companion object {
+        fun buildRequest(): OneTimeWorkRequest =
+            OneTimeWorkRequestBuilder<EmbeddingWorker>().build()
+    }
+}
