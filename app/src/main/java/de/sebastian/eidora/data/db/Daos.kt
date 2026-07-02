@@ -37,7 +37,7 @@ interface PhotoDao {
     @Query("DELETE FROM photos WHERE id = :id")
     suspend fun deleteById(id: String)
 
-    @Query("SELECT * FROM photos ORDER BY takenAt DESC NULLS LAST")
+    @Query("SELECT * FROM photos ORDER BY CASE WHEN takenAt IS NULL THEN 1 ELSE 0 END, takenAt DESC")
     fun observeAllSortedByDate(): Flow<List<PhotoEntity>>
 
     @Query("SELECT * FROM photos")
