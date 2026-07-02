@@ -14,33 +14,33 @@ class ModelDownloadWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        Log.i(TAG, "ModelDownloadWorker started")
+
         if (ModelDownloader.isDownloaded(applicationContext)) {
+            Log.i(TAG, "Model already downloaded, skipping")
             return Result.success()
         }
 
         return try {
             try {
-                setForeground(
-                    NotificationHelper.modelDownloadForegroundInfo(applicationContext, 0)
-                )
+                setForeground(NotificationHelper.modelDownloadForegroundInfo(applicationContext, 0))
             } catch (t: Throwable) {
-                Log.w(TAG, "setForeground failed", t)
+                Log.w(TAG, "setForeground failed, continuing without foreground service", t)
             }
-            setProgress(workDataOf(
-                PhotoSyncWorker.KEY_STATUS to applicationContext.getString(R.string.notification_download_model)
-            ))
 
+            Log.i(TAG, "Starting model download from ${ModelDownloader.MODEL_URL}")
             val success = ModelDownloader.download(applicationContext) { progress ->
-                try {
-                    setProgressAsync(workDataOf(PhotoSyncWorker.KEY_PROGRESS to progress))
-                    // Foreground update is best-effort, ignore failures
-                    setForegroundAsync(
-                        NotificationHelper.modelDownloadForegroundInfo(applicationContext, progress)
-                    )
-                } catch (t: Throwable) { /* ignore progress errors */ }
+                // Throttled progress log
+                if (progress % 10 == 0) Log.d(TAG, "Download progress: $progress%")
             }
 
-            if (success) Result.success() else Result.retry()
+            if (success) {
+                Log.i(TAG, "Model download successful")
+                Result.success()
+            } else {
+                Log.w(TAG, "Model download failed, will retry")
+                Result.retry()
+            }
         } catch (t: Throwable) {
             Log.e(TAG, "Unhandled error in ModelDownloadWorker", t)
             Result.retry()
