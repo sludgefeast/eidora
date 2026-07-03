@@ -44,6 +44,7 @@ import de.sebastian.eidora.worker.SyncPipeline
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             EidoraTheme {
                 EidoraApp()
@@ -136,6 +137,7 @@ fun EidoraApp() {
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
     Scaffold(
+        modifier = Modifier.imePadding(),
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(

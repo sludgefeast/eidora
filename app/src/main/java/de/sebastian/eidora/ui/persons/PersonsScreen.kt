@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -13,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -21,6 +24,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 import de.sebastian.eidora.R
 import de.sebastian.eidora.data.db.PersonWithCount
@@ -216,6 +220,8 @@ private fun VirtualPersonItem(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
 private fun SuggestionRow(
     suggestion: PersonSuggestionUi,
     onThumbnailClick: () -> Unit,
@@ -223,8 +229,9 @@ private fun SuggestionRow(
 ) {
     val context = LocalContext.current
     var text by remember { mutableStateOf("") }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
 
-    // Use representativeFaceId if available, otherwise fall back to firstFaceId
     val thumbnailId = suggestion.representativeFaceId ?: suggestion.firstFaceId
     val thumbnailFile = thumbnailId?.let { ThumbnailHelper.thumbnailFile(context, it) }
 
@@ -251,7 +258,14 @@ private fun SuggestionRow(
             keyboardActions = KeyboardActions(onDone = {
                 if (text.isNotBlank()) onNameConfirmed(text.trim())
             }),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .bringIntoViewRequester(bringIntoViewRequester)
+                .onFocusChanged { focus ->
+                    if (focus.isFocused) {
+                        scope.launch { bringIntoViewRequester.bringIntoView() }
+                    }
+                }
         )
     }
 }
