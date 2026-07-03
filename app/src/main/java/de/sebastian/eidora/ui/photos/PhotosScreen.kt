@@ -1,5 +1,7 @@
 package de.sebastian.eidora.ui.photos
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -9,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -28,7 +31,6 @@ fun PhotosScreen(
     val state by viewModel.uiState.collectAsState()
     val gridState = rememberLazyGridState()
 
-    // Track current year from first visible item
     val firstVisibleIndex by remember { derivedStateOf { gridState.firstVisibleItemIndex } }
     LaunchedEffect(firstVisibleIndex) {
         val item = state.items.getOrNull(firstVisibleIndex)
@@ -41,7 +43,9 @@ fun PhotosScreen(
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             state = gridState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(end = 6.dp)
         ) {
             state.items.forEach { item ->
                 when (item) {
@@ -82,7 +86,14 @@ fun PhotosScreen(
             }
         }
 
-        // Year overlay while scrolling
+        VerticalScrollbar(
+            state = gridState,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(4.dp)
+        )
+
         if (state.currentYear.isNotBlank()) {
             Text(
                 text = state.currentYear,
@@ -99,7 +110,6 @@ fun PhotosScreen(
             )
         }
 
-        // Multiselect action bar
         if (state.isMultiSelectActive && state.selectedPhotoIds.isNotEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -153,5 +163,43 @@ private fun PhotoGridItem(
                     .background(Color(0x660D47A1))
             )
         }
+    }
+}
+
+/**
+ * Simple vertical scrollbar that appears while scrolling and fades out when idle.
+ */
+@Composable
+private fun VerticalScrollbar(
+    state: LazyGridState,
+    modifier: Modifier = Modifier
+) {
+    val isScrolling by remember { derivedStateOf { state.isScrollInProgress } }
+    val alpha by animateFloatAsState(
+        targetValue = if (isScrolling) 0.7f else 0f,
+        animationSpec = tween(durationMillis = if (isScrolling) 100 else 800),
+        label = "scrollbar-alpha"
+    )
+
+    val totalItems by remember { derivedStateOf { state.layoutInfo.totalItemsCount } }
+    val visibleItems by remember { derivedStateOf { state.layoutInfo.visibleItemsInfo.size } }
+    val firstVisible by remember { derivedStateOf { state.firstVisibleItemIndex } }
+
+    if (totalItems == 0 || visibleItems >= totalItems) return
+
+    BoxWithConstraints(modifier = modifier.alpha(alpha)) {
+        val handleFraction = (visibleItems.toFloat() / totalItems.toFloat()).coerceAtLeast(0.05f)
+        val positionFraction = firstVisible.toFloat() / (totalItems - visibleItems).toFloat().coerceAtLeast(1f)
+
+        val handleHeight = maxHeight * handleFraction
+        val handleOffset = (maxHeight - handleHeight) * positionFraction
+
+        Box(
+            modifier = Modifier
+                .offset(y = handleOffset)
+                .width(4.dp)
+                .height(handleHeight)
+                .background(Color.White.copy(alpha = 0.6f), shape = MaterialTheme.shapes.small)
+        )
     }
 }
