@@ -166,7 +166,8 @@ private fun PersonGridItem(
         CircleThumbnail(
             file = thumbnailFile,
             contentDescription = personWithCount.person.name,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            borderColor = if (personWithCount.unconfirmedCount > 0) Color(0xFF4CAF50) else null
         ) {
             if (isSelected) {
                 Box(

@@ -91,7 +91,9 @@ interface PersonDao {
     suspend fun deleteOrphaned()
 
     @Query("""
-        SELECT p.*, COUNT(CASE WHEN f.name IS NOT NULL AND f.ignored = 0 THEN 1 END) as confirmedCount
+        SELECT p.*, 
+               COUNT(CASE WHEN f.name IS NOT NULL AND f.ignored = 0 THEN 1 END) as confirmedCount,
+               COUNT(CASE WHEN f.name IS NULL AND f.ignored = 0 THEN 1 END) as unconfirmedCount
         FROM persons p
         LEFT JOIN face_regions f ON f.personId = p.id
         WHERE p.name IS NOT NULL
@@ -122,7 +124,8 @@ interface PersonDao {
 
 data class PersonWithCount(
     @Embedded val person: PersonEntity,
-    val confirmedCount: Int
+    val confirmedCount: Int,
+    val unconfirmedCount: Int = 0
 )
 
 // ---------------------------------------------------------------------------

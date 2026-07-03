@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import java.io.File
 
@@ -23,11 +25,20 @@ fun CircleThumbnail(
     file: File?,
     contentDescription: String? = null,
     modifier: Modifier = Modifier,
+    borderColor: Color? = null,
+    borderWidth: Dp = 3.dp,
     overlay: @Composable BoxScope.() -> Unit = {}
 ) {
     Box(
         modifier = modifier
             .aspectRatio(1f)
+            .then(
+                if (borderColor != null)
+                    Modifier
+                        .background(borderColor, CircleShape)
+                        .padding(borderWidth)
+                else Modifier
+            )
             .clip(CircleShape)
     ) {
         if (file != null && file.exists()) {

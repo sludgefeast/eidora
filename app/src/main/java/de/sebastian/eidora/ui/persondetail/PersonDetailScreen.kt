@@ -170,12 +170,8 @@ private fun FaceGridItem(
         CircleThumbnail(
             file = thumbnailFile,
             contentDescription = null,
-            modifier = Modifier.fillMaxSize().then(
-                if (borderColor != null) Modifier
-                    .padding(3.dp)
-                    .background(borderColor, CircleShape)
-                else Modifier
-            )
+            modifier = Modifier.fillMaxSize(),
+            borderColor = borderColor
         ) {
             if (isSelected) {
                 Box(
