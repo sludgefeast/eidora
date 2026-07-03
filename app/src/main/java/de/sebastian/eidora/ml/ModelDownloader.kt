@@ -14,7 +14,7 @@ object ModelDownloader {
 
     // FaceNet512 model from shubham0204/OnDevice-Face-Recognition-Android
     const val MODEL_URL =
-        "https://github.com/shubham0204/OnDevice-Face-Recognition-Android/raw/main/app/src/main/assets/facenet_512.tflite"
+        "https://github.com/shubham0204/OnDevice-Face-Recognition-Android/raw/v0.0.1/app/src/main/assets/facenet_512.tflite"
 
     // SHA-256 of the expected model file for integrity verification
     private const val EXPECTED_SHA256 =
