@@ -42,7 +42,7 @@
 
     <!-- Sync notification -->
     <string name="notification_channel_sync">Synchronisierung</string>
-    <string name="notification_sync_title">Eidora-Synchronisierung</string>
+    <string name="notification_sync_title">Synchronisierung</string>
     <string name="notification_sync_running">Fotos werden synchronisiert…</string>
     <string name="notification_sync_done">Synchronisierung abgeschlossen</string>
 
