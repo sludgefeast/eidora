@@ -34,7 +34,15 @@ fun PersonDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(state.personName) })
+            TopAppBar(title = {
+                Text(
+                    text = state.personName,
+                    fontStyle = if (state.viewMode != PersonDetailViewMode.NORMAL)
+                        androidx.compose.ui.text.font.FontStyle.Italic
+                    else
+                        androidx.compose.ui.text.font.FontStyle.Normal
+                )
+            })
         },
         bottomBar = {
             if (state.isMultiSelectActive && state.selectedFaceIds.isNotEmpty()) {
@@ -64,7 +72,9 @@ fun PersonDetailScreen(
                     FaceGridItem(
                         face = faceWithPhoto,
                         isSelected = state.selectedFaceIds.contains(faceWithPhoto.faceRegion.id),
-                        borderColor = Color(0xFF4CAF50),
+                        borderColor = if (state.viewMode == PersonDetailViewMode.NORMAL)
+                            Color(0xFF4CAF50)
+                        else null,
                         onTap = {
                             if (state.isMultiSelectActive)
                                 viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id)
@@ -125,12 +135,18 @@ fun PersonDetailScreen(
         val face = state.unconfirmedFaces.find { it.faceRegion.id == faceId }
             ?: state.confirmedFaces.find { it.faceRegion.id == faceId }
         FaceActionsSheet(
+            viewMode = state.viewMode,
             onOpenPhoto = {
                 face?.let { onFaceClick(faceId, it.faceRegion.photoId) }
             },
             onConfirm = { viewModel.confirmFace(faceId) },
             onIgnore = { viewModel.ignoreFace(faceId) },
-            onRemove = { viewModel.removeFace(faceId) },
+            onRemove = {
+                if (state.viewMode == PersonDetailViewMode.IGNORED)
+                    viewModel.unignoreFace(faceId)
+                else
+                    viewModel.removeFace(faceId)
+            },
             onRedetect = { viewModel.redetectFace(faceId) },
             onAssign = { viewModel.showAssignSheet(faceId) },
             onDismiss = { viewModel.dismissActions() }
@@ -187,6 +203,7 @@ private fun FaceGridItem(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun FaceActionsSheet(
+    viewMode: PersonDetailViewMode,
     onOpenPhoto: () -> Unit,
     onConfirm: () -> Unit,
     onIgnore: () -> Unit,
@@ -197,14 +214,33 @@ private fun FaceActionsSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(bottom = 32.dp)) {
-            listOf(
-                stringResource(R.string.action_open_photo) to onOpenPhoto,
-                stringResource(R.string.action_confirm) to onConfirm,
-                stringResource(R.string.action_ignore) to onIgnore,
-                stringResource(R.string.action_remove_from_person) to onRemove,
-                stringResource(R.string.action_redetect) to onRedetect,
-                stringResource(R.string.action_assign_to_person) to onAssign
-            ).forEach { (label, action) ->
+            val actions = buildList<Pair<String, () -> Unit>> {
+                add(stringResource(R.string.action_open_photo) to onOpenPhoto)
+
+                // Confirm: only in NORMAL mode (Unknown/Ignored have no person to confirm to)
+                if (viewMode == PersonDetailViewMode.NORMAL) {
+                    add(stringResource(R.string.action_confirm) to onConfirm)
+                }
+
+                // Ignore: not in IGNORED mode (already ignored)
+                if (viewMode != PersonDetailViewMode.IGNORED) {
+                    add(stringResource(R.string.action_ignore) to onIgnore)
+                }
+
+                // Remove or Unignore depending on mode
+                when (viewMode) {
+                    PersonDetailViewMode.NORMAL ->
+                        add(stringResource(R.string.action_remove_from_person) to onRemove)
+                    PersonDetailViewMode.IGNORED ->
+                        add(stringResource(R.string.action_unignore) to onRemove)
+                    PersonDetailViewMode.UNKNOWN -> { /* no remove/unignore */ }
+                }
+
+                add(stringResource(R.string.action_redetect) to onRedetect)
+                add(stringResource(R.string.action_assign_to_person) to onAssign)
+            }
+
+            actions.forEach { (label, action) ->
                 ListItem(
                     headlineContent = { Text(label) },
                     modifier = Modifier.combinedClickable(onClick = { action(); onDismiss() })

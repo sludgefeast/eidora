@@ -51,4 +51,5 @@
     <string name="label_no_date">No date</string>
     <string name="notification_download_model">Downloading face recognition model…</string>
     <string name="action_reject_suggestion">Reject suggestion</string>
+    <string name="action_unignore">Unignore</string>
 </resources>

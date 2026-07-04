@@ -13,8 +13,11 @@ import kotlinx.coroutines.launch
 
 import de.sebastian.eidora.ui.common.MultiSelectState
 
+enum class PersonDetailViewMode { NORMAL, UNKNOWN, IGNORED }
+
 data class PersonDetailUiState(
     val personName: String = "",
+    val viewMode: PersonDetailViewMode = PersonDetailViewMode.NORMAL,
     val unconfirmedFaces: List<FaceRegionWithPhoto> = emptyList(),
     val confirmedFaces: List<FaceRegionWithPhoto> = emptyList(),
     val multiSelect: MultiSelectState<String> = MultiSelectState(),
@@ -73,6 +76,7 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         personName = getApplication<Application>()
                             .getString(de.sebastian.eidora.R.string.virtual_person_unknown),
+                        viewMode = PersonDetailViewMode.UNKNOWN,
                         unconfirmedFaces = faces,
                         confirmedFaces = emptyList()
                     )
@@ -88,6 +92,7 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         personName = getApplication<Application>()
                             .getString(de.sebastian.eidora.R.string.virtual_person_ignored),
+                        viewMode = PersonDetailViewMode.IGNORED,
                         unconfirmedFaces = faces,
                         confirmedFaces = emptyList()
                     )
@@ -132,6 +137,10 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun removeFace(faceId: String) {
         viewModelScope.launch { repo.removeFaceFromPerson(faceId) }
+    }
+
+    fun unignoreFace(faceId: String) {
+        viewModelScope.launch { repo.unignoreFace(faceId) }
     }
 
     fun redetectFace(faceId: String) {
