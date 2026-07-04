@@ -390,7 +390,8 @@ private fun FaceActionsSheet(
 
                 // Remove or Unignore depending on mode
                 when (viewMode) {
-                    PersonDetailViewMode.NORMAL ->
+                    PersonDetailViewMode.NORMAL,
+                    PersonDetailViewMode.SUGGESTION ->
                         add(stringResource(R.string.action_remove_from_person) to onRemove)
                     PersonDetailViewMode.IGNORED ->
                         add(stringResource(R.string.action_unignore) to onRemove)
