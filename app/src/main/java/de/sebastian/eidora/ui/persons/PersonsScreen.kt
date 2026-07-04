@@ -73,22 +73,33 @@ fun PersonsScreen(
             )
         }
 
-        // Virtual persons at end of grid
-        item {
-            VirtualPersonItem(
-                label = stringResource(R.string.virtual_person_unknown),
-                color = Color(0xFF9E9E9E),
-                count = state.unknownCount,
-                onClick = { onPersonClick(VIRTUAL_UNKNOWN) }
-            )
-        }
-        item {
-            VirtualPersonItem(
-                label = stringResource(R.string.virtual_person_ignored),
-                color = Color(0xFF616161),
-                count = state.ignoredCount,
-                onClick = { onPersonClick(VIRTUAL_IGNORED) }
-            )
+        // Virtual persons on their own row below the confirmed persons grid
+        item(span = { GridItemSpan(3) }) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, start = 4.dp, end = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    VirtualPersonItem(
+                        label = stringResource(R.string.virtual_person_unknown),
+                        color = Color(0xFF9E9E9E),
+                        count = state.unknownCount,
+                        onClick = { onPersonClick(VIRTUAL_UNKNOWN) }
+                    )
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    VirtualPersonItem(
+                        label = stringResource(R.string.virtual_person_ignored),
+                        color = Color(0xFF616161),
+                        count = state.ignoredCount,
+                        onClick = { onPersonClick(VIRTUAL_IGNORED) }
+                    )
+                }
+                // Third slot empty for symmetry with 3-column grid
+                Spacer(modifier = Modifier.weight(1f))
+            }
         }
 
         // Suggestions header
