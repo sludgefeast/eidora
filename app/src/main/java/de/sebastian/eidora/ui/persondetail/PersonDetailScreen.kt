@@ -8,20 +8,30 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import de.sebastian.eidora.R
 import de.sebastian.eidora.data.db.FaceRegionWithPhoto
 import de.sebastian.eidora.ui.common.CircleThumbnail
+import de.sebastian.eidora.ui.common.MergeConfirmDialog
 import de.sebastian.eidora.util.ThumbnailHelper
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -32,17 +42,117 @@ fun PersonDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    var isEditingName by remember { mutableStateOf(false) }
+    var editedName by remember(state.personName) { mutableStateOf(state.personName) }
+
+    // Auto-start editing when opening a suggestion; leave editing when it becomes a named person
+    LaunchedEffect(state.viewMode) {
+        when (state.viewMode) {
+            PersonDetailViewMode.SUGGESTION -> {
+                isEditingName = true
+                editedName = ""
+            }
+            PersonDetailViewMode.NORMAL -> {
+                isEditingName = false
+            }
+            else -> { /* leave as-is for virtual persons */ }
+        }
+    }
+
+    val canEdit = state.viewMode == PersonDetailViewMode.NORMAL ||
+                  state.viewMode == PersonDetailViewMode.SUGGESTION
+
     Scaffold(
         topBar = {
-            TopAppBar(title = {
-                Text(
-                    text = state.personName,
-                    fontStyle = if (state.viewMode != PersonDetailViewMode.NORMAL)
-                        androidx.compose.ui.text.font.FontStyle.Italic
-                    else
-                        androidx.compose.ui.text.font.FontStyle.Normal
-                )
-            })
+            TopAppBar(
+                title = {
+                    if (isEditingName && canEdit) {
+                        val focusRequester = remember { FocusRequester() }
+                        OutlinedTextField(
+                            value = editedName,
+                            onValueChange = { editedName = it },
+                            singleLine = true,
+                            placeholder = {
+                                if (state.viewMode == PersonDetailViewMode.SUGGESTION) {
+                                    Text(stringResource(R.string.hint_enter_name))
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                if (editedName.isNotBlank() && editedName != state.personName) {
+                                    viewModel.renameCurrentPerson(editedName.trim())
+                                }
+                                if (state.viewMode != PersonDetailViewMode.SUGGESTION) {
+                                    isEditingName = false
+                                }
+                            }),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester)
+                        )
+                        LaunchedEffect(Unit) { focusRequester.requestFocus() }
+                    } else {
+                        Text(
+                            text = state.personName,
+                            fontStyle = if (state.viewMode != PersonDetailViewMode.NORMAL)
+                                androidx.compose.ui.text.font.FontStyle.Italic
+                            else
+                                androidx.compose.ui.text.font.FontStyle.Normal
+                        )
+                    }
+                },
+                actions = {
+                    when {
+                        state.viewMode == PersonDetailViewMode.SUGGESTION -> {
+                            // Only save button, no cancel/pencil
+                            IconButton(onClick = {
+                                if (editedName.isNotBlank()) {
+                                    viewModel.renameCurrentPerson(editedName.trim())
+                                }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = stringResource(R.string.action_confirm)
+                                )
+                            }
+                        }
+                        state.viewMode == PersonDetailViewMode.NORMAL -> {
+                            if (isEditingName) {
+                                IconButton(onClick = {
+                                    isEditingName = false
+                                    editedName = state.personName
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.action_cancel)
+                                    )
+                                }
+                                IconButton(onClick = {
+                                    if (editedName.isNotBlank() && editedName != state.personName) {
+                                        viewModel.renameCurrentPerson(editedName.trim())
+                                    }
+                                    isEditingName = false
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = stringResource(R.string.action_edit_name)
+                                    )
+                                }
+                            } else {
+                                IconButton(onClick = {
+                                    editedName = state.personName
+                                    isEditingName = true
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = stringResource(R.string.action_edit_name)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            )
         },
         bottomBar = {
             if (state.isMultiSelectActive && state.selectedFaceIds.isNotEmpty()) {
@@ -92,6 +202,16 @@ fun PersonDetailScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            if (state.viewMode == PersonDetailViewMode.SUGGESTION) {
+                item(span = { GridItemSpan(3) }) {
+                    Text(
+                        text = stringResource(R.string.suggestion_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp)
+                    )
+                }
+            }
             if (state.unconfirmedFaces.isNotEmpty()) {
                 items(state.unconfirmedFaces, key = { it.faceRegion.id }) { faceWithPhoto ->
                     FaceGridItem(
@@ -182,6 +302,22 @@ fun PersonDetailScreen(
         AssignToPersonSheet(
             viewModel = viewModel,
             onDismiss = { viewModel.dismissAssignSheet() }
+        )
+    }
+    state.mergeConflict?.let { conflict ->
+        val context = LocalContext.current
+        val thumbnail = conflict.targetRepresentativeFaceId?.let {
+            ThumbnailHelper.thumbnailFile(context, it)
+        }
+        MergeConfirmDialog(
+            existingPersonName = conflict.targetPersonName,
+            existingRepresentativeThumbnail = thumbnail,
+            onConfirmMerge = {
+                viewModel.confirmMergeConflict { targetId ->
+                    isEditingName = false
+                }
+            },
+            onCancel = { viewModel.cancelMergeConflict() }
         )
     }
 }

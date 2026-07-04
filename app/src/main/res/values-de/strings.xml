@@ -53,4 +53,6 @@
     <string name="action_reject_suggestion">Vorschlag verwerfen</string>
     <string name="action_unignore">Ignorieren aufheben</string>
     <string name="action_assign_faces">Gesichter zuordnen</string>
+    <string name="action_edit_name">Namen bearbeiten</string>
+    <string name="suggestion_hint">Diese Gesichter scheinen zur selben Person zu gehören. Gib einen Namen ein, um sie zu bestätigen.</string>
 </resources>

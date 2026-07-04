@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 
 import de.sebastian.eidora.ui.common.MultiSelectState
 
-enum class PersonDetailViewMode { NORMAL, UNKNOWN, IGNORED }
+enum class PersonDetailViewMode { NORMAL, UNKNOWN, IGNORED, SUGGESTION }
 
 data class PersonDetailUiState(
     val personName: String = "",
@@ -26,11 +26,19 @@ data class PersonDetailUiState(
     val assignTargetFaceIds: Set<String> = emptySet(),
     val allPersons: List<PersonWithCount> = emptyList(),
     val personSearchQuery: String = "",
-    val isReassigning: Boolean = false
+    val isReassigning: Boolean = false,
+    val mergeConflict: MergeConflict? = null
 ) {
     val selectedFaceIds get() = multiSelect.selectedIds
     val isMultiSelectActive get() = multiSelect.isActive
 }
+
+data class MergeConflict(
+    val sourcePersonId: String,
+    val targetPersonId: String,
+    val targetPersonName: String,
+    val targetRepresentativeFaceId: String?
+)
 
 class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -48,7 +56,14 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
         currentPersonId = personId
         viewModelScope.launch {
             val person = personDao.findById(personId)
-            _uiState.update { it.copy(personName = person?.name ?: "") }
+            val isSuggestion = person != null && person.name == null
+            _uiState.update {
+                it.copy(
+                    personName = person?.name ?: "",
+                    viewMode = if (isSuggestion) PersonDetailViewMode.SUGGESTION
+                               else PersonDetailViewMode.NORMAL
+                )
+            }
 
             faceDao.observeByPersonId(personId).collect { faces: List<FaceRegionWithPhoto> ->
                 _uiState.update {
@@ -142,6 +157,56 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun unignoreFace(faceId: String) {
         viewModelScope.launch { repo.unignoreFace(faceId) }
+    }
+
+    fun renameCurrentPerson(newName: String) {
+        val personId = currentPersonId ?: return
+        viewModelScope.launch {
+            val trimmed = newName.trim()
+            if (trimmed.isBlank()) return@launch
+            val existing = personDao.findByName(trimmed)
+            if (existing != null && existing.id != personId) {
+                _uiState.update {
+                    it.copy(
+                        mergeConflict = MergeConflict(
+                            sourcePersonId = personId,
+                            targetPersonId = existing.id,
+                            targetPersonName = trimmed,
+                            targetRepresentativeFaceId = existing.representativeFaceId
+                        )
+                    )
+                }
+                return@launch
+            }
+            repo.renamePerson(personId, trimmed)
+            // If this was a suggestion, confirm all its unnamed faces too
+            val faces = faceDao.findByPersonId(personId)
+            faces.filter { it.name == null && !it.ignored }.forEach { face ->
+                repo.confirmFace(face.id, personId)
+            }
+            _uiState.update {
+                it.copy(
+                    personName = trimmed,
+                    viewMode = PersonDetailViewMode.NORMAL
+                )
+            }
+        }
+    }
+
+    fun confirmMergeConflict(onMerged: (String) -> Unit = {}) {
+        val conflict = _uiState.value.mergeConflict ?: return
+        viewModelScope.launch {
+            repo.mergePersons(
+                listOf(conflict.sourcePersonId, conflict.targetPersonId),
+                conflict.targetPersonId
+            )
+            _uiState.update { it.copy(mergeConflict = null) }
+            onMerged(conflict.targetPersonId)
+        }
+    }
+
+    fun cancelMergeConflict() {
+        _uiState.update { it.copy(mergeConflict = null) }
     }
 
     /**
