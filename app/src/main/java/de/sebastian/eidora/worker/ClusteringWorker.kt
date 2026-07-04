@@ -15,6 +15,9 @@ private const val TAG = "ClusteringWorker"
 // Fix 1: lower threshold for fewer false positives
 private const val CLUSTER_MATCH_THRESHOLD = 0.30f
 
+// Stricter threshold for individual face-to-person matching (pre-clustering step)
+private const val INDIVIDUAL_MATCH_THRESHOLD = 0.25f
+
 // Fix 2: minimum cluster size to create a suggestion
 private const val MIN_CLUSTER_SIZE = 2
 
@@ -45,12 +48,55 @@ class ClusteringWorker(
                 return Result.retry()
             }
 
-            val candidates: List<Pair<String, FloatArray>> = faceDao
-                .findUnclusteredAndNotIgnored()
+            // Pre-clustering step: try to match each unknown face individually
+            // against the centroids of confirmed faces per named person.
+            // Uses a stricter threshold than the cluster-level match.
+            val unknownFacesAll = faceDao.findUnclusteredAndNotIgnored()
                 .filter { it.embedding != null }
+
+            val personCentroids: Map<String, FloatArray> = personDao.getAll()
+                .filter { it.name != null }
+                .mapNotNull { person ->
+                    val confirmedEmbeddings = faceDao.findByPersonId(person.id)
+                        .filter { it.name != null && !it.ignored && it.embedding != null }
+                        .map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
+                    if (confirmedEmbeddings.isEmpty()) null
+                    else person.id to FaceNetModel.centroid(confirmedEmbeddings)
+                }.toMap()
+
+            val individuallyAssigned = mutableSetOf<String>()
+            if (personCentroids.isNotEmpty()) {
+                unknownFacesAll.forEach { face ->
+                    try {
+                        val embedding = FaceNetModel.bytesToFloatArray(face.embedding!!)
+                        var bestId: String? = null
+                        var bestDist = INDIVIDUAL_MATCH_THRESHOLD
+                        personCentroids.forEach { (personId, centroid) ->
+                            val d = FaceNetModel.cosineDistance(embedding, centroid)
+                            if (d < bestDist) { bestDist = d; bestId = personId }
+                        }
+                        bestId?.let { personId ->
+                            faceDao.updatePersonId(face.id, personId)
+                            individuallyAssigned.add(face.id)
+                        }
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "Individual match failed for face ${face.id}", t)
+                    }
+                }
+                Log.i(TAG, "Individually assigned ${individuallyAssigned.size} faces to existing persons")
+            }
+
+            // Remaining candidates for clustering
+            val candidates: List<Pair<String, FloatArray>> = unknownFacesAll
+                .filter { it.id !in individuallyAssigned }
                 .map { face -> Pair(face.id, FaceNetModel.bytesToFloatArray(face.embedding!!)) }
 
-            if (candidates.isEmpty()) return Result.success()
+            if (candidates.isEmpty()) {
+                try { recomputeAllCentroids(db) } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to recompute centroids", t)
+                }
+                return Result.success()
+            }
 
             val clusterResults = try {
                 ChineseWhispers.cluster(candidates)
