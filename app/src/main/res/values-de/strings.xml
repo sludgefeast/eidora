@@ -52,4 +52,5 @@
     <string name="notification_download_model">Gesichtserkennungsmodell wird heruntergeladen…</string>
     <string name="action_reject_suggestion">Vorschlag verwerfen</string>
     <string name="action_unignore">Ignorieren aufheben</string>
+    <string name="action_assign_faces">Gesichter zuordnen</string>
 </resources>

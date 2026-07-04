@@ -53,6 +53,31 @@ fun PersonDetailScreen(
                     onRedetect = { viewModel.redetectSelected() },
                     onAssign = { viewModel.showAssignSheet() }
                 )
+            } else if (state.viewMode == PersonDetailViewMode.UNKNOWN &&
+                       state.unconfirmedFaces.isNotEmpty()) {
+                Surface(shadowElevation = 8.dp) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Button(
+                            onClick = { viewModel.reassignUnknownFaces() },
+                            enabled = !state.isReassigning
+                        ) {
+                            if (state.isReassigning) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Text(stringResource(R.string.action_assign_faces))
+                        }
+                    }
+                }
             }
         }
     ) { padding ->

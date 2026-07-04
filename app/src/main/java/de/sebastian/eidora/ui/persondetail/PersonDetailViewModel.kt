@@ -25,7 +25,8 @@ data class PersonDetailUiState(
     val showAssignSheet: Boolean = false,
     val assignTargetFaceIds: Set<String> = emptySet(),
     val allPersons: List<PersonWithCount> = emptyList(),
-    val personSearchQuery: String = ""
+    val personSearchQuery: String = "",
+    val isReassigning: Boolean = false
 ) {
     val selectedFaceIds get() = multiSelect.selectedIds
     val isMultiSelectActive get() = multiSelect.isActive
@@ -141,6 +142,22 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun unignoreFace(faceId: String) {
         viewModelScope.launch { repo.unignoreFace(faceId) }
+    }
+
+    /**
+     * Runs the clustering worker to reassign unknown faces. The UI updates
+     * automatically as faces leave the "Unknown" flow.
+     */
+    fun reassignUnknownFaces() {
+        val app = getApplication<Application>()
+        _uiState.update { it.copy(isReassigning = true) }
+        de.sebastian.eidora.worker.SyncPipeline.enqueueClustering(app)
+        // Reset spinner after a short delay - the flow will already have
+        // updated the visible faces as they leave "Unknown"
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(3000)
+            _uiState.update { it.copy(isReassigning = false) }
+        }
     }
 
     fun redetectFace(faceId: String) {
