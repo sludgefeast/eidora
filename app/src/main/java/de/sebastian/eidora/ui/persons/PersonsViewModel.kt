@@ -130,10 +130,6 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
                 repo.mergePersons(listOf(personId, existing.id), existing.id)
             } else {
                 personDao.updateName(personId, name)
-                val faces = faceDao.findByPersonId(personId)
-                faces.filter { it.name == null }.forEach { face ->
-                    repo.confirmFace(face.id, personId)
-                }
             }
         }
     }

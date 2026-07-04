@@ -179,11 +179,6 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             repo.renamePerson(personId, trimmed)
-            // If this was a suggestion, confirm all its unnamed faces too
-            val faces = faceDao.findByPersonId(personId)
-            faces.filter { it.name == null && !it.ignored }.forEach { face ->
-                repo.confirmFace(face.id, personId)
-            }
             _uiState.update {
                 it.copy(
                     personName = trimmed,
