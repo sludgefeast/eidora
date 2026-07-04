@@ -137,4 +137,10 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    fun rejectSuggestion(personId: String) {
+        viewModelScope.launch {
+            repo.rejectSuggestion(personId)
+        }
+    }
 }

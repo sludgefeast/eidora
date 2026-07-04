@@ -10,6 +10,8 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -102,7 +104,8 @@ fun PersonsScreen(
                 SuggestionRow(
                     suggestion = suggestion,
                     onThumbnailClick = { onPersonClick(suggestion.personId) },
-                    onNameConfirmed = { name -> viewModel.confirmSuggestion(suggestion.personId, name) }
+                    onNameConfirmed = { name -> viewModel.confirmSuggestion(suggestion.personId, name) },
+                    onReject = { viewModel.rejectSuggestion(suggestion.personId) }
                 )
             }
         }
@@ -221,12 +224,11 @@ private fun VirtualPersonItem(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
 private fun SuggestionRow(
     suggestion: PersonSuggestionUi,
     onThumbnailClick: () -> Unit,
-    onNameConfirmed: (String) -> Unit
+    onNameConfirmed: (String) -> Unit,
+    onReject: () -> Unit
 ) {
     val context = LocalContext.current
     var text by remember { mutableStateOf("") }
@@ -268,6 +270,13 @@ private fun SuggestionRow(
                     }
                 }
         )
+        Spacer(modifier = Modifier.width(4.dp))
+        IconButton(onClick = onReject) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = stringResource(R.string.action_reject_suggestion)
+            )
+        }
     }
 }
 

@@ -30,6 +30,22 @@ class FaceRepository(
     }
 
     // -----------------------------------------------------------------------
+    // Reject suggestion (unnamed Person)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Detaches all faces from an unnamed suggestion Person (personId → null)
+     * and deletes the Person. Faces become "Unknown" again.
+     */
+    suspend fun rejectSuggestion(personId: String) {
+        val person = personDao.findById(personId) ?: return
+        if (person.name != null) return  // Safety: only reject unnamed suggestions
+        val faces = faceDao.findByPersonId(personId)
+        faces.forEach { face -> faceDao.updatePersonId(face.id, null) }
+        personDao.deleteById(personId)
+    }
+
+    // -----------------------------------------------------------------------
     // Ignore face
     // -----------------------------------------------------------------------
 
