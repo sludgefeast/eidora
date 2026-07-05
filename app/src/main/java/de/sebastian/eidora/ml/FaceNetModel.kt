@@ -70,7 +70,7 @@ class FaceNetModel(context: Context) : Closeable {
                 Log.i(TAG, "GPU delegate not supported on this device")
                 return null
             }
-            val delegate = GpuDelegate(compat.bestOptionsForThisDevice)
+            val delegate = GpuDelegate()
             val options = Interpreter.Options().addDelegate(delegate)
             val interp = Interpreter(buffer, options)
             Log.i(TAG, "Using GPU backend")

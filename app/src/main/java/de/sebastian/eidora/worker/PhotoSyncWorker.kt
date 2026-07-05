@@ -14,6 +14,10 @@ import de.sebastian.eidora.data.db.PhotoEntity
 import de.sebastian.eidora.domain.model.FaceRegionCoords
 import de.sebastian.eidora.util.*
 import de.sebastian.eidora.worker.NotificationHelper
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flatMapMerge
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.util.UUID
@@ -104,18 +108,16 @@ class PhotoSyncWorker(
         val doneCount = java.util.concurrent.atomic.AtomicInteger(0)
         val total = jpegFiles.size
 
-        kotlinx.coroutines.flow.flow { jpegFiles.forEach { emit(it) } }
-            .let { flow ->
-                @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-                flow.flatMapMerge(concurrency = SYNC_PARALLELISM) { file ->
-                    kotlinx.coroutines.flow.flow {
-                        try {
-                            processFile(file)
-                        } catch (t: Throwable) {
-                            Log.e(TAG, "Failed to process file ${file.name}, skipping", t)
-                        }
-                        emit(file)
+        @OptIn(ExperimentalCoroutinesApi::class)
+        flow { jpegFiles.forEach { emit(it) } }
+            .flatMapMerge(concurrency = SYNC_PARALLELISM) { file ->
+                flow {
+                    try {
+                        processFile(file)
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "Failed to process file ${file.name}, skipping", t)
                     }
+                    emit(file)
                 }
             }
             .collect { file ->
