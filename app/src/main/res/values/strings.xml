@@ -54,4 +54,7 @@
     <string name="action_assign_faces">Assign faces</string>
     <string name="action_edit_name">Edit name</string>
     <string name="suggestion_hint">These faces appear to belong to the same person. Enter a name to confirm.</string>
+    <string name="merge_conflict_title">Name already used</string>
+    <string name="merge_conflict_message">A person named &quot;%1$s&quot; already exists. Merge into the existing person?</string>
+    <string name="action_merge_into_existing">Merge</string>
 </resources>

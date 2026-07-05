@@ -54,4 +54,7 @@
     <string name="action_assign_faces">Gesichter zuordnen</string>
     <string name="action_edit_name">Namen bearbeiten</string>
     <string name="suggestion_hint">Diese Gesichter scheinen zur selben Person zu gehören. Gib einen Namen ein, um sie zu bestätigen.</string>
+    <string name="merge_conflict_title">Name schon vergeben</string>
+    <string name="merge_conflict_message">Eine Person mit dem Namen &quot;%1$s&quot; existiert bereits. In die bestehende Person zusammenführen?</string>
+    <string name="action_merge_into_existing">Zusammenführen</string>
 </resources>
