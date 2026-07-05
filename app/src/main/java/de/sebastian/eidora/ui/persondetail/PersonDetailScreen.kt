@@ -39,6 +39,7 @@ import de.sebastian.eidora.util.ThumbnailHelper
 fun PersonDetailScreen(
     viewModel: PersonDetailViewModel,
     onBack: () -> Unit,
+    onNavigateToPerson: (personId: String) -> Unit,
     onFaceClick: (faceRegionId: String, photoId: String) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -324,6 +325,7 @@ fun PersonDetailScreen(
             onConfirmMerge = {
                 viewModel.confirmMergeConflict { targetId ->
                     isEditingName = false
+                    onNavigateToPerson(targetId)
                 }
             },
             onCancel = { viewModel.cancelMergeConflict() }

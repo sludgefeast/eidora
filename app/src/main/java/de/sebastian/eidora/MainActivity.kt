@@ -180,6 +180,11 @@ fun EidoraApp() {
                 PersonDetailScreen(
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
+                    onNavigateToPerson = { targetId ->
+                        navController.navigate("person_detail/$targetId") {
+                            popUpTo("persons")
+                        }
+                    },
                     onFaceClick = { faceId, photoId ->
                         navController.navigate("fullscreen/$photoId?faceId=$faceId")
                     }
