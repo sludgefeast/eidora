@@ -159,6 +159,11 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.unignoreFace(faceId) }
     }
 
+    fun rejectCurrentSuggestion() {
+        val personId = currentPersonId ?: return
+        viewModelScope.launch { repo.rejectSuggestion(personId) }
+    }
+
     fun renameCurrentPerson(newName: String) {
         val personId = currentPersonId ?: return
         viewModelScope.launch {

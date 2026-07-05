@@ -38,6 +38,7 @@ import de.sebastian.eidora.util.ThumbnailHelper
 @Composable
 fun PersonDetailScreen(
     viewModel: PersonDetailViewModel,
+    onBack: () -> Unit,
     onFaceClick: (faceRegionId: String, photoId: String) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -104,7 +105,15 @@ fun PersonDetailScreen(
                 actions = {
                     when {
                         state.viewMode == PersonDetailViewMode.SUGGESTION -> {
-                            // Only save button, no cancel/pencil
+                            IconButton(onClick = {
+                                viewModel.rejectCurrentSuggestion()
+                                onBack()
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.action_reject_suggestion)
+                                )
+                            }
                             IconButton(onClick = {
                                 if (editedName.isNotBlank()) {
                                     viewModel.renameCurrentPerson(editedName.trim())

@@ -177,9 +177,13 @@ fun EidoraApp() {
                         else -> vm.load(personId)
                     }
                 }
-                PersonDetailScreen(vm) { faceId, photoId ->
-                    navController.navigate("fullscreen/$photoId?faceId=$faceId")
-                }
+                PersonDetailScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onFaceClick = { faceId, photoId ->
+                        navController.navigate("fullscreen/$photoId?faceId=$faceId")
+                    }
+                )
             }
             composable(
                 "fullscreen/{photoId}?faceId={faceId}",
