@@ -64,12 +64,18 @@ class PhotoSyncWorker(
 
     private suspend fun doFullSync(): Result {
         try { setForeground(NotificationHelper.syncForegroundInfo(applicationContext, 0, "Scanning files…")) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
+        val patterns = try {
+            de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext).getFilenamePatterns()
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to load filename patterns, using empty list (no filter)", t)
+            emptyList()
+        }
         val cameraDir = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
             "Camera"
         )
         val jpegFiles = try {
-            collectJpegs(cameraDir) { count ->
+            collectJpegs(cameraDir, patterns) { count ->
                 try {
                     setForeground(
                         NotificationHelper.syncForegroundInfo(
@@ -141,16 +147,22 @@ class PhotoSyncWorker(
     // Per-file processing
     // -----------------------------------------------------------------------
 
-    private fun collectJpegs(root: File, onProgress: (Int) -> Unit): List<File> {
+    private fun collectJpegs(
+        root: File,
+        patterns: List<String>,
+        onProgress: (Int) -> Unit
+    ): List<File> {
         if (!root.exists()) return emptyList()
         val result = mutableListOf<File>()
         var scanned = 0
         for (file in root.walkTopDown()) {
             scanned++
             if (scanned % 500 == 0) onProgress(scanned)
-            if (file.isFile && FileUtil.isJpeg(file) && FileUtil.isInDebugDateRange(file)) {
-                result.add(file)
-            }
+            if (!file.isFile) continue
+            if (!de.sebastian.eidora.data.settings.SettingsRepository
+                    .matchesAnyPattern(file.name, patterns)) continue
+            if (!FileUtil.isJpeg(file)) continue
+            result.add(file)
         }
         return result
     }

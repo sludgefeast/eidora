@@ -11,7 +11,6 @@ import kotlin.random.Random
  */
 object ChineseWhispers {
 
-    private const val EDGE_THRESHOLD = 0.30f  // cosine distance; lower = more similar, fewer false positives
     private const val MAX_ITERATIONS = 100
 
     data class ClusterResult(
@@ -23,7 +22,7 @@ object ChineseWhispers {
      * @param nodes List of (faceRegionId, embedding)
      * @return List of ClusterResult assigning each node to a cluster id
      */
-    fun cluster(nodes: List<Pair<String, FloatArray>>): List<ClusterResult> {
+    fun cluster(nodes: List<Pair<String, FloatArray>>, edgeThreshold: Float = 0.30f): List<ClusterResult> {
         if (nodes.isEmpty()) return emptyList()
         if (nodes.size == 1) return listOf(ClusterResult(nodes[0].first, 0))
 
@@ -35,7 +34,7 @@ object ChineseWhispers {
         for (i in 0 until n) {
             for (j in i + 1 until n) {
                 val dist = FaceNetModel.cosineDistance(nodes[i].second, nodes[j].second)
-                if (dist < EDGE_THRESHOLD) {
+                if (dist < edgeThreshold) {
                     val weight = 1f - dist  // similarity
                     edges[i].add(Pair(j, weight))
                     edges[j].add(Pair(i, weight))

@@ -14,6 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.*
@@ -138,6 +139,32 @@ fun EidoraApp() {
 
     Scaffold(
         modifier = Modifier.imePadding(),
+        topBar = {
+            // Show top bar only on main tabs, not on detail screens
+            if (currentRoute == "persons" || currentRoute == "photos") {
+                var menuExpanded by remember { mutableStateOf(false) }
+                TopAppBar(
+                    title = { Text(stringResource(R.string.app_name)) },
+                    actions = {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = null)
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.settings_title)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    navController.navigate("settings")
+                                }
+                            )
+                        }
+                    }
+                )
+            }
+        },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
@@ -213,6 +240,13 @@ fun EidoraApp() {
                     onPhotoClick = { photoId ->
                         navController.navigate("fullscreen/$photoId")
                     }
+                )
+            }
+            composable("settings") {
+                val vm: de.sebastian.eidora.ui.settings.SettingsViewModel = viewModel()
+                de.sebastian.eidora.ui.settings.SettingsScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() }
                 )
             }
         }

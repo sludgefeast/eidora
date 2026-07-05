@@ -12,14 +12,6 @@ import java.util.UUID
 
 private const val TAG = "ClusteringWorker"
 
-// Fix 1: lower threshold for fewer false positives
-private const val CLUSTER_MATCH_THRESHOLD = 0.30f
-
-// Stricter threshold for individual face-to-person matching (pre-clustering step)
-private const val INDIVIDUAL_MATCH_THRESHOLD = 0.25f
-
-// Fix 2: minimum cluster size to create a suggestion
-private const val MIN_CLUSTER_SIZE = 2
 
 class ClusteringWorker(
     context: Context,
@@ -38,6 +30,19 @@ class ClusteringWorker(
                 Log.w(TAG, "setForeground failed", t)
             }
             setProgress(workDataOf(PhotoSyncWorker.KEY_STATUS to "Clustering faces…"))
+
+            val config = try {
+                de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext)
+                    .getClusteringConfig()
+            } catch (t: Throwable) {
+                Log.w(TAG, "Failed to load clustering config, using defaults", t)
+                de.sebastian.eidora.data.settings.ClusteringConfig(
+                    edgeThreshold = 0.30f,
+                    clusterMatchThreshold = 0.30f,
+                    individualMatchThreshold = 0.25f,
+                    minClusterSize = 2
+                )
+            }
 
             // Fix 4: abort if any faces still lack embeddings – they haven't been
             // processed by EmbeddingWorker yet. Retry later instead of clustering
@@ -70,7 +75,7 @@ class ClusteringWorker(
                     try {
                         val embedding = FaceNetModel.bytesToFloatArray(face.embedding!!)
                         var bestId: String? = null
-                        var bestDist = INDIVIDUAL_MATCH_THRESHOLD
+                        var bestDist = config.individualMatchThreshold
                         personCentroids.forEach { (personId, centroid) ->
                             val d = FaceNetModel.cosineDistance(embedding, centroid)
                             if (d < bestDist) { bestDist = d; bestId = personId }
@@ -99,7 +104,7 @@ class ClusteringWorker(
             }
 
             val clusterResults = try {
-                ChineseWhispers.cluster(candidates)
+                ChineseWhispers.cluster(candidates, config.edgeThreshold)
             } catch (t: Throwable) {
                 Log.e(TAG, "Clustering algorithm failed", t)
                 return Result.failure()
@@ -110,7 +115,7 @@ class ClusteringWorker(
 
                 // Fix 2: skip singleton clusters – leave them as Unknown until
                 // more evidence accumulates in future syncs
-                if (members.size < MIN_CLUSTER_SIZE) {
+                if (members.size < config.minClusterSize) {
                     Log.d(TAG, "Skipping singleton cluster (${members.size} face)")
                     return@forEach
                 }
@@ -122,7 +127,7 @@ class ClusteringWorker(
                     val clusterCentroid = FaceNetModel.centroid(memberEmbeddings)
 
                     var bestPerson: PersonEntity? = null
-                    var bestDistance = CLUSTER_MATCH_THRESHOLD
+                    var bestDistance = config.clusterMatchThreshold
 
                     personDao.getAll().forEach { person ->
                         try {

@@ -34,15 +34,4 @@ object FileUtil {
         }
     }
 
-    /**
-     * DEBUG FILTER: Only process photos with filename prefix IMG_202601 to IMG_202605.
-     * Remove this filter for production builds.
-     */
-    fun isInDebugDateRange(file: File): Boolean {
-        val name = file.name
-        return (1..5).any { month ->
-            val prefix = "IMG_20260${month}"
-            name.startsWith(prefix)
-        }
-    }
 }

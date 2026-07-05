@@ -83,6 +83,9 @@ dependencies {
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Preferences DataStore
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     // ML Kit Face Detection
     implementation(libs.mlkit.face.detection)
 
