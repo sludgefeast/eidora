@@ -2,8 +2,12 @@ package de.sebastian.eidora.ml
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.support.common.ops.NormalizeOp
+import org.tensorflow.lite.gpu.CompatibilityList
+import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.image.ops.ResizeOp
@@ -15,10 +19,16 @@ import java.nio.channels.FileChannel
 import kotlin.math.max
 import kotlin.math.sqrt
 
+private const val TAG = "FaceNetModel"
+
 class FaceNetModel(context: Context) : Closeable {
 
     private val interpreter: Interpreter
+    private val gpuDelegate: GpuDelegate?
     private val imageProcessor: ImageProcessor
+    private val mutex = Mutex()
+
+    val backend: String
 
     init {
         val modelFile = ModelDownloader.modelFile(context)
@@ -32,8 +42,18 @@ class FaceNetModel(context: Context) : Closeable {
         val mappedBuffer = RandomAccessFile(modelFile, "r").use { raf ->
             raf.channel.map(FileChannel.MapMode.READ_ONLY, 0, raf.length())
         }
-        val options = Interpreter.Options().apply { numThreads = 4 }
-        interpreter = Interpreter(mappedBuffer, options)
+
+        // Try GPU first; fall back to CPU on any error.
+        val (createdInterpreter, createdDelegate, backendName) = tryCreateGpuInterpreter(mappedBuffer)
+            ?: run {
+                Log.i(TAG, "Using CPU backend (4 threads)")
+                val cpuOptions = Interpreter.Options().apply { numThreads = 4 }
+                Triple(Interpreter(mappedBuffer, cpuOptions), null, "CPU")
+            }
+
+        interpreter = createdInterpreter
+        gpuDelegate = createdDelegate
+        backend = backendName
 
         imageProcessor = ImageProcessor.Builder()
             .add(ResizeOp(160, 160, ResizeOp.ResizeMethod.BILINEAR))
@@ -41,21 +61,45 @@ class FaceNetModel(context: Context) : Closeable {
             .build()
     }
 
+    private fun tryCreateGpuInterpreter(
+        buffer: java.nio.MappedByteBuffer
+    ): Triple<Interpreter, GpuDelegate, String>? {
+        return try {
+            val compat = CompatibilityList()
+            if (!compat.isDelegateSupportedOnThisDevice) {
+                Log.i(TAG, "GPU delegate not supported on this device")
+                return null
+            }
+            val delegate = GpuDelegate(compat.bestOptionsForThisDevice)
+            val options = Interpreter.Options().addDelegate(delegate)
+            val interp = Interpreter(buffer, options)
+            Log.i(TAG, "Using GPU backend")
+            Triple(interp, delegate, "GPU")
+        } catch (t: Throwable) {
+            Log.w(TAG, "GPU delegate init failed, falling back to CPU", t)
+            null
+        }
+    }
+
     /**
      * Computes a 512-dimensional embedding for the given face bitmap.
-     * Input should be a cropped face image (no padding).
+     * Thread-safe: the TFLite interpreter is guarded by a mutex.
      */
-    fun computeEmbedding(faceBitmap: Bitmap): FloatArray {
+    suspend fun computeEmbedding(faceBitmap: Bitmap): FloatArray {
+        // Preprocessing runs concurrently across coroutines; only the ML inference is serialized.
         val tensorImage = TensorImage.fromBitmap(faceBitmap)
         val processed = imageProcessor.process(tensorImage)
 
         val outputBuffer = Array(1) { FloatArray(512) }
-        interpreter.run(processed.buffer, outputBuffer)
+        mutex.withLock {
+            interpreter.run(processed.buffer, outputBuffer)
+        }
         return outputBuffer[0]
     }
 
     override fun close() {
-        interpreter.close()
+        try { interpreter.close() } catch (t: Throwable) { /* ignore */ }
+        try { gpuDelegate?.close() } catch (t: Throwable) { /* ignore */ }
     }
 
     // -----------------------------------------------------------------------

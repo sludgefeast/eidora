@@ -6,18 +6,29 @@ import androidx.work.*
 import de.sebastian.eidora.data.db.DatabaseProvider
 import de.sebastian.eidora.data.db.FaceRegionEntity
 import de.sebastian.eidora.ml.FaceNetModel
-import de.sebastian.eidora.worker.NotificationHelper
 import de.sebastian.eidora.util.ThumbnailHelper
 import de.sebastian.eidora.util.toFaceRegionCoords
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flatMapMerge
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "EmbeddingWorker"
+private const val PARALLELISM = 3
 
 class EmbeddingWorker(
     context: Context,
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
 
+    @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     override suspend fun doWork(): Result {
         val db = DatabaseProvider.getInstance(applicationContext)
         val faceDao = db.faceRegionDao()
@@ -29,31 +40,55 @@ class EmbeddingWorker(
             Log.e(TAG, "Failed to initialize FaceNet model", t)
             return Result.failure()
         }
+        Log.i(TAG, "FaceNet model initialized on backend: ${model.backend}")
 
         return try {
             val pending: List<FaceRegionEntity> = faceDao.findWithoutEmbedding()
-            pending.forEachIndexed { index, face ->
-                val progress = ((index + 1) * 100) / pending.size
-                setProgress(workDataOf(
-                    PhotoSyncWorker.KEY_PROGRESS to progress,
-                    PhotoSyncWorker.KEY_STATUS to "Computing embeddings…"
-                ))
-                try { setForeground(NotificationHelper.embeddingForegroundInfo(applicationContext, progress)) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
-                try {
-                    val photo = photoDao.findById(face.photoId) ?: return@forEachIndexed
-                    val photoFile = File(photo.path)
-                    if (!photoFile.exists()) return@forEachIndexed
+            val total = pending.size
+            if (total == 0) return Result.success()
 
-                    val coords = face.regionJson.toFaceRegionCoords()
-                    val bitmap = ThumbnailHelper.cropForEmbedding(photoFile, coords) ?: return@forEachIndexed
+            val done = AtomicInteger(0)
 
-                    val embedding = model.computeEmbedding(bitmap)
-                    bitmap.recycle()
-                    faceDao.updateEmbedding(face.id, FaceNetModel.floatArrayToBytes(embedding))
-                } catch (t: Throwable) {
-                    Log.e(TAG, "Failed to compute embedding for face ${face.id}, skipping", t)
+            // Producer: crop face bitmaps in parallel on IO dispatcher
+            // Consumer (implicit): compute embedding via mutex-guarded interpreter,
+            // then write result back to DB
+            pending.asFlow()
+                .flatMapMerge(concurrency = PARALLELISM) { face ->
+                    flow {
+                        val bitmap = try {
+                            val photo = photoDao.findById(face.photoId) ?: return@flow
+                            val photoFile = File(photo.path)
+                            if (!photoFile.exists()) return@flow
+                            val coords = face.regionJson.toFaceRegionCoords()
+                            ThumbnailHelper.cropForEmbedding(photoFile, coords)
+                        } catch (t: Throwable) {
+                            Log.e(TAG, "Failed to prepare face ${face.id}, skipping", t); null
+                        }
+                        if (bitmap != null) emit(face to bitmap)
+                    }.flowOn(Dispatchers.IO)
                 }
-            }
+                .buffer(capacity = PARALLELISM)
+                .collect { (face, bitmap) ->
+                    try {
+                        val embedding = model.computeEmbedding(bitmap)
+                        faceDao.updateEmbedding(face.id, FaceNetModel.floatArrayToBytes(embedding))
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "Failed embedding for face ${face.id}, skipping", t)
+                    } finally {
+                        bitmap.recycle()
+                    }
+                    val current = done.incrementAndGet()
+                    if (current % 5 == 0 || current == total) {
+                        val progress = (current * 100) / total
+                        setProgress(workDataOf(
+                            PhotoSyncWorker.KEY_PROGRESS to progress,
+                            PhotoSyncWorker.KEY_STATUS to "Computing embeddings…"
+                        ))
+                        try {
+                            setForeground(NotificationHelper.embeddingForegroundInfo(applicationContext, progress))
+                        } catch (t: Throwable) { /* ignore progress errors */ }
+                    }
+                }
             Result.success()
         } catch (t: Throwable) {
             Log.e(TAG, "Unhandled error in EmbeddingWorker", t)

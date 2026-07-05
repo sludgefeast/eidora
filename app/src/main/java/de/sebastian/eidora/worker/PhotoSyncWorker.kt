@@ -19,6 +19,7 @@ import java.io.File
 import java.util.UUID
 
 private const val TAG = "PhotoSyncWorker"
+private const val SYNC_PARALLELISM = 3
 
 class PhotoSyncWorker(
     context: Context,
@@ -100,16 +101,33 @@ class PhotoSyncWorker(
             try { deletePhoto(path) } catch (t: Throwable) { Log.e(TAG, "Failed to delete photo $path", t) }
         }
 
-        jpegFiles.forEachIndexed { index, file ->
-            val progress = ((index + 1) * 100) / jpegFiles.size
-            setProgress(workDataOf(KEY_PROGRESS to progress, KEY_STATUS to file.name))
-            try { setForeground(NotificationHelper.syncForegroundInfo(applicationContext, progress, file.name)) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
-            try {
-                processFile(file)
-            } catch (t: Throwable) {
-                Log.e(TAG, "Failed to process file ${file.name}, skipping", t)
+        val doneCount = java.util.concurrent.atomic.AtomicInteger(0)
+        val total = jpegFiles.size
+
+        kotlinx.coroutines.flow.flow { jpegFiles.forEach { emit(it) } }
+            .let { flow ->
+                @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+                flow.flatMapMerge(concurrency = SYNC_PARALLELISM) { file ->
+                    kotlinx.coroutines.flow.flow {
+                        try {
+                            processFile(file)
+                        } catch (t: Throwable) {
+                            Log.e(TAG, "Failed to process file ${file.name}, skipping", t)
+                        }
+                        emit(file)
+                    }
+                }
             }
-        }
+            .collect { file ->
+                val current = doneCount.incrementAndGet()
+                val progress = (current * 100) / total
+                setProgress(workDataOf(KEY_PROGRESS to progress, KEY_STATUS to file.name))
+                try {
+                    setForeground(NotificationHelper.syncForegroundInfo(applicationContext, progress, file.name))
+                } catch (t: Throwable) {
+                    android.util.Log.w("FACES", "setForeground failed", t)
+                }
+            }
 
         try { personDao.deleteOrphaned() } catch (t: Throwable) { Log.e(TAG, "Failed to delete orphaned persons", t) }
 
