@@ -52,6 +52,16 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     private var currentPersonId: String? = null
 
+    init {
+        // Observe all named persons independently of load mode,
+        // so the "Assign to person" sheet always has options.
+        viewModelScope.launch {
+            repo.observePersonsWithCount().collect { persons: List<PersonWithCount> ->
+                _uiState.update { it.copy(allPersons = persons) }
+            }
+        }
+    }
+
     fun load(personId: String) {
         currentPersonId = personId
         viewModelScope.launch {
@@ -76,11 +86,6 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     )
                 }
-            }
-        }
-        viewModelScope.launch {
-            repo.observePersonsWithCount().collect { persons: List<PersonWithCount> ->
-                _uiState.update { it.copy(allPersons = persons) }
             }
         }
     }
