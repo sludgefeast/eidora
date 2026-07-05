@@ -63,13 +63,21 @@ class PhotoSyncWorker(
     // -----------------------------------------------------------------------
 
     private suspend fun doFullSync(): Result {
-        try { setForeground(NotificationHelper.syncForegroundInfo(applicationContext, 0, "Starting…")) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
+        try { setForeground(NotificationHelper.syncForegroundInfo(applicationContext, 0, "Scanning files…")) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
         val cameraDir = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
             "Camera"
         )
         val jpegFiles = try {
-            collectJpegs(cameraDir)
+            collectJpegs(cameraDir) { count ->
+                try {
+                    setForeground(
+                        NotificationHelper.syncForegroundInfo(
+                            applicationContext, 0, "Scanning files… $count found"
+                        )
+                    )
+                } catch (t: Throwable) { /* ignore progress errors */ }
+            }
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to collect JPEGs from $cameraDir", t)
             return Result.failure()
@@ -133,11 +141,18 @@ class PhotoSyncWorker(
     // Per-file processing
     // -----------------------------------------------------------------------
 
-    private fun collectJpegs(root: File): List<File> {
+    private fun collectJpegs(root: File, onProgress: (Int) -> Unit): List<File> {
         if (!root.exists()) return emptyList()
-        return root.walkTopDown()
-            .filter { it.isFile && FileUtil.isJpeg(it) && FileUtil.isInDebugDateRange(it) }
-            .toList()
+        val result = mutableListOf<File>()
+        var scanned = 0
+        for (file in root.walkTopDown()) {
+            scanned++
+            if (scanned % 500 == 0) onProgress(scanned)
+            if (file.isFile && FileUtil.isJpeg(file) && FileUtil.isInDebugDateRange(file)) {
+                result.add(file)
+            }
+        }
+        return result
     }
 
     private suspend fun processFile(file: File) {
