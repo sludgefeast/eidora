@@ -82,7 +82,7 @@ class PhotoSyncWorker(
         val jpegFiles = try {
             collectJpegs(cameraDir, patterns) { count ->
                 try {
-                    setForeground(
+                    setForegroundAsync(
                         NotificationHelper.syncForegroundInfo(
                             applicationContext, 0, "Scanning files… $count found"
                         )
