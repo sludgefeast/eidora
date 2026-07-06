@@ -37,8 +37,8 @@ object NotificationHelper {
         return makeForegroundInfo(NOTIFICATION_ID_EMBEDDING, notification)
     }
 
-    fun clusteringForegroundInfo(context: Context): ForegroundInfo {
-        val notification = buildNotification(context, "Clustering faces", "Running…", -1)
+    fun clusteringForegroundInfo(context: Context, progress: Int = -1, message: String = "Running…"): ForegroundInfo {
+        val notification = buildNotification(context, "Clustering faces", message, progress)
         return makeForegroundInfo(NOTIFICATION_ID_CLUSTERING, notification)
     }
 

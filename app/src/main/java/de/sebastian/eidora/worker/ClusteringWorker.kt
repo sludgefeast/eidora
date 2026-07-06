@@ -12,7 +12,6 @@ import java.util.UUID
 
 private const val TAG = "ClusteringWorker"
 
-
 class ClusteringWorker(
     context: Context,
     params: WorkerParameters
@@ -24,12 +23,7 @@ class ClusteringWorker(
         val personDao = db.personDao()
 
         return try {
-            try {
-                setForeground(NotificationHelper.clusteringForegroundInfo(applicationContext))
-            } catch (t: Throwable) {
-                Log.w(TAG, "setForeground failed", t)
-            }
-            setProgress(workDataOf(PhotoSyncWorker.KEY_STATUS to "Clustering faces…"))
+            reportProgress(0, "Preparing…")
 
             val config = try {
                 de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext)
@@ -44,18 +38,12 @@ class ClusteringWorker(
                 )
             }
 
-            // Fix 4: abort if any faces still lack embeddings – they haven't been
-            // processed by EmbeddingWorker yet. Retry later instead of clustering
-            // on incomplete data.
             val pendingEmbeddings = faceDao.findWithoutEmbedding()
             if (pendingEmbeddings.isNotEmpty()) {
                 Log.w(TAG, "${pendingEmbeddings.size} faces still missing embeddings – retrying later")
                 return Result.retry()
             }
 
-            // Pre-clustering step: try to match each unknown face individually
-            // against the centroids of confirmed faces per named person.
-            // Uses a stricter threshold than the cluster-level match.
             val unknownFacesAll = faceDao.findUnclusteredAndNotIgnored()
                 .filter { it.embedding != null }
 
@@ -69,9 +57,10 @@ class ClusteringWorker(
                     else person.id to FaceNetModel.centroid(confirmedEmbeddings)
                 }.toMap()
 
+            // ----- Phase 1: Individual matching (0-30%) -----
             val individuallyAssigned = mutableSetOf<String>()
-            if (personCentroids.isNotEmpty()) {
-                unknownFacesAll.forEach { face ->
+            if (personCentroids.isNotEmpty() && unknownFacesAll.isNotEmpty()) {
+                unknownFacesAll.forEachIndexed { index, face ->
                     try {
                         val embedding = FaceNetModel.bytesToFloatArray(face.embedding!!)
                         var bestId: String? = null
@@ -87,37 +76,46 @@ class ClusteringWorker(
                     } catch (t: Throwable) {
                         Log.w(TAG, "Individual match failed for face ${face.id}", t)
                     }
+                    if (index % 10 == 0) {
+                        val phaseProgress = (index * 30) / unknownFacesAll.size
+                        reportProgress(phaseProgress, "Matching known persons… ${index + 1}/${unknownFacesAll.size}")
+                    }
                 }
                 Log.i(TAG, "Individually assigned ${individuallyAssigned.size} faces to existing persons")
             }
+            reportProgress(30, "Matching known persons… done")
 
-            // Remaining candidates for clustering
             val candidates: List<Pair<String, FloatArray>> = unknownFacesAll
                 .filter { it.id !in individuallyAssigned }
                 .map { face -> Pair(face.id, FaceNetModel.bytesToFloatArray(face.embedding!!)) }
 
             if (candidates.isEmpty()) {
-                try { recomputeAllCentroids(db) } catch (t: Throwable) {
-                    Log.e(TAG, "Failed to recompute centroids", t)
-                }
+                reportProgress(80, "Updating centroids…")
+                try { recomputeAllCentroids(db) { p -> reportProgress(80 + p * 20 / 100, "Updating centroids…") } }
+                catch (t: Throwable) { Log.e(TAG, "Failed to recompute centroids", t) }
+                reportProgress(100, "Done")
                 return Result.success()
             }
 
+            // ----- Phase 2: Chinese Whispers (30-40%) -----
+            reportProgress(30, "Grouping similar faces… (${candidates.size} candidates)")
             val clusterResults = try {
                 ChineseWhispers.cluster(candidates, config.edgeThreshold)
             } catch (t: Throwable) {
                 Log.e(TAG, "Clustering algorithm failed", t)
                 return Result.failure()
             }
+            reportProgress(40, "Grouping similar faces… done")
 
-            clusterResults.groupBy { it.clusterId }.forEach { (_, members) ->
-                if (members.isEmpty()) return@forEach
+            // ----- Phase 3: Cluster assignment (40-80%) -----
+            val clusterGroups = clusterResults.groupBy { it.clusterId }
+            val totalClusters = clusterGroups.size
+            clusterGroups.entries.forEachIndexed { index, (_, members) ->
+                if (members.isEmpty()) return@forEachIndexed
 
-                // Fix 2: skip singleton clusters – leave them as Unknown until
-                // more evidence accumulates in future syncs
                 if (members.size < config.minClusterSize) {
                     Log.d(TAG, "Skipping singleton cluster (${members.size} face)")
-                    return@forEach
+                    return@forEachIndexed
                 }
 
                 try {
@@ -159,12 +157,26 @@ class ClusteringWorker(
                 } catch (t: Throwable) {
                     Log.e(TAG, "Failed to process cluster, skipping", t)
                 }
+
+                val phaseProgress = 40 + ((index + 1) * 40) / totalClusters.coerceAtLeast(1)
+                reportProgress(phaseProgress, "Assigning clusters… ${index + 1}/$totalClusters")
             }
 
-            try { recomputeAllCentroids(db) } catch (t: Throwable) {
+            // ----- Phase 4: Centroid recompute (80-100%) -----
+            reportProgress(80, "Updating centroids…")
+            try {
+                recomputeAllCentroids(db) { p ->
+                    reportProgress(80 + p * 20 / 100, "Updating centroids…")
+                }
+            } catch (t: Throwable) {
                 Log.e(TAG, "Failed to recompute centroids", t)
             }
 
+            reportProgress(100, "Done")
+            try {
+                androidx.core.app.NotificationManagerCompat.from(applicationContext)
+                    .cancel(NotificationHelper.NOTIFICATION_ID_CLUSTERING)
+            } catch (t: Throwable) { /* ignore */ }
             Result.success()
         } catch (t: Throwable) {
             Log.e(TAG, "Unhandled error in ClusteringWorker", t)
@@ -172,31 +184,46 @@ class ClusteringWorker(
         }
     }
 
-    private suspend fun recomputeAllCentroids(db: EidoraDatabase) {
+    private suspend fun reportProgress(percent: Int, message: String) {
+        try {
+            setProgress(workDataOf(
+                PhotoSyncWorker.KEY_PROGRESS to percent,
+                PhotoSyncWorker.KEY_STATUS to message
+            ))
+            setForeground(NotificationHelper.clusteringForegroundInfo(applicationContext, percent, message))
+        } catch (t: Throwable) { /* ignore */ }
+    }
+
+    private suspend fun recomputeAllCentroids(
+        db: EidoraDatabase,
+        onProgress: (Int) -> Unit = {}
+    ) {
         val personDao = db.personDao()
         val faceDao = db.faceRegionDao()
 
-        personDao.getAll().forEach { person ->
+        val persons = personDao.getAll()
+        persons.forEachIndexed { index, person ->
             try {
                 val allFaces = faceDao.findByPersonId(person.id)
                     .filter { !it.ignored && it.embedding != null }
-                if (allFaces.isEmpty()) return@forEach
+                if (allFaces.isNotEmpty()) {
+                    val basisFaces = allFaces.filter { it.name != null }.ifEmpty { allFaces }
+                    val embeddings: List<FloatArray> = basisFaces
+                        .map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
+                    val centroid = FaceNetModel.centroid(embeddings)
 
-                val basisFaces = allFaces.filter { it.name != null }.ifEmpty { allFaces }
-                val embeddings: List<FloatArray> = basisFaces
-                    .map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
-                val centroid = FaceNetModel.centroid(embeddings)
-
-                val representative = basisFaces.minByOrNull { face ->
-                    FaceNetModel.cosineDistance(
-                        FaceNetModel.bytesToFloatArray(face.embedding!!),
-                        centroid
-                    )
+                    val representative = basisFaces.minByOrNull { face ->
+                        FaceNetModel.cosineDistance(
+                            FaceNetModel.bytesToFloatArray(face.embedding!!),
+                            centroid
+                        )
+                    }
+                    personDao.updateRepresentativeFace(person.id, representative?.id)
                 }
-                personDao.updateRepresentativeFace(person.id, representative?.id)
             } catch (t: Throwable) {
                 Log.w(TAG, "Failed to recompute centroid for person ${person.id}", t)
             }
+            onProgress(((index + 1) * 100) / persons.size.coerceAtLeast(1))
         }
     }
 
