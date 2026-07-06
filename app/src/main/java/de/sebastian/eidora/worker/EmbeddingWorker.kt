@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -60,6 +62,24 @@ class EmbeddingWorker(
             val done = AtomicInteger(0)
             val startedAt = System.currentTimeMillis()
 
+            val notifierScope = kotlinx.coroutines.CoroutineScope(
+                kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob()
+            )
+            val notifierJob = notifierScope.launch {
+                while (isActive) {
+                    val current = done.get()
+                    val progress = if (total == 0) 0 else (current * 100) / total
+                    val eta = PhotoSyncWorker.formatEta(startedAt, current, total)
+                    val message = if (eta.isNotEmpty()) "$progress% – $eta" else "$progress%"
+                    try {
+                        setForeground(
+                            NotificationHelper.embeddingForegroundInfoWithMessage(applicationContext, progress, message)
+                        )
+                    } catch (t: Throwable) { /* ignore */ }
+                    kotlinx.coroutines.delay(500)
+                }
+            }
+
             // Producer: crop face bitmaps in parallel on IO dispatcher
             // Consumer (implicit): compute embedding via mutex-guarded interpreter,
             // then write result back to DB
@@ -99,19 +119,13 @@ class EmbeddingWorker(
                         bitmap.recycle()
                     }
                     val current = done.incrementAndGet()
-                    if (current % 5 == 0 || current == total) {
-                        val progress = (current * 100) / total
-                        val eta = PhotoSyncWorker.formatEta(startedAt, current, total)
-                        val message = if (eta.isNotEmpty()) "$progress% – $eta" else "$progress%"
-                        setProgress(workDataOf(
-                            PhotoSyncWorker.KEY_PROGRESS to progress,
-                            PhotoSyncWorker.KEY_STATUS to "Computing embeddings…"
-                        ))
-                        try {
-                            setForeground(NotificationHelper.embeddingForegroundInfoWithMessage(applicationContext, progress, message))
-                        } catch (t: Throwable) { /* ignore progress errors */ }
-                    }
+                    setProgress(workDataOf(
+                        PhotoSyncWorker.KEY_PROGRESS to (current * 100) / total,
+                        PhotoSyncWorker.KEY_STATUS to "Computing embeddings…"
+                    ))
                 }
+
+            notifierJob.cancel()
             Result.success()
         } catch (t: Throwable) {
             Log.e(TAG, "Unhandled error in EmbeddingWorker", t)
