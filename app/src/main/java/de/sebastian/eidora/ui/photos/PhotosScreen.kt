@@ -147,6 +147,7 @@ private fun PhotoGridItem(
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(2.dp)
             .aspectRatio(1f)
             .combinedClickable(onClick = onTap, onLongClick = onLongPress)
     ) {
