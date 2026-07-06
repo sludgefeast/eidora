@@ -22,7 +22,7 @@ class ClusteringWorker(
         val faceDao = db.faceRegionDao()
         val personDao = db.personDao()
 
-        return try {
+        try {
             reportProgress(0, "Preparing…")
 
             val config = try {
@@ -173,14 +173,15 @@ class ClusteringWorker(
             }
 
             reportProgress(100, "Done")
+            return Result.success()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Unhandled error in ClusteringWorker", t)
+            return Result.failure()
+        } finally {
             try {
                 androidx.core.app.NotificationManagerCompat.from(applicationContext)
                     .cancel(NotificationHelper.NOTIFICATION_ID_CLUSTERING)
             } catch (t: Throwable) { /* ignore */ }
-            Result.success()
-        } catch (t: Throwable) {
-            Log.e(TAG, "Unhandled error in ClusteringWorker", t)
-            Result.failure()
         }
     }
 

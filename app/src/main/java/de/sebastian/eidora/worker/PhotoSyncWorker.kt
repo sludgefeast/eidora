@@ -62,6 +62,10 @@ class PhotoSyncWorker(
             Result.failure()
         } finally {
             try { detector?.close() } catch (t: Throwable) { Log.w(TAG, "Error closing detector", t) }
+            try {
+                androidx.core.app.NotificationManagerCompat.from(applicationContext)
+                    .cancel(NotificationHelper.NOTIFICATION_ID_SYNC)
+            } catch (t: Throwable) { /* ignore */ }
         }
     }
 
@@ -164,13 +168,6 @@ class PhotoSyncWorker(
         notifierJob.cancel()
 
         try { personDao.deleteOrphaned() } catch (t: Throwable) { Log.e(TAG, "Failed to delete orphaned persons", t) }
-
-        // Explicitly cancel the sync notification so it doesn't linger
-        // while the next worker in the chain runs with its own notification.
-        try {
-            androidx.core.app.NotificationManagerCompat.from(applicationContext)
-                .cancel(NotificationHelper.NOTIFICATION_ID_SYNC)
-        } catch (t: Throwable) { /* ignore */ }
 
         setProgress(workDataOf(KEY_PROGRESS to 100, KEY_STATUS to "Done"))
         return Result.success()

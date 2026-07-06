@@ -127,17 +127,16 @@ class EmbeddingWorker(
 
             notifierJob.cancel()
 
-            try {
-                androidx.core.app.NotificationManagerCompat.from(applicationContext)
-                    .cancel(NotificationHelper.NOTIFICATION_ID_EMBEDDING)
-            } catch (t: Throwable) { /* ignore */ }
-
             Result.success()
         } catch (t: Throwable) {
             Log.e(TAG, "Unhandled error in EmbeddingWorker", t)
             Result.failure()
         } finally {
             try { model.close() } catch (t: Throwable) { Log.w(TAG, "Error closing model", t) }
+            try {
+                androidx.core.app.NotificationManagerCompat.from(applicationContext)
+                    .cancel(NotificationHelper.NOTIFICATION_ID_EMBEDDING)
+            } catch (t: Throwable) { /* ignore */ }
         }
     }
 
