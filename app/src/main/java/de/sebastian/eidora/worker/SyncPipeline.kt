@@ -15,26 +15,22 @@ object SyncPipeline {
             .beginUniqueWork(
                 UNIQUE_WORK_NAME,
                 ExistingWorkPolicy.KEEP,
-                ModelDownloadWorker.buildRequest()
+                PhotoSyncWorker.buildRequest()
             )
-            .then(PhotoSyncWorker.buildRequest())
+            .then(ModelDownloadWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())
             .then(ClusteringWorker.buildRequest())
             .enqueue()
     }
 
-    /**
-     * Cancels an existing pipeline and starts a new one. Use when settings
-     * that affect constraints (e.g. mobile-download allowance) change.
-     */
     fun enqueueForce(context: Context) {
         WorkManager.getInstance(context)
             .beginUniqueWork(
                 UNIQUE_WORK_NAME,
                 ExistingWorkPolicy.REPLACE,
-                ModelDownloadWorker.buildRequest()
+                PhotoSyncWorker.buildRequest()
             )
-            .then(PhotoSyncWorker.buildRequest())
+            .then(ModelDownloadWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())
             .then(ClusteringWorker.buildRequest())
             .enqueue()
@@ -58,9 +54,9 @@ object SyncPipeline {
             .beginUniqueWork(
                 UNIQUE_WORK_NAME,
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
-                ModelDownloadWorker.buildRequest()
+                syncRequest
             )
-            .then(syncRequest)
+            .then(ModelDownloadWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())
             .then(ClusteringWorker.buildRequest())
             .enqueue()
