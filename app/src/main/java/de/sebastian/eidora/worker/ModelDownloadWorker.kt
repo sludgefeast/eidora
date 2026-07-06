@@ -1,12 +1,19 @@
 package de.sebastian.eidora.worker
 
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.work.*
 import de.sebastian.eidora.R
+import de.sebastian.eidora.data.settings.SettingsProvider
 import de.sebastian.eidora.ml.ModelDownloader
+import de.sebastian.eidora.util.NetworkHelper
 
 private const val TAG = "ModelDownloadWorker"
+private const val NOTIFICATION_ID_MOBILE_WAIT = 1005
 
 class ModelDownloadWorker(
     context: Context,
@@ -21,6 +28,28 @@ class ModelDownloadWorker(
             return Result.success()
         }
 
+        // Check network policy: wait for Wi-Fi unless user has allowed mobile.
+        val allowMobile = try {
+            SettingsProvider.get(applicationContext).getAllowMobileModelDownload()
+        } catch (t: Throwable) { false }
+
+        if (!allowMobile) {
+            val net = NetworkHelper.currentStatus(applicationContext)
+            if (net == NetworkHelper.NetworkStatus.MOBILE) {
+                Log.i(TAG, "Only mobile network available and user has not allowed mobile download – showing prompt notification")
+                showMobileAllowNotification()
+                return Result.retry()
+            }
+            if (net == NetworkHelper.NetworkStatus.NONE) {
+                return Result.retry()
+            }
+        }
+
+        // Dismiss any previous prompt notification
+        try {
+            NotificationManagerCompat.from(applicationContext).cancel(NOTIFICATION_ID_MOBILE_WAIT)
+        } catch (t: Throwable) { /* ignore */ }
+
         return try {
             try {
                 setForeground(NotificationHelper.modelDownloadForegroundInfo(applicationContext, 0))
@@ -30,7 +59,6 @@ class ModelDownloadWorker(
 
             Log.i(TAG, "Starting model download from ${ModelDownloader.MODEL_URL}")
             val success = ModelDownloader.download(applicationContext) { progress ->
-                // Throttled progress log
                 if (progress % 10 == 0) Log.d(TAG, "Download progress: $progress%")
             }
 
@@ -44,6 +72,33 @@ class ModelDownloadWorker(
         } catch (t: Throwable) {
             Log.e(TAG, "Unhandled error in ModelDownloadWorker", t)
             Result.retry()
+        }
+    }
+
+    private fun showMobileAllowNotification() {
+        val ctx = applicationContext
+
+        val allowIntent = Intent(ctx, AllowMobileDownloadReceiver::class.java).apply {
+            action = AllowMobileDownloadReceiver.ACTION_ALLOW
+        }
+        val allowPending = PendingIntent.getBroadcast(
+            ctx, 0, allowIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(ctx, "sync")
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(ctx.getString(R.string.mobile_download_title))
+            .setContentText(ctx.getString(R.string.mobile_download_message))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(ctx.getString(R.string.mobile_download_message)))
+            .addAction(0, ctx.getString(R.string.mobile_download_confirm), allowPending)
+            .setOngoing(true)
+            .build()
+
+        try {
+            NotificationManagerCompat.from(ctx).notify(NOTIFICATION_ID_MOBILE_WAIT, notification)
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to show mobile-allow notification", t)
         }
     }
 

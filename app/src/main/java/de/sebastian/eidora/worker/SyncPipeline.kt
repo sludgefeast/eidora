@@ -23,6 +23,23 @@ object SyncPipeline {
             .enqueue()
     }
 
+    /**
+     * Cancels an existing pipeline and starts a new one. Use when settings
+     * that affect constraints (e.g. mobile-download allowance) change.
+     */
+    fun enqueueForce(context: Context) {
+        WorkManager.getInstance(context)
+            .beginUniqueWork(
+                UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                ModelDownloadWorker.buildRequest()
+            )
+            .then(PhotoSyncWorker.buildRequest())
+            .then(EmbeddingWorker.buildRequest())
+            .then(ClusteringWorker.buildRequest())
+            .enqueue()
+    }
+
     fun enqueueClustering(context: Context) {
         WorkManager.getInstance(context)
             .beginUniqueWork(

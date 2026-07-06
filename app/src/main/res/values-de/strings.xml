@@ -80,4 +80,7 @@
     <string name="setting_min_battery_percent_description">Verarbeitung pausiert unter diesem Akkustand.</string>
     <string name="setting_max_battery_temp">Maximale Akkutemperatur (°C)</string>
     <string name="setting_max_battery_temp_description">Verarbeitung pausiert bei Überschreitung dieser Temperatur.</string>
+    <string name="mobile_download_title">Download über Mobilfunk?</string>
+    <string name="mobile_download_message">Das Gesichtserkennungsmodell ist etwa 90 MB groß. Es ist kein WLAN verfügbar. Über Mobilfunk herunterladen?</string>
+    <string name="mobile_download_confirm">Jetzt herunterladen</string>
 </resources>

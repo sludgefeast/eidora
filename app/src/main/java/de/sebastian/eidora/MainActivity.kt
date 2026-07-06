@@ -41,6 +41,7 @@ import de.sebastian.eidora.ui.photos.PhotosScreen
 import de.sebastian.eidora.ui.photos.PhotosViewModel
 import de.sebastian.eidora.ui.theme.EidoraTheme
 import de.sebastian.eidora.worker.SyncPipeline
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

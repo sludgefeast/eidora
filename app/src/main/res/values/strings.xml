@@ -80,4 +80,7 @@
     <string name="setting_min_battery_percent_description">Processing pauses when battery is below this level.</string>
     <string name="setting_max_battery_temp">Maximum battery temperature (°C)</string>
     <string name="setting_max_battery_temp_description">Processing pauses when battery temperature exceeds this value.</string>
+    <string name="mobile_download_title">Download over mobile data?</string>
+    <string name="mobile_download_message">The face recognition model is about 90 MB. Wi-Fi is not available. Download over mobile data?</string>
+    <string name="mobile_download_confirm">Download now</string>
 </resources>

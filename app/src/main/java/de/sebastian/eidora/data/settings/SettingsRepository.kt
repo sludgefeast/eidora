@@ -20,6 +20,7 @@ private val KEY_INDIVIDUAL_MATCH_THRESHOLD = floatPreferencesKey("individual_mat
 private val KEY_MIN_CLUSTER_SIZE = intPreferencesKey("min_cluster_size")
 private val KEY_MIN_BATTERY_PERCENT = intPreferencesKey("min_battery_percent")
 private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius")
+private val KEY_ALLOW_MOBILE_MODEL_DOWNLOAD = androidx.datastore.preferences.core.booleanPreferencesKey("allow_mobile_model_download")
 
 data class ClusteringConfig(
     val edgeThreshold: Float,
@@ -87,6 +88,20 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[KEY_MIN_BATTERY_PERCENT] = config.minBatteryPercent
             prefs[KEY_MAX_BATTERY_TEMP] = config.maxBatteryTempCelsius
+        }
+    }
+
+    // ---- Model download over mobile network ---------------------------------
+
+    val allowMobileModelDownload: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[KEY_ALLOW_MOBILE_MODEL_DOWNLOAD] ?: false
+    }
+
+    suspend fun getAllowMobileModelDownload(): Boolean = allowMobileModelDownload.first()
+
+    suspend fun setAllowMobileModelDownload(allow: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_ALLOW_MOBILE_MODEL_DOWNLOAD] = allow
         }
     }
 
