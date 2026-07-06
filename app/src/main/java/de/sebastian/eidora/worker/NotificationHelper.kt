@@ -15,10 +15,10 @@ import de.sebastian.eidora.R
 object NotificationHelper {
 
     private const val CHANNEL_SYNC = "sync"
-    private const val NOTIFICATION_ID_SYNC = 1001
-    private const val NOTIFICATION_ID_EMBEDDING = 1002
-    private const val NOTIFICATION_ID_CLUSTERING = 1003
-    private const val NOTIFICATION_ID_DOWNLOAD = 1004
+    const val NOTIFICATION_ID_SYNC = 1001
+    const val NOTIFICATION_ID_EMBEDDING = 1002
+    const val NOTIFICATION_ID_CLUSTERING = 1003
+    const val NOTIFICATION_ID_DOWNLOAD = 1004
 
     fun syncForegroundInfo(context: Context, progress: Int, status: String): ForegroundInfo {
         val notification = buildNotification(
