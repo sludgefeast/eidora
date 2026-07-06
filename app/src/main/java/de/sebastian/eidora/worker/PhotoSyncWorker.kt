@@ -108,10 +108,31 @@ class PhotoSyncWorker(
         val doneCount = java.util.concurrent.atomic.AtomicInteger(0)
         val total = jpegFiles.size
 
+        val powerGate = PowerGate(applicationContext)
+        val powerConfig = try {
+            de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext).getPowerConfig()
+        } catch (t: Throwable) {
+            de.sebastian.eidora.data.settings.PowerConfig(
+                minBatteryPercent = 20,
+                maxBatteryTempCelsius = 40.0f
+            )
+        }
+
         @OptIn(ExperimentalCoroutinesApi::class)
         flow { jpegFiles.forEach { emit(it) } }
             .flatMapMerge(concurrency = SYNC_PARALLELISM) { file ->
                 flow {
+                    // Wait for power gate before starting work on this file
+                    powerGate.awaitOk(
+                        powerConfig.minBatteryPercent,
+                        powerConfig.maxBatteryTempCelsius
+                    ) { reason ->
+                        try {
+                            setForegroundAsync(
+                                NotificationHelper.syncForegroundInfo(applicationContext, 0, reason)
+                            )
+                        } catch (t: Throwable) { /* ignore */ }
+                    }
                     try {
                         processFile(file)
                     } catch (t: Throwable) {

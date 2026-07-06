@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import de.sebastian.eidora.data.settings.ClusteringConfig
+import de.sebastian.eidora.data.settings.PowerConfig
 import de.sebastian.eidora.data.settings.SettingsProvider
 import de.sebastian.eidora.data.settings.SettingsRepository
 import kotlinx.coroutines.flow.*
@@ -16,6 +17,10 @@ data class SettingsUiState(
         clusterMatchThreshold = SettingsRepository.DEFAULT_CLUSTER_MATCH_THRESHOLD,
         individualMatchThreshold = SettingsRepository.DEFAULT_INDIVIDUAL_MATCH_THRESHOLD,
         minClusterSize = SettingsRepository.DEFAULT_MIN_CLUSTER_SIZE
+    ),
+    val powerConfig: PowerConfig = PowerConfig(
+        minBatteryPercent = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
+        maxBatteryTempCelsius = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP
     )
 )
 
@@ -37,6 +42,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 _uiState.update { it.copy(clusteringConfig = config) }
             }
         }
+        viewModelScope.launch {
+            repo.powerConfig.collect { config ->
+                _uiState.update { it.copy(powerConfig = config) }
+            }
+        }
     }
 
     fun setPatterns(patterns: List<String>) {
@@ -47,5 +57,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setClusteringConfig(config: ClusteringConfig) {
         viewModelScope.launch { repo.setClusteringConfig(config) }
+    }
+
+    fun setPowerConfig(config: PowerConfig) {
+        viewModelScope.launch { repo.setPowerConfig(config) }
     }
 }

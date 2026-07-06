@@ -47,6 +47,16 @@ class EmbeddingWorker(
             val total = pending.size
             if (total == 0) return Result.success()
 
+            val powerGate = PowerGate(applicationContext)
+            val powerConfig = try {
+                de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext).getPowerConfig()
+            } catch (t: Throwable) {
+                de.sebastian.eidora.data.settings.PowerConfig(
+                    minBatteryPercent = 20,
+                    maxBatteryTempCelsius = 40.0f
+                )
+            }
+
             val done = AtomicInteger(0)
 
             // Producer: crop face bitmaps in parallel on IO dispatcher
@@ -55,6 +65,16 @@ class EmbeddingWorker(
             pending.asFlow()
                 .flatMapMerge(concurrency = PARALLELISM) { face ->
                     flow {
+                        powerGate.awaitOk(
+                            powerConfig.minBatteryPercent,
+                            powerConfig.maxBatteryTempCelsius
+                        ) { reason ->
+                            try {
+                                setForegroundAsync(
+                                    NotificationHelper.embeddingForegroundInfoWithMessage(applicationContext, 0, reason)
+                                )
+                            } catch (t: Throwable) { /* ignore */ }
+                        }
                         val bitmap = try {
                             val photo = photoDao.findById(face.photoId) ?: return@flow
                             val photoFile = File(photo.path)

@@ -74,4 +74,10 @@
     <string name="setting_min_cluster_size_description">Clusters smaller than this size are ignored (not shown as suggestions).</string>
     <string name="setting_default_hint">Default: %1$s</string>
     <string name="setting_reset_to_default">Reset to default</string>
+    <string name="settings_power_title">Power</string>
+    <string name="settings_power_description">Pause processing when the device gets too hot or the battery gets too low.</string>
+    <string name="setting_min_battery_percent">Minimum battery level (%)</string>
+    <string name="setting_min_battery_percent_description">Processing pauses when battery is below this level.</string>
+    <string name="setting_max_battery_temp">Maximum battery temperature (°C)</string>
+    <string name="setting_max_battery_temp_description">Processing pauses when battery temperature exceeds this value.</string>
 </resources>

@@ -149,6 +149,33 @@ fun SettingsScreen(
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(minClusterSize = it)) }
             )
 
+            Spacer(Modifier.height(24.dp))
+
+            // Section: power
+            SectionHeader(stringResource(R.string.settings_power_title))
+            Text(
+                text = stringResource(R.string.settings_power_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            val pwr = state.powerConfig
+            IntSetting(
+                label = stringResource(R.string.setting_min_battery_percent),
+                description = stringResource(R.string.setting_min_battery_percent_description),
+                value = pwr.minBatteryPercent,
+                default = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
+                onValueChange = { viewModel.setPowerConfig(pwr.copy(minBatteryPercent = it)) }
+            )
+            FloatSetting(
+                label = stringResource(R.string.setting_max_battery_temp),
+                description = stringResource(R.string.setting_max_battery_temp_description),
+                value = pwr.maxBatteryTempCelsius,
+                default = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
+                onValueChange = { viewModel.setPowerConfig(pwr.copy(maxBatteryTempCelsius = it)) }
+            )
+
             Spacer(Modifier.height(32.dp))
         }
     }

@@ -74,4 +74,10 @@
     <string name="setting_min_cluster_size_description">Kleinere Cluster werden ignoriert (nicht als Vorschlag angezeigt).</string>
     <string name="setting_default_hint">Standard: %1$s</string>
     <string name="setting_reset_to_default">Auf Standard zurücksetzen</string>
+    <string name="settings_power_title">Energie</string>
+    <string name="settings_power_description">Verarbeitung pausieren, wenn das Gerät zu heiß wird oder der Akkustand zu niedrig ist.</string>
+    <string name="setting_min_battery_percent">Minimaler Akkustand (%)</string>
+    <string name="setting_min_battery_percent_description">Verarbeitung pausiert unter diesem Akkustand.</string>
+    <string name="setting_max_battery_temp">Maximale Akkutemperatur (°C)</string>
+    <string name="setting_max_battery_temp_description">Verarbeitung pausiert bei Überschreitung dieser Temperatur.</string>
 </resources>

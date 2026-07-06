@@ -18,12 +18,19 @@ private val KEY_CLUSTER_EDGE_THRESHOLD = floatPreferencesKey("cluster_edge_thres
 private val KEY_CLUSTER_MATCH_THRESHOLD = floatPreferencesKey("cluster_match_threshold")
 private val KEY_INDIVIDUAL_MATCH_THRESHOLD = floatPreferencesKey("individual_match_threshold")
 private val KEY_MIN_CLUSTER_SIZE = intPreferencesKey("min_cluster_size")
+private val KEY_MIN_BATTERY_PERCENT = intPreferencesKey("min_battery_percent")
+private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius")
 
 data class ClusteringConfig(
     val edgeThreshold: Float,
     val clusterMatchThreshold: Float,
     val individualMatchThreshold: Float,
     val minClusterSize: Int
+)
+
+data class PowerConfig(
+    val minBatteryPercent: Int,
+    val maxBatteryTempCelsius: Float
 )
 
 class SettingsRepository(private val context: Context) {
@@ -65,11 +72,31 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
+    // ---- Power gate --------------------------------------------------------
+
+    val powerConfig: Flow<PowerConfig> = context.dataStore.data.map { prefs ->
+        PowerConfig(
+            minBatteryPercent = prefs[KEY_MIN_BATTERY_PERCENT] ?: DEFAULT_MIN_BATTERY_PERCENT,
+            maxBatteryTempCelsius = prefs[KEY_MAX_BATTERY_TEMP] ?: DEFAULT_MAX_BATTERY_TEMP
+        )
+    }
+
+    suspend fun getPowerConfig(): PowerConfig = powerConfig.first()
+
+    suspend fun setPowerConfig(config: PowerConfig) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_MIN_BATTERY_PERCENT] = config.minBatteryPercent
+            prefs[KEY_MAX_BATTERY_TEMP] = config.maxBatteryTempCelsius
+        }
+    }
+
     companion object {
         const val DEFAULT_EDGE_THRESHOLD = 0.30f
         const val DEFAULT_CLUSTER_MATCH_THRESHOLD = 0.30f
         const val DEFAULT_INDIVIDUAL_MATCH_THRESHOLD = 0.25f
         const val DEFAULT_MIN_CLUSTER_SIZE = 2
+        const val DEFAULT_MIN_BATTERY_PERCENT = 20
+        const val DEFAULT_MAX_BATTERY_TEMP = 40.0f
 
         fun patternToRegex(pattern: String): Regex {
             val escaped = pattern.split("*").joinToString(".*") { Regex.escape(it) }
