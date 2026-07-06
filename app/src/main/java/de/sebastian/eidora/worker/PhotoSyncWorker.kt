@@ -124,7 +124,7 @@ class PhotoSyncWorker(
 
         val notifierScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob())
         val notifierJob = notifierScope.launch {
-            while (kotlinx.coroutines.isActive) {
+            while (isActive) {
                 val current = doneCount.get()
                 val progress = if (total == 0) 0 else (current * 100) / total
                 val file = currentFile.get()
