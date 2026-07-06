@@ -18,6 +18,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.util.UUID
@@ -106,7 +107,9 @@ class PhotoSyncWorker(
         }
 
         val doneCount = java.util.concurrent.atomic.AtomicInteger(0)
+        val currentFile = java.util.concurrent.atomic.AtomicReference<String>("")
         val total = jpegFiles.size
+        val startedAt = System.currentTimeMillis()
 
         val powerGate = PowerGate(applicationContext)
         val powerConfig = try {
@@ -118,21 +121,32 @@ class PhotoSyncWorker(
             )
         }
 
+        val notifierScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob())
+        val notifierJob = notifierScope.launch {
+            while (kotlinx.coroutines.isActive) {
+                val current = doneCount.get()
+                val progress = if (total == 0) 0 else (current * 100) / total
+                val file = currentFile.get()
+                val eta = formatEta(startedAt, current, total)
+                val message = if (eta.isNotEmpty()) "$file – $eta" else file
+                try {
+                    setForeground(NotificationHelper.syncForegroundInfo(applicationContext, progress, message))
+                } catch (t: Throwable) { /* ignore */ }
+                kotlinx.coroutines.delay(500)
+            }
+        }
+
         @OptIn(ExperimentalCoroutinesApi::class)
         flow { jpegFiles.forEach { emit(it) } }
             .flatMapMerge(concurrency = SYNC_PARALLELISM) { file ->
                 flow {
-                    // Wait for power gate before starting work on this file
                     powerGate.awaitOk(
                         powerConfig.minBatteryPercent,
                         powerConfig.maxBatteryTempCelsius
                     ) { reason ->
-                        try {
-                            setForegroundAsync(
-                                NotificationHelper.syncForegroundInfo(applicationContext, 0, reason)
-                            )
-                        } catch (t: Throwable) { /* ignore */ }
+                        currentFile.set(reason)
                     }
+                    currentFile.set(file.name)
                     try {
                         processFile(file)
                     } catch (t: Throwable) {
@@ -141,16 +155,12 @@ class PhotoSyncWorker(
                     emit(file)
                 }
             }
-            .collect { file ->
+            .collect { _ ->
                 val current = doneCount.incrementAndGet()
-                val progress = (current * 100) / total
-                setProgress(workDataOf(KEY_PROGRESS to progress, KEY_STATUS to file.name))
-                try {
-                    setForeground(NotificationHelper.syncForegroundInfo(applicationContext, progress, file.name))
-                } catch (t: Throwable) {
-                    android.util.Log.w("FACES", "setForeground failed", t)
-                }
+                setProgress(workDataOf(KEY_PROGRESS to (current * 100) / total))
             }
+
+        notifierJob.cancel()
 
         try { personDao.deleteOrphaned() } catch (t: Throwable) { Log.e(TAG, "Failed to delete orphaned persons", t) }
 
@@ -383,5 +393,30 @@ class PhotoSyncWorker(
 
         fun buildRequest(): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<PhotoSyncWorker>().build()
+
+        /**
+         * Estimates remaining time from throughput so far.
+         * Returns empty string when not enough data (< 5 items done).
+         */
+        internal fun formatEta(startedAt: Long, done: Int, total: Int): String {
+            if (done < 5 || done >= total) return ""
+            val elapsed = System.currentTimeMillis() - startedAt
+            if (elapsed <= 0) return ""
+            val perItem = elapsed.toDouble() / done
+            val remainingMs = ((total - done) * perItem).toLong()
+            return "${formatDuration(remainingMs)} left"
+        }
+
+        private fun formatDuration(ms: Long): String {
+            val totalSec = ms / 1000
+            val h = totalSec / 3600
+            val m = (totalSec % 3600) / 60
+            val s = totalSec % 60
+            return when {
+                h > 0 -> "%dh %dm".format(h, m)
+                m > 0 -> "%dm %ds".format(m, s)
+                else -> "%ds".format(s)
+            }
+        }
     }
 }

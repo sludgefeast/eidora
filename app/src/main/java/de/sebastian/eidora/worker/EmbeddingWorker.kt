@@ -58,6 +58,7 @@ class EmbeddingWorker(
             }
 
             val done = AtomicInteger(0)
+            val startedAt = System.currentTimeMillis()
 
             // Producer: crop face bitmaps in parallel on IO dispatcher
             // Consumer (implicit): compute embedding via mutex-guarded interpreter,
@@ -100,12 +101,14 @@ class EmbeddingWorker(
                     val current = done.incrementAndGet()
                     if (current % 5 == 0 || current == total) {
                         val progress = (current * 100) / total
+                        val eta = PhotoSyncWorker.formatEta(startedAt, current, total)
+                        val message = if (eta.isNotEmpty()) "$progress% – $eta" else "$progress%"
                         setProgress(workDataOf(
                             PhotoSyncWorker.KEY_PROGRESS to progress,
                             PhotoSyncWorker.KEY_STATUS to "Computing embeddings…"
                         ))
                         try {
-                            setForeground(NotificationHelper.embeddingForegroundInfo(applicationContext, progress))
+                            setForeground(NotificationHelper.embeddingForegroundInfoWithMessage(applicationContext, progress, message))
                         } catch (t: Throwable) { /* ignore progress errors */ }
                     }
                 }
