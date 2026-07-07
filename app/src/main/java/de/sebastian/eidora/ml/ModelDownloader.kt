@@ -5,47 +5,78 @@ import android.util.Log
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
 
 object ModelDownloader {
 
     private const val TAG = "ModelDownloader"
-    private const val MODEL_FILENAME = "facenet_512.tflite"
 
-    // FaceNet512 model from shubham0204/OnDevice-Face-Recognition-Android
-    const val MODEL_URL =
-        "https://github.com/shubham0204/OnDevice-Face-Recognition-Android/raw/v0.0.1/app/src/main/assets/facenet_512.tflite"
+    data class ModelInfo(
+        val filename: String,
+        val url: String,
+        val minSizeBytes: Long
+    )
 
-    // SHA-256 of the expected model file for integrity verification
-    private const val EXPECTED_SHA256 =
-        "" // optional – leave empty to skip verification
+    val FACENET = ModelInfo(
+        filename = "facenet_512.tflite",
+        url = "https://github.com/shubham0204/OnDevice-Face-Recognition-Android/raw/v0.0.1/app/src/main/assets/facenet_512.tflite",
+        minSizeBytes = 1_000_000L
+    )
 
-    /**
-     * Path where the downloaded model is stored.
-     */
-    fun modelFile(context: Context): File =
-        File(context.filesDir, MODEL_FILENAME)
+    val BLAZEFACE = ModelInfo(
+        filename = "blazeface_full_range.tflite",
+        url = "https://github.com/shubham0204/OnDevice-Face-Recognition-Android/raw/v0.0.1/app/src/main/assets/face_detection_full_range.tflite",
+        minSizeBytes = 100_000L
+    )
 
-    /**
-     * Checks whether the model has already been downloaded.
-     */
-    fun isDownloaded(context: Context): Boolean {
-        val file = modelFile(context)
-        return file.exists() && file.length() > 1_000_000  // sanity check: at least 1 MB
+    private val ALL_MODELS = listOf(FACENET, BLAZEFACE)
+
+    /** Kept for backwards compatibility with existing callers. */
+    val MODEL_URL: String get() = FACENET.url
+
+    fun modelFile(context: Context, info: ModelInfo = FACENET): File =
+        File(context.filesDir, info.filename)
+
+    fun isDownloaded(context: Context, info: ModelInfo = FACENET): Boolean {
+        val file = modelFile(context, info)
+        return file.exists() && file.length() >= info.minSizeBytes
     }
 
     /**
-     * Downloads the model to internal storage. Blocking call – should run in a
-     * background coroutine or worker.
-     *
-     * @return true on success, false on any failure
+     * True when all models required for the pipeline are present.
+     */
+    fun allModelsReady(context: Context): Boolean =
+        ALL_MODELS.all { isDownloaded(context, it) }
+
+    /**
+     * Downloads every missing model. Progress callback aggregates over all
+     * pending downloads (0-100 across the entire batch).
      */
     fun download(context: Context, onProgress: ((Int) -> Unit)? = null): Boolean {
-        val target = modelFile(context)
-        val tempFile = File(context.filesDir, "$MODEL_FILENAME.part")
+        val pending = ALL_MODELS.filter { !isDownloaded(context, it) }
+        if (pending.isEmpty()) return true
+
+        pending.forEachIndexed { index, info ->
+            val ok = downloadOne(context, info) { p ->
+                if (onProgress != null) {
+                    val overall = ((index * 100 + p) / pending.size)
+                    onProgress(overall)
+                }
+            }
+            if (!ok) return false
+        }
+        return true
+    }
+
+    private fun downloadOne(
+        context: Context,
+        info: ModelInfo,
+        onProgress: ((Int) -> Unit)?
+    ): Boolean {
+        val target = File(context.filesDir, info.filename)
+        val tempFile = File(context.filesDir, "${info.filename}.part")
 
         return try {
-            val url = URL(MODEL_URL)
+            val url = URL(info.url)
             val connection = url.openConnection() as HttpURLConnection
             connection.connectTimeout = 30_000
             connection.readTimeout = 60_000
@@ -53,7 +84,7 @@ object ModelDownloader {
             connection.connect()
 
             if (connection.responseCode !in 200..299) {
-                Log.e(TAG, "Download failed: HTTP ${connection.responseCode}")
+                Log.e(TAG, "Download ${info.filename} failed: HTTP ${connection.responseCode}")
                 return false
             }
 
@@ -69,49 +100,24 @@ object ModelDownloader {
                         output.write(buffer, 0, read)
                         downloadedBytes += read
                         if (totalBytes > 0 && onProgress != null) {
-                            val progress = ((downloadedBytes * 100) / totalBytes).toInt()
-                            onProgress(progress)
+                            onProgress(((downloadedBytes * 100) / totalBytes).toInt())
                         }
                     }
                 }
             }
 
-            if (EXPECTED_SHA256.isNotBlank()) {
-                val actual = sha256(tempFile)
-                if (actual != EXPECTED_SHA256) {
-                    Log.e(TAG, "SHA-256 mismatch: expected $EXPECTED_SHA256, got $actual")
-                    tempFile.delete()
-                    return false
-                }
-            }
-
-            // Atomic rename
             if (target.exists()) target.delete()
-            val renamed = tempFile.renameTo(target)
-            if (!renamed) {
-                Log.e(TAG, "Failed to rename temp file")
+            if (!tempFile.renameTo(target)) {
+                Log.e(TAG, "Failed to rename temp file for ${info.filename}")
                 return false
             }
 
-            Log.i(TAG, "Model downloaded successfully (${target.length()} bytes)")
+            Log.i(TAG, "Model ${info.filename} downloaded (${target.length()} bytes)")
             true
         } catch (t: Throwable) {
-            Log.e(TAG, "Download failed", t)
+            Log.e(TAG, "Download ${info.filename} failed", t)
             tempFile.delete()
             false
         }
-    }
-
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(8192)
-            while (true) {
-                val read = input.read(buffer)
-                if (read == -1) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }

@@ -8,7 +8,6 @@ lifecycle = "2.8.7"
 navigation = "2.8.5"
 room = "2.6.1"
 work = "2.10.0"
-mlkit-face = "16.1.7"
 tensorflow-lite = "2.16.1"
 tensorflow-lite-support = "0.4.4"
 tensorflow-lite-gpu = "2.16.1"
@@ -47,8 +46,6 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 # WorkManager
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 
-# ML Kit
-mlkit-face-detection = { group = "com.google.mlkit", name = "face-detection", version.ref = "mlkit-face" }
 
 # TFLite
 tensorflow-lite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tensorflow-lite" }
@@ -64,7 +61,6 @@ coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coi
 
 # Serialization + Coroutines
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
-kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "kotlinx-coroutines" }
 
 # Core
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }

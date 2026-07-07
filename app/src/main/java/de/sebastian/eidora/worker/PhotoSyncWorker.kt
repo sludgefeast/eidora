@@ -4,14 +4,12 @@ import android.content.Context
 import android.os.Environment
 import android.util.Log
 import androidx.work.*
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.FaceDetection
-import com.google.mlkit.vision.face.FaceDetectorOptions
 import de.sebastian.eidora.data.db.DatabaseProvider
 import de.sebastian.eidora.data.db.FaceRegionEntity
 import de.sebastian.eidora.data.db.PersonEntity
 import de.sebastian.eidora.data.db.PhotoEntity
 import de.sebastian.eidora.domain.model.FaceRegionCoords
+import de.sebastian.eidora.ml.BlazeFaceDetector
 import de.sebastian.eidora.util.*
 import de.sebastian.eidora.worker.NotificationHelper
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,7 +18,6 @@ import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.util.UUID
 
@@ -39,15 +36,9 @@ class PhotoSyncWorker(
 
     private val detector by lazy {
         try {
-            FaceDetection.getClient(
-                FaceDetectorOptions.Builder()
-                    .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
-                    .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
-                    .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
-                    .build()
-            )
+            BlazeFaceDetector(applicationContext)
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to initialize ML Kit face detector", t)
+            Log.e(TAG, "Failed to initialize BlazeFace detector", t)
             null
         }
     }
@@ -280,64 +271,49 @@ class PhotoSyncWorker(
     private suspend fun runMlKit(file: File, photoId: String) {
         val det = detector
         if (det == null) {
-            Log.w(TAG, "ML Kit detector not available, skipping ${file.name}")
+            Log.w(TAG, "BlazeFace detector not available, skipping ${file.name}")
+            photoDao.updateAnalyzed(photoId, true)
+            return
+        }
+
+        val bitmap = try {
+            de.sebastian.eidora.util.BitmapLoader.loadOrientedBitmap(file, maxSize = 1024)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to load bitmap for ${file.name}", t)
+            photoDao.updateAnalyzed(photoId, true)
+            return
+        }
+        if (bitmap == null) {
+            Log.w(TAG, "Bitmap decode returned null for ${file.name}")
             photoDao.updateAnalyzed(photoId, true)
             return
         }
 
         val faces = try {
-            val inputImage = InputImage.fromFilePath(applicationContext, android.net.Uri.fromFile(file))
-            det.process(inputImage).await()
+            det.detect(bitmap)
         } catch (t: Throwable) {
-            Log.e(TAG, "ML Kit detection failed for ${file.name}", t)
+            Log.e(TAG, "BlazeFace detection failed for ${file.name}", t)
             photoDao.updateAnalyzed(photoId, true)
+            bitmap.recycle()
             return
+        } finally {
+            // We keep the bitmap alive until after detect() returns; recycle here.
+            // detect() already recycles its internally-resized copy.
         }
+        bitmap.recycle()
 
         if (faces.isNotEmpty()) {
-            val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            try { android.graphics.BitmapFactory.decodeFile(file.absolutePath, opts) } catch (t: Throwable) {
-                Log.e(TAG, "Could not decode bitmap dimensions for ${file.name}", t)
-                photoDao.updateAnalyzed(photoId, true)
-                return
-            }
-            val rawW = opts.outWidth.toFloat().takeIf { it > 0 } ?: run {
-                Log.w(TAG, "Invalid image dimensions for ${file.name}")
-                photoDao.updateAnalyzed(photoId, true)
-                return
-            }
-            val rawH = opts.outHeight.toFloat()
-
-            // ML Kit rotates the image according to EXIF before detection.
-            // Coordinates are in the rotated image space, so we must use
-            // rotated dimensions for normalization.
-            val rotation = try {
-                androidx.exifinterface.media.ExifInterface(file.absolutePath)
-                    .getAttributeInt(
-                        androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
-                        androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
-                    )
-            } catch (t: Throwable) {
-                androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
-            }
-            val isRotated90or270 = rotation == androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90
-                || rotation == androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270
-                || rotation == androidx.exifinterface.media.ExifInterface.ORIENTATION_TRANSVERSE
-                || rotation == androidx.exifinterface.media.ExifInterface.ORIENTATION_TRANSPOSE
-
-            // Use rotated dimensions for coordinate normalization
-            val imgW = if (isRotated90or270) rawH else rawW
-            val imgH = if (isRotated90or270) rawW else rawH
-
             val xmpRegions = mutableListOf<XmpFaceRegion>()
             faces.forEach { face ->
                 try {
-                    val box = face.boundingBox
+                    // Detector returns normalized [0..1] coords already; we
+                    // convert to center-based FaceRegionCoords as expected by
+                    // the rest of the app.
                     val coords = FaceRegionCoords(
-                        x = box.centerX() / imgW,
-                        y = box.centerY() / imgH,
-                        w = box.width() / imgW,
-                        h = box.height() / imgH
+                        x = face.xMin + face.width / 2f,
+                        y = face.yMin + face.height / 2f,
+                        w = face.width,
+                        h = face.height
                     )
                     val faceId = UUID.randomUUID().toString()
                     faceDao.insert(FaceRegionEntity(

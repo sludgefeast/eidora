@@ -66,6 +66,7 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
+    implementation("androidx.compose.foundation:foundation")
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     debugImplementation(libs.androidx.ui.tooling)
@@ -86,8 +87,6 @@ dependencies {
     // Preferences DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // ML Kit Face Detection
-    implementation(libs.mlkit.face.detection)
 
     // TFLite for FaceNet
     implementation(libs.tensorflow.lite)
@@ -106,8 +105,7 @@ dependencies {
     // Kotlin serialization (FaceRegionCoords JSON)
     implementation(libs.kotlinx.serialization.json)
 
-    // Coroutines + Play Services (for ML Kit await())
-    implementation(libs.kotlinx.coroutines.play.services)
+    // Coroutines
 
     // AppCompat (required for Theme.AppCompat)
     implementation(libs.androidx.appcompat)
