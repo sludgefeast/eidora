@@ -5,7 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material3.*
@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -209,23 +208,19 @@ private fun VerticalScrollbar(
                 .offset(y = handleOffset)
                 .width(24.dp)  // Bigger hit target than visible bar
                 .height(handleHeight)
-                .pointerInput(totalItems, visibleItems) {
-                    androidx.compose.foundation.gestures.detectVerticalDragGestures(
-                        onDragStart = { isDragging = true },
-                        onDragEnd = { isDragging = false },
-                        onDragCancel = { isDragging = false },
-                        onVerticalDrag = { change, dragAmount ->
-                            change.consume()
-                            val trackPx = heightPx - handleHeightPx
-                            if (trackPx <= 0f) return@detectVerticalDragGestures
-                            // Convert pixel drag into fractional scroll position
-                            val currentPos = firstVisible.toFloat() +
-                                (dragAmount / trackPx) * (totalItems - visibleItems).toFloat()
-                            val targetIndex = currentPos.toInt().coerceIn(0, totalItems - 1)
-                            scope.launch { state.scrollToItem(targetIndex) }
-                        }
-                    )
-                },
+                .draggable(
+                    orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
+                    state = androidx.compose.foundation.gestures.rememberDraggableState { dragAmount ->
+                        val trackPx = heightPx - handleHeightPx
+                        if (trackPx <= 0f) return@rememberDraggableState
+                        val currentPos = firstVisible.toFloat() +
+                            (dragAmount / trackPx) * (totalItems - visibleItems).toFloat()
+                        val targetIndex = currentPos.toInt().coerceIn(0, totalItems - 1)
+                        scope.launch { state.scrollToItem(targetIndex) }
+                    },
+                    onDragStarted = { isDragging = true },
+                    onDragStopped = { isDragging = false }
+                ),
             contentAlignment = Alignment.CenterEnd
         ) {
             Box(
