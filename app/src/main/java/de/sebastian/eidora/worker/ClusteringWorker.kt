@@ -197,7 +197,7 @@ class ClusteringWorker(
 
     private suspend fun recomputeAllCentroids(
         db: EidoraDatabase,
-        onProgress: (Int) -> Unit = {}
+        onProgress: suspend (Int) -> Unit = {}
     ) {
         val personDao = db.personDao()
         val faceDao = db.faceRegionDao()

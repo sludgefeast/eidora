@@ -88,6 +88,7 @@ class ModelDownloadWorker(
 
         val notification = NotificationCompat.Builder(ctx, "sync")
             .setSmallIcon(R.drawable.ic_notification)
+            .setColor(android.graphics.Color.parseColor("#EC4899"))
             .setContentTitle(ctx.getString(R.string.mobile_download_title))
             .setContentText(ctx.getString(R.string.mobile_download_message))
             .setStyle(NotificationCompat.BigTextStyle().bigText(ctx.getString(R.string.mobile_download_message)))

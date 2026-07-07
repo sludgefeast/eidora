@@ -84,6 +84,7 @@ object NotificationHelper {
     ): Notification {
         val builder = NotificationCompat.Builder(context, CHANNEL_SYNC)
             .setSmallIcon(R.drawable.ic_notification)
+            .setColor(android.graphics.Color.parseColor("#EC4899"))
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(contentIntent(context))
