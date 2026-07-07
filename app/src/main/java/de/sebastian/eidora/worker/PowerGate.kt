@@ -74,7 +74,7 @@ class PowerGate(private val context: Context) {
     suspend fun awaitOk(
         minBatteryPercent: Int,
         maxBatteryTempCelsius: Float,
-        onWait: (String) -> Unit
+        onWait: suspend (String) -> Unit
     ) {
         while (true) {
             val status = currentStatus()
