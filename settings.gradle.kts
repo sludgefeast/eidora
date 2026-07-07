@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Faces"
+rootProject.name = "Eidora"
 include(":app")
