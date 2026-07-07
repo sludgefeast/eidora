@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -90,9 +91,15 @@ fun EidoraApp() {
 
     val hasAllPermissions = hasMedia && hasFiles && hasNotifications
 
-    LaunchedEffect(hasAllPermissions) {
-        if (hasAllPermissions) {
-            try { SyncPipeline.enqueue(context) } catch (t: Throwable) {
+    // Enqueue the pipeline only once per app start, even if permissions
+    // change multiple times or the composition recomposes.
+    var pipelineEnqueued by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(hasAllPermissions, pipelineEnqueued) {
+        if (hasAllPermissions && !pipelineEnqueued) {
+            try {
+                SyncPipeline.enqueue(context)
+                pipelineEnqueued = true
+            } catch (t: Throwable) {
                 android.util.Log.e("FACES", "SyncPipeline failed", t)
             }
         }

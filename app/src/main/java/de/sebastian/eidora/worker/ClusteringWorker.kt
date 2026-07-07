@@ -38,6 +38,21 @@ class ClusteringWorker(
                 )
             }
 
+            val powerGate = PowerGate(applicationContext)
+            val powerConfig = try {
+                de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext).getPowerConfig()
+            } catch (t: Throwable) {
+                de.sebastian.eidora.data.settings.PowerConfig(
+                    minBatteryPercent = 20,
+                    maxBatteryTempCelsius = 40.0f
+                )
+            }
+            powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius) { reason ->
+                try {
+                    setForeground(NotificationHelper.clusteringForegroundInfo(applicationContext, 0, reason))
+                } catch (t: Throwable) { /* ignore */ }
+            }
+
             val pendingEmbeddings = faceDao.findWithoutEmbedding()
             if (pendingEmbeddings.isNotEmpty()) {
                 Log.w(TAG, "${pendingEmbeddings.size} faces still missing embeddings – retrying later")
@@ -60,7 +75,18 @@ class ClusteringWorker(
             // ----- Phase 1: Individual matching (0-30%) -----
             val individuallyAssigned = mutableSetOf<String>()
             if (personCentroids.isNotEmpty() && unknownFacesAll.isNotEmpty()) {
-                unknownFacesAll.forEachIndexed { index, face ->
+                for ((index, face) in unknownFacesAll.withIndex()) {
+                    if (isStopped) {
+                        Log.i(TAG, "Clustering was cancelled at index $index, exiting")
+                        return Result.failure()
+                    }
+                    if (index % 50 == 0 && index > 0) {
+                        powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius) { reason ->
+                            try {
+                                setForeground(NotificationHelper.clusteringForegroundInfo(applicationContext, (index * 30) / unknownFacesAll.size, reason))
+                            } catch (t: Throwable) { /* ignore */ }
+                        }
+                    }
                     try {
                         val embedding = FaceNetModel.bytesToFloatArray(face.embedding!!)
                         var bestId: String? = null
