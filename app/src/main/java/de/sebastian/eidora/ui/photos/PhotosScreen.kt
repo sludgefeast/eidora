@@ -164,7 +164,7 @@ private fun PhotoGridItem(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0x660D47A1))
+                    .background(Color(0x990D47A1))
             )
         }
     }

@@ -83,4 +83,6 @@
     <string name="mobile_download_title">Download über Mobilfunk?</string>
     <string name="mobile_download_message">Das Gesichtserkennungsmodell ist etwa 90 MB groß. Es ist kein WLAN verfügbar. Über Mobilfunk herunterladen?</string>
     <string name="mobile_download_confirm">Jetzt herunterladen</string>
+    <string name="model_download_failed_title">Modell-Download fehlgeschlagen</string>
+    <string name="model_download_failed_message">Das Gesichtserkennungsmodell konnte nach mehreren Versuchen nicht heruntergeladen werden. Prüfe ob eine App-Aktualisierung verfügbar ist oder deine Netzwerkverbindung.</string>
 </resources>

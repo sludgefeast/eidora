@@ -167,6 +167,7 @@ fun PersonDetailScreen(
         bottomBar = {
             if (state.isMultiSelectActive && state.selectedFaceIds.isNotEmpty()) {
                 MultiSelectActionBar(
+                    viewMode = state.viewMode,
                     onConfirm = { viewModel.confirmSelected() },
                     onIgnore = { viewModel.ignoreSelected() },
                     onRemove = { viewModel.removeSelected() },
@@ -365,7 +366,7 @@ private fun FaceGridItem(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0x660D47A1))
+                        .background(Color(0x990D47A1))
                 )
             }
         }
@@ -425,6 +426,7 @@ private fun FaceActionsSheet(
 
 @Composable
 private fun MultiSelectActionBar(
+    viewMode: PersonDetailViewMode,
     onConfirm: () -> Unit,
     onIgnore: () -> Unit,
     onRemove: () -> Unit,
@@ -439,9 +441,26 @@ private fun MultiSelectActionBar(
                 .padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_confirm)) }
-            TextButton(onClick = onIgnore) { Text(stringResource(R.string.action_ignore)) }
-            TextButton(onClick = onRemove) { Text(stringResource(R.string.action_remove_from_person)) }
+            // Confirm: only in NORMAL and SUGGESTION (a real person exists to confirm against)
+            if (viewMode == PersonDetailViewMode.NORMAL ||
+                viewMode == PersonDetailViewMode.SUGGESTION) {
+                TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_confirm)) }
+            }
+            // Ignore: everywhere except when the faces are already ignored
+            if (viewMode != PersonDetailViewMode.IGNORED) {
+                TextButton(onClick = onIgnore) { Text(stringResource(R.string.action_ignore)) }
+            }
+            // Remove / Unignore: not in UNKNOWN (nothing to remove them from)
+            when (viewMode) {
+                PersonDetailViewMode.NORMAL,
+                PersonDetailViewMode.SUGGESTION -> {
+                    TextButton(onClick = onRemove) { Text(stringResource(R.string.action_remove_from_person)) }
+                }
+                PersonDetailViewMode.IGNORED -> {
+                    TextButton(onClick = onRemove) { Text(stringResource(R.string.action_unignore)) }
+                }
+                PersonDetailViewMode.UNKNOWN -> { /* no remove */ }
+            }
             TextButton(onClick = onRedetect) { Text(stringResource(R.string.action_redetect)) }
             TextButton(onClick = onAssign) { Text(stringResource(R.string.action_assign_to_person)) }
         }

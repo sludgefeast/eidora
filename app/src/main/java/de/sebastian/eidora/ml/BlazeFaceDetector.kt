@@ -19,7 +19,7 @@ import kotlin.math.min
 
 private const val TAG = "BlazeFaceDetector"
 
-// MediaPipe BlazeFace Full-Range: 192x192 input, single anchor scale.
+// MediaPipe BlazeFace Full-Range Sparse: 192x192 input, single anchor scale.
 private const val INPUT_SIZE = 192
 private const val NUM_ANCHORS = 2304
 private const val NUM_COORDS = 16   // 4 bbox + 12 keypoints
@@ -198,14 +198,11 @@ class BlazeFaceDetector(context: Context) : Closeable {
     private fun sigmoid(x: Float): Float = 1f / (1f + exp(-x))
 
     /**
-     * MediaPipe Full-Range: single anchor scale, 4 feature-map strides (48, 24, 12, 6)
-     * → 48² + 24² + 12² + 6² = 2304 + 576 + 144 + 36 = 3060 …
-     *
-     * Actually Full-Range v1 uses one 48x48 feature map with anchor count = 2304
-     * (48*48 * 1 anchor per cell). We generate those grid anchors here.
+     * MediaPipe BlazeFace Full-Range: single 48x48 feature map, 1 anchor per cell.
+     * 48 * 48 = 2304 anchors.
      */
     private fun generateAnchors(): FloatArray {
-        val gridSize = 48  // 192 / 4 stride
+        val gridSize = 48
         val anchors = FloatArray(NUM_ANCHORS * 2)
         var idx = 0
         for (y in 0 until gridSize) {
