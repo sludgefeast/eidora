@@ -23,7 +23,7 @@ private const val TAG = "BlazeFaceDetector"
 private const val INPUT_SIZE = 192
 private const val NUM_ANCHORS = 2304
 private const val NUM_COORDS = 16   // 4 bbox + 12 keypoints
-private const val SCORE_THRESHOLD = 0.6f
+private const val SCORE_THRESHOLD = 0.4f
 private const val NMS_IOU_THRESHOLD = 0.3f
 
 /**

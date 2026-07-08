@@ -294,7 +294,7 @@ class PhotoSyncWorker(
         }
 
         val bitmap = try {
-            de.sebastian.eidora.util.BitmapLoader.loadOrientedBitmap(file, maxSize = 1024)
+            de.sebastian.eidora.util.BitmapLoader.loadOrientedBitmap(file, maxSize = 2048)
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to load bitmap for ${file.name}", t)
             photoDao.updateAnalyzed(photoId, true)
