@@ -72,12 +72,8 @@ class PhotoSyncWorker(
             Log.w(TAG, "Failed to load filename patterns, using empty list (no filter)", t)
             emptyList()
         }
-        val cameraDir = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
-            "Camera"
-        )
         val jpegFiles = try {
-            collectJpegs(cameraDir, patterns) { count ->
+            collectJpegsFromMediaStore(patterns) { count ->
                 try {
                     setForegroundAsync(
                         NotificationHelper.syncForegroundInfo(
@@ -87,7 +83,7 @@ class PhotoSyncWorker(
                 } catch (t: Throwable) { /* ignore progress errors */ }
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to collect JPEGs from $cameraDir", t)
+            Log.e(TAG, "Failed to query MediaStore for JPEGs", t)
             return Result.failure()
         }
 
@@ -194,22 +190,43 @@ class PhotoSyncWorker(
     // Per-file processing
     // -----------------------------------------------------------------------
 
-    private fun collectJpegs(
-        root: File,
+    /**
+     * Queries the MediaStore for JPEG images and returns them as File objects.
+     * Filter patterns are applied to the display name (filename).
+     * Much faster than walking the file system for large photo collections.
+     */
+    private fun collectJpegsFromMediaStore(
         patterns: List<String>,
         onProgress: (Int) -> Unit
     ): List<File> {
-        if (!root.exists()) return emptyList()
+        val uri = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        val projection = arrayOf(
+            android.provider.MediaStore.Images.Media._ID,
+            android.provider.MediaStore.Images.Media.DATA,
+            android.provider.MediaStore.Images.Media.DISPLAY_NAME,
+            android.provider.MediaStore.Images.Media.MIME_TYPE
+        )
+        val selection = "${android.provider.MediaStore.Images.Media.MIME_TYPE} = ?"
+        val selectionArgs = arrayOf("image/jpeg")
+
         val result = mutableListOf<File>()
-        var scanned = 0
-        for (file in root.walkTopDown()) {
-            scanned++
-            if (scanned % 500 == 0) onProgress(scanned)
-            if (!file.isFile) continue
-            if (!de.sebastian.eidora.data.settings.SettingsRepository
-                    .matchesAnyPattern(file.name, patterns)) continue
-            if (!FileUtil.isJpeg(file)) continue
-            result.add(file)
+        applicationContext.contentResolver.query(
+            uri, projection, selection, selectionArgs,
+            "${android.provider.MediaStore.Images.Media.DATE_TAKEN} DESC"
+        )?.use { cursor ->
+            val dataCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DATA)
+            val nameCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DISPLAY_NAME)
+            var scanned = 0
+            while (cursor.moveToNext()) {
+                scanned++
+                if (scanned % 500 == 0) onProgress(scanned)
+                val name = cursor.getString(nameCol) ?: continue
+                if (!de.sebastian.eidora.data.settings.SettingsRepository
+                        .matchesAnyPattern(name, patterns)) continue
+                val path = cursor.getString(dataCol) ?: continue
+                val file = File(path)
+                if (file.isFile) result.add(file)
+            }
         }
         return result
     }
