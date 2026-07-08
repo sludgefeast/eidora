@@ -23,8 +23,8 @@ class ModelDownloadWorker(
     override suspend fun doWork(): Result {
         Log.i(TAG, "ModelDownloadWorker started")
 
-        if (ModelDownloader.isDownloaded(applicationContext)) {
-            Log.i(TAG, "Model already downloaded, skipping")
+        if (ModelDownloader.allModelsReady(applicationContext)) {
+            Log.i(TAG, "All models already downloaded, skipping")
             return Result.success()
         }
 
