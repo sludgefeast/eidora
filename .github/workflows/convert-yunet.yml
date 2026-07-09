@@ -32,18 +32,28 @@ jobs:
             "ml_dtypes" \
             --extra-index-url https://pypi.ngc.nvidia.com
 
-      - name: Patch numpy to allow pickled test data (onnx2tf workaround)
+      - name: Provide calibration data (onnx2tf download workaround)
         run: |
           SITE=$(python -c "import site; print(site.getsitepackages()[0])")
-          cat > "$SITE/sitecustomize.py" << 'PYEOF'
-          import numpy as np
-          _orig_load = np.load
-          def _patched_load(*args, **kwargs):
-              kwargs.setdefault("allow_pickle", True)
-              return _orig_load(*args, **kwargs)
-          np.load = _patched_load
+          # Find where onnx2tf expects its test/calibration npy file
+          grep -rn "calibration_image_sample_data" "$SITE/onnx2tf/utils/common_functions.py" | head -5 || true
+          # Generate a valid .npy with the expected shape and drop it in all
+          # plausible locations so download_test_image_data() skips its
+          # (broken) download and loads our file instead.
+          python - << 'PYEOF'
+          import numpy as np, os, site
+          data = (np.random.rand(20, 128, 128, 3) * 255).astype(np.float32)
+          name = "calibration_image_sample_data_20x128x128x3_float32.npy"
+          targets = [
+              name,  # current working directory
+              os.path.join(site.getsitepackages()[0], "onnx2tf", name),
+              os.path.join(site.getsitepackages()[0], "onnx2tf", "utils", name),
+          ]
+          for t in targets:
+              os.makedirs(os.path.dirname(t) or ".", exist_ok=True)
+              np.save(t, data)
+              print("wrote", t)
           PYEOF
-          echo "Patched: $SITE/sitecustomize.py"
 
       - name: Download YuNet ONNX from OpenCV Zoo
         run: |
