@@ -53,16 +53,17 @@ class PowerGate(private val context: Context) {
     ): PowerGateResult {
         if (status.batteryPercent in 0 until minBatteryPercent) {
             return PowerGateResult.Blocked(
-                "Paused: battery below ${minBatteryPercent}% (currently ${status.batteryPercent}%)"
+                context.getString(de.sebastian.eidora.R.string.powergate_battery_low, minBatteryPercent, status.batteryPercent)
             )
         }
         if (status.batteryTempCelsius > 0f && status.batteryTempCelsius > maxBatteryTempCelsius) {
             return PowerGateResult.Blocked(
-                "Paused: battery ${"%.1f".format(status.batteryTempCelsius)}°C > ${"%.1f".format(maxBatteryTempCelsius)}°C"
+                context.getString(de.sebastian.eidora.R.string.powergate_battery_hot,
+                    "%.1f".format(status.batteryTempCelsius), "%.1f".format(maxBatteryTempCelsius))
             )
         }
         if (status.thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE) {
-            return PowerGateResult.Blocked("Paused: device thermal throttling")
+            return PowerGateResult.Blocked(context.getString(de.sebastian.eidora.R.string.powergate_thermal))
         }
         return PowerGateResult.Ok
     }

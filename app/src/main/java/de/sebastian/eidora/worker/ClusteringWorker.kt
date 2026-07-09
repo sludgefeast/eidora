@@ -23,7 +23,7 @@ class ClusteringWorker(
         val personDao = db.personDao()
 
         try {
-            reportProgress(0, "Preparing…")
+            reportProgress(0, applicationContext.getString(de.sebastian.eidora.R.string.notif_preparing))
 
             val config = try {
                 de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext)
@@ -104,34 +104,34 @@ class ClusteringWorker(
                     }
                     if (index % 10 == 0) {
                         val phaseProgress = (index * 30) / unknownFacesAll.size
-                        reportProgress(phaseProgress, "Matching known persons… ${index + 1}/${unknownFacesAll.size}")
+                        reportProgress(phaseProgress, applicationContext.getString(de.sebastian.eidora.R.string.notif_matching_persons, index + 1, unknownFacesAll.size))
                     }
                 }
                 Log.i(TAG, "Individually assigned ${individuallyAssigned.size} faces to existing persons")
             }
-            reportProgress(30, "Matching known persons… done")
+            reportProgress(30, applicationContext.getString(de.sebastian.eidora.R.string.notif_matching_persons_done))
 
             val candidates: List<Pair<String, FloatArray>> = unknownFacesAll
                 .filter { it.id !in individuallyAssigned }
                 .map { face -> Pair(face.id, FaceNetModel.bytesToFloatArray(face.embedding!!)) }
 
             if (candidates.isEmpty()) {
-                reportProgress(80, "Updating centroids…")
-                try { recomputeAllCentroids(db) { p -> reportProgress(80 + p * 20 / 100, "Updating centroids…") } }
+                reportProgress(80, applicationContext.getString(de.sebastian.eidora.R.string.notif_updating_centroids))
+                try { recomputeAllCentroids(db) { p -> reportProgress(80 + p * 20 / 100, applicationContext.getString(de.sebastian.eidora.R.string.notif_updating_centroids)) } }
                 catch (t: Throwable) { Log.e(TAG, "Failed to recompute centroids", t) }
-                reportProgress(100, "Done")
+                reportProgress(100, applicationContext.getString(de.sebastian.eidora.R.string.notif_done))
                 return Result.success()
             }
 
             // ----- Phase 2: Chinese Whispers (30-40%) -----
-            reportProgress(30, "Grouping similar faces… (${candidates.size} candidates)")
+            reportProgress(30, applicationContext.getString(de.sebastian.eidora.R.string.notif_grouping, candidates.size))
             val clusterResults = try {
                 ChineseWhispers.cluster(candidates, config.edgeThreshold)
             } catch (t: Throwable) {
                 Log.e(TAG, "Clustering algorithm failed", t)
                 return Result.failure()
             }
-            reportProgress(40, "Grouping similar faces… done")
+            reportProgress(40, applicationContext.getString(de.sebastian.eidora.R.string.notif_grouping_done))
 
             // ----- Phase 3: Cluster assignment (40-80%) -----
             val clusterGroups = clusterResults.groupBy { it.clusterId }
@@ -185,20 +185,20 @@ class ClusteringWorker(
                 }
 
                 val phaseProgress = 40 + ((index + 1) * 40) / totalClusters.coerceAtLeast(1)
-                reportProgress(phaseProgress, "Assigning clusters… ${index + 1}/$totalClusters")
+                reportProgress(phaseProgress, applicationContext.getString(de.sebastian.eidora.R.string.notif_assigning, index + 1, totalClusters))
             }
 
             // ----- Phase 4: Centroid recompute (80-100%) -----
-            reportProgress(80, "Updating centroids…")
+            reportProgress(80, applicationContext.getString(de.sebastian.eidora.R.string.notif_updating_centroids))
             try {
                 recomputeAllCentroids(db) { p ->
-                    reportProgress(80 + p * 20 / 100, "Updating centroids…")
+                    reportProgress(80 + p * 20 / 100, applicationContext.getString(de.sebastian.eidora.R.string.notif_updating_centroids))
                 }
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to recompute centroids", t)
             }
 
-            reportProgress(100, "Done")
+            reportProgress(100, applicationContext.getString(de.sebastian.eidora.R.string.notif_done))
             return Result.success()
         } catch (t: Throwable) {
             Log.e(TAG, "Unhandled error in ClusteringWorker", t)

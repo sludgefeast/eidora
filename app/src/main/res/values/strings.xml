@@ -83,4 +83,24 @@
     <string name="mobile_download_title">Download over mobile data?</string>
     <string name="mobile_download_message">The face recognition model is about 90 MB. Wi-Fi is not available. Download over mobile data?</string>
     <string name="mobile_download_confirm">Download now</string>
+    <string name="notif_embedding_title">Computing embeddings</string>
+    <string name="notif_clustering_title">Clustering faces</string>
+    <string name="notif_running">Running…</string>
+    <string name="notif_scanning">Scanning media… %1$d checked</string>
+    <string name="notif_scanning_start">Scanning media…</string>
+    <string name="notif_done">Done</string>
+    <string name="notif_eta_left">%1$s left</string>
+    <string name="notif_preparing">Preparing…</string>
+    <string name="notif_matching_persons">Matching known persons… %1$d/%2$d</string>
+    <string name="notif_matching_persons_done">Matching known persons… done</string>
+    <string name="notif_grouping">Grouping similar faces… (%1$d candidates)</string>
+    <string name="notif_grouping_done">Grouping similar faces… done</string>
+    <string name="notif_assigning">Assigning clusters… %1$d/%2$d</string>
+    <string name="notif_updating_centroids">Updating centroids…</string>
+    <string name="powergate_battery_low">Paused: battery below %1$d%% (currently %2$d%%)</string>
+    <string name="powergate_battery_hot">Paused: battery %1$s°C above %2$s°C</string>
+    <string name="powergate_thermal">Paused: device thermal throttling</string>
+    <string name="permission_photo">Grant photo access</string>
+    <string name="permission_files">Grant file access</string>
+    <string name="permission_notifications">Grant notification access</string>
 </resources>

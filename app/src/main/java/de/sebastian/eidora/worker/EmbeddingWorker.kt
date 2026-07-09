@@ -69,7 +69,7 @@ class EmbeddingWorker(
                 while (isActive) {
                     val current = done.get()
                     val progress = if (total == 0) 0 else (current * 100) / total
-                    val eta = PhotoSyncWorker.formatEta(startedAt, current, total)
+                    val eta = PhotoSyncWorker.formatEta(applicationContext, startedAt, current, total)
                     val message = if (eta.isNotEmpty()) "$progress% – $eta" else "$progress%"
                     try {
                         setForeground(
@@ -121,7 +121,7 @@ class EmbeddingWorker(
                     val current = done.incrementAndGet()
                     setProgress(workDataOf(
                         PhotoSyncWorker.KEY_PROGRESS to (current * 100) / total,
-                        PhotoSyncWorker.KEY_STATUS to "Computing embeddings…"
+                        PhotoSyncWorker.KEY_STATUS to applicationContext.getString(de.sebastian.eidora.R.string.notif_embedding_title)
                     ))
                 }
 

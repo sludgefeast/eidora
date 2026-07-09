@@ -115,7 +115,7 @@ fun EidoraApp() {
                 )
                 if (!hasMedia) {
                     Button(onClick = { mediaLauncher.launch(permission) }, modifier = Modifier.padding(bottom = 8.dp)) {
-                        Text("Grant photo access")
+                        Text(stringResource(R.string.permission_photo))
                     }
                 }
                 if (!hasFiles) {
@@ -125,7 +125,7 @@ fun EidoraApp() {
                             Uri.parse("package:${context.packageName}")
                         ))
                     }, modifier = Modifier.padding(bottom = 8.dp)) {
-                        Text("Grant file access")
+                        Text(stringResource(R.string.permission_files))
                     }
                 }
                 if (!hasNotifications) {
@@ -134,7 +134,7 @@ fun EidoraApp() {
                             notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
                     }) {
-                        Text("Grant notification access")
+                        Text(stringResource(R.string.permission_notifications))
                     }
                 }
             }

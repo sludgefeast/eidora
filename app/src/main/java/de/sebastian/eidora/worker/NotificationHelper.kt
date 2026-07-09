@@ -28,17 +28,17 @@ object NotificationHelper {
     }
 
     fun embeddingForegroundInfo(context: Context, progress: Int): ForegroundInfo {
-        val notification = buildNotification(context, "Computing embeddings", "$progress%", progress)
+        val notification = buildNotification(context, context.getString(R.string.notif_embedding_title), "$progress%", progress)
         return makeForegroundInfo(NOTIFICATION_ID_EMBEDDING, notification)
     }
 
     fun embeddingForegroundInfoWithMessage(context: Context, progress: Int, message: String): ForegroundInfo {
-        val notification = buildNotification(context, "Computing embeddings", message, progress)
+        val notification = buildNotification(context, context.getString(R.string.notif_embedding_title), message, progress)
         return makeForegroundInfo(NOTIFICATION_ID_EMBEDDING, notification)
     }
 
-    fun clusteringForegroundInfo(context: Context, progress: Int = -1, message: String = "Running…"): ForegroundInfo {
-        val notification = buildNotification(context, "Clustering faces", message, progress)
+    fun clusteringForegroundInfo(context: Context, progress: Int = -1, message: String? = null): ForegroundInfo {
+        val notification = buildNotification(context, context.getString(R.string.notif_clustering_title), message ?: context.getString(R.string.notif_running), progress)
         return makeForegroundInfo(NOTIFICATION_ID_CLUSTERING, notification)
     }
 

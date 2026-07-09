@@ -65,7 +65,7 @@ class PhotoSyncWorker(
     // -----------------------------------------------------------------------
 
     private suspend fun doFullSync(): Result {
-        try { setForeground(NotificationHelper.syncForegroundInfo(applicationContext, 0, "Scanning files…")) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
+        try { setForeground(NotificationHelper.syncForegroundInfo(applicationContext, 0, applicationContext.getString(de.sebastian.eidora.R.string.notif_scanning_start))) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
         val patterns = try {
             de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext).getFilenamePatterns()
         } catch (t: Throwable) {
@@ -77,7 +77,7 @@ class PhotoSyncWorker(
                 try {
                     setForegroundAsync(
                         NotificationHelper.syncForegroundInfo(
-                            applicationContext, 0, "Scanning files… $count found"
+                            applicationContext, 0, applicationContext.getString(de.sebastian.eidora.R.string.notif_scanning, count)
                         )
                     )
                 } catch (t: Throwable) { /* ignore progress errors */ }
@@ -87,7 +87,7 @@ class PhotoSyncWorker(
             return Result.failure()
         }
 
-        setProgress(workDataOf(KEY_STATUS to "Scanning files…"))
+        setProgress(workDataOf(KEY_STATUS to applicationContext.getString(de.sebastian.eidora.R.string.notif_scanning_start)))
 
         val dbPaths = try { photoDao.getAllPaths().toSet() } catch (t: Throwable) {
             Log.e(TAG, "Failed to read DB paths", t); return Result.failure()
@@ -119,7 +119,7 @@ class PhotoSyncWorker(
                 val current = doneCount.get()
                 val progress = if (total == 0) 0 else (current * 100) / total
                 val file = currentFile.get()
-                val eta = formatEta(startedAt, current, total)
+                val eta = formatEta(applicationContext, startedAt, current, total)
                 val message = if (eta.isNotEmpty()) "$file – $eta" else file
                 try {
                     setForeground(NotificationHelper.syncForegroundInfo(applicationContext, progress, message))
@@ -156,7 +156,7 @@ class PhotoSyncWorker(
 
         try { personDao.deleteOrphaned() } catch (t: Throwable) { Log.e(TAG, "Failed to delete orphaned persons", t) }
 
-        setProgress(workDataOf(KEY_PROGRESS to 100, KEY_STATUS to "Done"))
+        setProgress(workDataOf(KEY_PROGRESS to 100, KEY_STATUS to applicationContext.getString(de.sebastian.eidora.R.string.notif_done)))
         return Result.success()
     }
 
@@ -396,13 +396,13 @@ class PhotoSyncWorker(
          * Estimates remaining time from throughput so far.
          * Returns empty string when not enough data (< 5 items done).
          */
-        internal fun formatEta(startedAt: Long, done: Int, total: Int): String {
+        internal fun formatEta(context: android.content.Context, startedAt: Long, done: Int, total: Int): String {
             if (done < 5 || done >= total) return ""
             val elapsed = System.currentTimeMillis() - startedAt
             if (elapsed <= 0) return ""
             val perItem = elapsed.toDouble() / done
             val remainingMs = ((total - done) * perItem).toLong()
-            return "${formatDuration(remainingMs)} left"
+            return context.getString(de.sebastian.eidora.R.string.notif_eta_left, formatDuration(remainingMs))
         }
 
         private fun formatDuration(ms: Long): String {

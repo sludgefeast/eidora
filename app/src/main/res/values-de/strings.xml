@@ -83,4 +83,24 @@
     <string name="mobile_download_title">Download über Mobilfunk?</string>
     <string name="mobile_download_message">Das Gesichtserkennungsmodell ist etwa 90 MB groß. Es ist kein WLAN verfügbar. Über Mobilfunk herunterladen?</string>
     <string name="mobile_download_confirm">Jetzt herunterladen</string>
+    <string name="notif_embedding_title">Berechne Embeddings</string>
+    <string name="notif_clustering_title">Gruppiere Gesichter</string>
+    <string name="notif_running">Läuft…</string>
+    <string name="notif_scanning">Durchsuche Medien… %1$d geprüft</string>
+    <string name="notif_scanning_start">Durchsuche Medien…</string>
+    <string name="notif_done">Fertig</string>
+    <string name="notif_eta_left">%1$s verbleibend</string>
+    <string name="notif_preparing">Vorbereitung…</string>
+    <string name="notif_matching_persons">Gleiche bekannte Personen ab… %1$d/%2$d</string>
+    <string name="notif_matching_persons_done">Bekannte Personen abgeglichen</string>
+    <string name="notif_grouping">Gruppiere ähnliche Gesichter… (%1$d Kandidaten)</string>
+    <string name="notif_grouping_done">Ähnliche Gesichter gruppiert</string>
+    <string name="notif_assigning">Ordne Cluster zu… %1$d/%2$d</string>
+    <string name="notif_updating_centroids">Aktualisiere Referenzgesichter…</string>
+    <string name="powergate_battery_low">Pausiert: Akku unter %1$d %% (aktuell %2$d %%)</string>
+    <string name="powergate_battery_hot">Pausiert: Akku %1$s °C über %2$s °C</string>
+    <string name="powergate_thermal">Pausiert: Gerät drosselt wegen Hitze</string>
+    <string name="permission_photo">Fotozugriff erlauben</string>
+    <string name="permission_files">Dateizugriff erlauben</string>
+    <string name="permission_notifications">Benachrichtigungen erlauben</string>
 </resources>
