@@ -83,6 +83,4 @@
     <string name="mobile_download_title">Download over mobile data?</string>
     <string name="mobile_download_message">The face recognition model is about 90 MB. Wi-Fi is not available. Download over mobile data?</string>
     <string name="mobile_download_confirm">Download now</string>
-    <string name="model_download_failed_title">Model download failed</string>
-    <string name="model_download_failed_message">Could not download the face recognition model after several attempts. Check for an app update or your network connection.</string>
 </resources>

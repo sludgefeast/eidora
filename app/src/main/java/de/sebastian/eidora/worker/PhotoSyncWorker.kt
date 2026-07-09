@@ -9,7 +9,7 @@ import de.sebastian.eidora.data.db.FaceRegionEntity
 import de.sebastian.eidora.data.db.PersonEntity
 import de.sebastian.eidora.data.db.PhotoEntity
 import de.sebastian.eidora.domain.model.FaceRegionCoords
-import de.sebastian.eidora.ml.BlazeFaceDetector
+import de.sebastian.eidora.ml.YuNetDetector
 import de.sebastian.eidora.util.*
 import de.sebastian.eidora.worker.NotificationHelper
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -36,9 +36,9 @@ class PhotoSyncWorker(
 
     private val detector by lazy {
         try {
-            BlazeFaceDetector(applicationContext)
+            YuNetDetector(applicationContext)
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to initialize BlazeFace detector", t)
+            Log.e(TAG, "Failed to initialize YuNet detector", t)
             null
         }
     }
@@ -288,7 +288,7 @@ class PhotoSyncWorker(
     private suspend fun runMlKit(file: File, photoId: String) {
         val det = detector
         if (det == null) {
-            Log.w(TAG, "BlazeFace detector not available, skipping ${file.name}")
+            Log.w(TAG, "YuNet detector not available, skipping ${file.name}")
             photoDao.updateAnalyzed(photoId, true)
             return
         }
@@ -309,7 +309,7 @@ class PhotoSyncWorker(
         val faces = try {
             det.detect(bitmap)
         } catch (t: Throwable) {
-            Log.e(TAG, "BlazeFace detection failed for ${file.name}", t)
+            Log.e(TAG, "YuNet detection failed for ${file.name}", t)
             photoDao.updateAnalyzed(photoId, true)
             bitmap.recycle()
             return

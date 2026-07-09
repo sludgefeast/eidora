@@ -257,11 +257,8 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun removeSelected() {
         val ids = _uiState.value.selectedFaceIds.toList()
-        val isIgnored = _uiState.value.viewMode == PersonDetailViewMode.IGNORED
         viewModelScope.launch {
-            ids.forEach {
-                if (isIgnored) repo.unignoreFace(it) else repo.removeFaceFromPerson(it)
-            }
+            ids.forEach { repo.removeFaceFromPerson(it) }
             clearSelection()
         }
     }

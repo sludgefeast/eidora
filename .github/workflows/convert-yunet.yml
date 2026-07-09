@@ -1,0 +1,69 @@
+name: Convert YuNet to TFLite
+
+# Manually triggered. Downloads the official YuNet ONNX from OpenCV Zoo,
+# converts it to TFLite with a fixed 640x640 input using onnx2tf, and
+# publishes the result as a GitHub release ("models-v1").
+on:
+  workflow_dispatch:
+
+jobs:
+  convert:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write  # needed to create the release
+    steps:
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install onnx2tf and dependencies
+        run: |
+          pip install --no-cache-dir \
+            "tensorflow==2.15.0" \
+            "onnx==1.15.0" \
+            "onnxruntime==1.17.1" \
+            "onnx2tf==1.19.16" \
+            "onnx_graphsurgeon" \
+            "sng4onnx" \
+            "onnxsim==0.4.33" \
+            "protobuf==3.20.3" \
+            "h5py==3.10.0" \
+            "psutil" \
+            "ml_dtypes==0.2.0" \
+            --extra-index-url https://pypi.ngc.nvidia.com
+
+      - name: Download YuNet ONNX from OpenCV Zoo
+        run: |
+          curl -L -o face_detection_yunet_2023mar.onnx \
+            https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+          sha256sum face_detection_yunet_2023mar.onnx
+
+      - name: Convert to TFLite (fixed 640x640)
+        run: |
+          onnx2tf -i face_detection_yunet_2023mar.onnx \
+            -ois input:1,3,640,640 \
+            -o yunet_saved_model
+          ls -la yunet_saved_model/
+
+      - name: Collect and rename output
+        run: |
+          # onnx2tf writes float32 and float16 tflite files into the output dir
+          cp yunet_saved_model/*_float32.tflite yunet_640_float32.tflite
+          sha256sum yunet_640_float32.tflite > checksums.txt
+          cat checksums.txt
+
+      - name: Create release with model
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: models-v1
+          name: "Model assets v1"
+          body: |
+            YuNet face detection model converted from the official OpenCV Zoo
+            ONNX (face_detection_yunet_2023mar.onnx) to TFLite with fixed
+            640x640 input via onnx2tf.
+
+            See checksums.txt for SHA-256.
+          files: |
+            yunet_640_float32.tflite
+            checksums.txt

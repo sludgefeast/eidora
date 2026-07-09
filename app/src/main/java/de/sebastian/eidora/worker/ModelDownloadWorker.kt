@@ -57,59 +57,22 @@ class ModelDownloadWorker(
                 Log.w(TAG, "setForeground failed, continuing without foreground service", t)
             }
 
-            Log.i(TAG, "Starting model download (attempt ${runAttemptCount + 1})")
-            val outcome = ModelDownloader.download(applicationContext) { progress ->
+            Log.i(TAG, "Starting model download from ${ModelDownloader.MODEL_URL}")
+            val success = ModelDownloader.download(applicationContext) { progress ->
                 if (progress % 10 == 0) Log.d(TAG, "Download progress: $progress%")
             }
 
-            when (outcome) {
-                ModelDownloader.DownloadOutcome.SUCCESS -> {
-                    Log.i(TAG, "Model download successful")
-                    Result.success()
-                }
-                ModelDownloader.DownloadOutcome.HASH_MISMATCH -> {
-                    // File was downloaded but content differs from expected.
-                    // Give up quickly – retrying will almost certainly yield the same bad file.
-                    if (runAttemptCount >= 2) {
-                        Log.e(TAG, "Model hash mismatch after ${runAttemptCount + 1} attempts, giving up")
-                        showPermanentFailureNotification()
-                        Result.failure()
-                    } else {
-                        Log.w(TAG, "Model hash mismatch, will retry")
-                        Result.retry()
-                    }
-                }
-                ModelDownloader.DownloadOutcome.NETWORK_ERROR -> {
-                    if (runAttemptCount >= 5) {
-                        Log.e(TAG, "Model download kept failing (network), giving up after ${runAttemptCount + 1} attempts")
-                        showPermanentFailureNotification()
-                        Result.failure()
-                    } else {
-                        Log.w(TAG, "Model download failed (network), will retry")
-                        Result.retry()
-                    }
-                }
+            if (success) {
+                Log.i(TAG, "Model download successful")
+                Result.success()
+            } else {
+                Log.w(TAG, "Model download failed, will retry")
+                Result.retry()
             }
         } catch (t: Throwable) {
             Log.e(TAG, "Unhandled error in ModelDownloadWorker", t)
             Result.retry()
         }
-    }
-
-    private fun showPermanentFailureNotification() {
-        val ctx = applicationContext
-        val notification = androidx.core.app.NotificationCompat.Builder(ctx, "sync")
-            .setSmallIcon(R.drawable.ic_notification)
-            .setColor(android.graphics.Color.parseColor("#EC4899"))
-            .setContentTitle(ctx.getString(R.string.model_download_failed_title))
-            .setContentText(ctx.getString(R.string.model_download_failed_message))
-            .setStyle(androidx.core.app.NotificationCompat.BigTextStyle()
-                .bigText(ctx.getString(R.string.model_download_failed_message)))
-            .setAutoCancel(true)
-            .build()
-        try {
-            androidx.core.app.NotificationManagerCompat.from(ctx).notify(1006, notification)
-        } catch (t: Throwable) { /* ignore */ }
     }
 
     private fun showMobileAllowNotification() {

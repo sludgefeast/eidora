@@ -22,13 +22,17 @@ object ModelDownloader {
         sha256 = "82b2083e7f0e4c4d9ebcd309b3f08c3ca4d1a7963806bb67a410fa9bb32e9e8e"
     )
 
-    val BLAZEFACE = ModelInfo(
-        filename = "face_detection_full_range_sparse.tflite",
-        url = "https://github.com/patlevin/face-detection-tflite/raw/refs/tags/v0.6.0/fdlite/data/face_detection_full_range_sparse.tflite",
-        sha256 = "671dd2f9ed11a78436fc21cc42357a803dfc6f73e9fb86541be942d5716c2dce"
+    val YUNET = ModelInfo(
+        filename = "yunet_640_float32.tflite",
+        // TODO: Replace <GITHUB_USER> with your GitHub username after running
+        // the "Convert YuNet to TFLite" workflow once. The workflow creates
+        // the release "models-v1" containing this file plus checksums.txt.
+        url = "https://github.com/<GITHUB_USER>/eidora/releases/download/models-v1/yunet_640_float32.tflite",
+        // TODO: Replace with the SHA-256 from the release's checksums.txt.
+        sha256 = "REPLACE_WITH_SHA256_FROM_CHECKSUMS_TXT"
     )
 
-    private val ALL_MODELS = listOf(FACENET, BLAZEFACE)
+    private val ALL_MODELS = listOf(FACENET, YUNET)
 
     /** Kept for backwards compatibility with existing callers. */
     val MODEL_URL: String get() = FACENET.url
@@ -41,10 +45,16 @@ object ModelDownloader {
         return file.exists() && verify(file, info) == VerifyResult.OK
     }
 
+    /**
+     * True when all models required for the pipeline are present.
+     */
+    fun allModelsReady(context: Context): Boolean =
+        ALL_MODELS.all { isDownloaded(context, it) }
+
     enum class VerifyResult { OK, WRONG_HASH }
 
     /** Verifies the file's SHA-256 matches [info.sha256]. */
-    fun verify(file: java.io.File, info: ModelInfo): VerifyResult {
+    fun verify(file: File, info: ModelInfo): VerifyResult {
         val actual = sha256(file)
         if (actual == null || !actual.equals(info.sha256, ignoreCase = true)) {
             Log.w(TAG, "${info.filename}: hash mismatch (got $actual)")
@@ -53,7 +63,7 @@ object ModelDownloader {
         return VerifyResult.OK
     }
 
-    private fun sha256(file: java.io.File): String? {
+    private fun sha256(file: File): String? {
         return try {
             val md = java.security.MessageDigest.getInstance("SHA-256")
             file.inputStream().use { input ->
@@ -69,12 +79,6 @@ object ModelDownloader {
             Log.w(TAG, "SHA-256 computation failed", t); null
         }
     }
-
-    /**
-     * True when all models required for the pipeline are present.
-     */
-    fun allModelsReady(context: Context): Boolean =
-        ALL_MODELS.all { isDownloaded(context, it) }
 
     enum class DownloadOutcome {
         /** All missing models were downloaded and verified. */
