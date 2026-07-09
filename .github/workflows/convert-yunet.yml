@@ -20,17 +20,16 @@ jobs:
       - name: Install onnx2tf and dependencies
         run: |
           pip install --no-cache-dir \
-            "tensorflow==2.15.0" \
-            "onnx==1.15.0" \
-            "onnxruntime==1.17.1" \
-            "onnx2tf==1.19.16" \
+            "tensorflow==2.17.0" \
+            "tf_keras" \
+            "onnx==1.16.1" \
+            "onnxruntime==1.18.1" \
+            "onnx2tf==1.26.3" \
             "onnx_graphsurgeon" \
             "sng4onnx" \
-            "onnxsim==0.4.33" \
-            "protobuf==3.20.3" \
-            "h5py==3.10.0" \
+            "onnxsim==0.4.36" \
             "psutil" \
-            "ml_dtypes==0.2.0" \
+            "ml_dtypes" \
             --extra-index-url https://pypi.ngc.nvidia.com
 
       - name: Download YuNet ONNX from OpenCV Zoo
