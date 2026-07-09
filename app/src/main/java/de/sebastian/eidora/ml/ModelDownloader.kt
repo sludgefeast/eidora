@@ -22,17 +22,7 @@ object ModelDownloader {
         sha256 = "82b2083e7f0e4c4d9ebcd309b3f08c3ca4d1a7963806bb67a410fa9bb32e9e8e"
     )
 
-    val YUNET = ModelInfo(
-        filename = "yunet_640_float32.tflite",
-        // TODO: Replace <GITHUB_USER> with your GitHub username after running
-        // the "Convert YuNet to TFLite" workflow once. The workflow creates
-        // the release "models-v1" containing this file plus checksums.txt.
-        url = "https://github.com/<GITHUB_USER>/eidora/releases/download/models-v1/yunet_640_float32.tflite",
-        // TODO: Replace with the SHA-256 from the release's checksums.txt.
-        sha256 = "REPLACE_WITH_SHA256_FROM_CHECKSUMS_TXT"
-    )
-
-    private val ALL_MODELS = listOf(FACENET, YUNET)
+    private val ALL_MODELS = listOf(FACENET)
 
     /** Kept for backwards compatibility with existing callers. */
     val MODEL_URL: String get() = FACENET.url

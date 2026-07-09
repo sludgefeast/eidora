@@ -29,6 +29,18 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Download YuNet model from models-v1 release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p app/src/main/assets
+          gh release download models-v1 \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "yunet_640_float32.tflite" \
+            --dir app/src/main/assets \
+            --clobber
+          ls -la app/src/main/assets/
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 

@@ -9,7 +9,6 @@ import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import java.io.Closeable
-import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
@@ -59,12 +58,12 @@ class YuNetDetector(context: Context) : Closeable {
     private val scaleOutputs: Map<Int, ScaleOutputs>
 
     init {
-        val modelFile = ModelDownloader.modelFile(context, ModelDownloader.YUNET)
-        if (!modelFile.exists()) {
-            throw IllegalStateException("YuNet model not found at ${modelFile.absolutePath}")
-        }
-        val buffer = RandomAccessFile(modelFile, "r").use { raf ->
-            raf.channel.map(FileChannel.MapMode.READ_ONLY, 0, raf.length())
+        // The YuNet model is bundled as an APK asset at build time
+        // (downloaded from the models-v1 release by the build workflow).
+        val buffer = context.assets.openFd("yunet_640_float32.tflite").use { afd ->
+            java.io.FileInputStream(afd.fileDescriptor).channel.map(
+                FileChannel.MapMode.READ_ONLY, afd.startOffset, afd.declaredLength
+            )
         }
 
         val gpu = tryCreateGpu(buffer)
