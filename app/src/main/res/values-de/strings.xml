@@ -103,4 +103,6 @@
     <string name="permission_photo">Fotozugriff erlauben</string>
     <string name="permission_files">Dateizugriff erlauben</string>
     <string name="permission_notifications">Benachrichtigungen erlauben</string>
+    <string name="model_download_failed_title">Modell-Download fehlgeschlagen</string>
+    <string name="model_download_failed_message">Das Gesichtserkennungsmodell konnte nach mehreren Versuchen nicht heruntergeladen werden. Prüfe ob eine App-Aktualisierung verfügbar ist oder deine Netzwerkverbindung.</string>
 </resources>

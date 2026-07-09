@@ -103,4 +103,6 @@
     <string name="permission_photo">Grant photo access</string>
     <string name="permission_files">Grant file access</string>
     <string name="permission_notifications">Grant notification access</string>
+    <string name="model_download_failed_title">Model download failed</string>
+    <string name="model_download_failed_message">Could not download the face recognition model after several attempts. Check for an app update or your network connection.</string>
 </resources>
