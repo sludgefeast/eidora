@@ -32,6 +32,19 @@ jobs:
             "ml_dtypes" \
             --extra-index-url https://pypi.ngc.nvidia.com
 
+      - name: Patch numpy to allow pickled test data (onnx2tf workaround)
+        run: |
+          SITE=$(python -c "import site; print(site.getsitepackages()[0])")
+          cat > "$SITE/sitecustomize.py" << 'PYEOF'
+          import numpy as np
+          _orig_load = np.load
+          def _patched_load(*args, **kwargs):
+              kwargs.setdefault("allow_pickle", True)
+              return _orig_load(*args, **kwargs)
+          np.load = _patched_load
+          PYEOF
+          echo "Patched: $SITE/sitecustomize.py"
+
       - name: Download YuNet ONNX from OpenCV Zoo
         run: |
           curl -L -o face_detection_yunet_2023mar.onnx \
