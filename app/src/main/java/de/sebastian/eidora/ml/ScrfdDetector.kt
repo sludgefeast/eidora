@@ -100,9 +100,13 @@ class ScrfdDetector(context: Context) : Closeable {
 
         for (i in 0 until interpreter.outputTensorCount) {
             val shape = interpreter.getOutputTensor(i).shape()
-            if (shape.size != 3 || shape[0] != 1) continue
-            val n = shape[1]
-            val c = shape[2]
+            Log.i(TAG, "Output tensor $i shape: ${shape.contentToString()}")
+            // Accept both [1, n, c] (batched) and [n, c] (non-batched) layouts
+            val (n, c) = when {
+                shape.size == 3 && shape[0] == 1 -> shape[1] to shape[2]
+                shape.size == 2 -> shape[0] to shape[1]
+                else -> continue
+            }
             val stride = anchorCounts.entries.find { it.value == n }?.key ?: continue
             when (c) {
                 1 -> scoreByStride[stride] = i
@@ -123,19 +127,35 @@ class ScrfdDetector(context: Context) : Closeable {
         }
     }
 
+    /** Creates a correctly-shaped output buffer for tensor [tensorIdx]. */
+    private fun makeOutputBuffer(tensorIdx: Int): Any {
+        val shape = interpreter.getOutputTensor(tensorIdx).shape()
+        return if (shape.size == 3) {
+            Array(shape[0]) { Array(shape[1]) { FloatArray(shape[2]) } }
+        } else {
+            Array(shape[0]) { FloatArray(shape[1]) }
+        }
+    }
+
+    /** Unwraps a 2D or 3D output buffer into rows of FloatArray. */
+    @Suppress("UNCHECKED_CAST")
+    private fun rows(buffer: Any): Array<FloatArray> {
+        return when {
+            buffer is Array<*> && buffer.size == 1 && buffer[0] is Array<*> ->
+                buffer[0] as Array<FloatArray>
+            else -> buffer as Array<FloatArray>
+        }
+    }
+
     suspend fun detect(source: Bitmap): List<DetectedFace> {
         val resized = Bitmap.createScaledBitmap(source, INPUT_SIZE, INPUT_SIZE, true)
         val input = bitmapToBuffer(resized)
         if (resized !== source) resized.recycle()
 
         val outputs = HashMap<Int, Any>()
-        val buffers = HashMap<Int, Array<Array<FloatArray>>>()
         for ((_, idx) in scaleOutputs) {
-            for ((tensorIdx, channels) in listOf(idx.score to 1, idx.bbox to 4, idx.kps to 10)) {
-                val n = interpreter.getOutputTensor(tensorIdx).shape()[1]
-                val arr = Array(1) { Array(n) { FloatArray(channels) } }
-                outputs[tensorIdx] = arr
-                buffers[tensorIdx] = arr
+            for (tensorIdx in listOf(idx.score, idx.bbox, idx.kps)) {
+                outputs[tensorIdx] = makeOutputBuffer(tensorIdx)
             }
         }
 
@@ -148,9 +168,9 @@ class ScrfdDetector(context: Context) : Closeable {
             val idx = scaleOutputs[stride]!!
             decodeScale(
                 stride,
-                buffers[idx.score]!![0],
-                buffers[idx.bbox]!![0],
-                buffers[idx.kps]!![0],
+                rows(outputs[idx.score]!!),
+                rows(outputs[idx.bbox]!!),
+                rows(outputs[idx.kps]!!),
                 candidates
             )
         }
