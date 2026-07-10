@@ -29,14 +29,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Download YuNet model from models-v1 release
+      - name: Download SCRFD model from models-v2 release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p app/src/main/assets
-          gh release download models-v1 \
+          gh release download models-v2 \
             --repo "$GITHUB_REPOSITORY" \
-            --pattern "yunet_640_float32.tflite" \
+            --pattern "scrfd_2.5g_kps_640_float32.tflite" \
             --dir app/src/main/assets \
             --clobber
           ls -la app/src/main/assets/
