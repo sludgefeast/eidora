@@ -52,13 +52,13 @@ jobs:
       - name: Download SCRFD_2.5G_KPS ONNX
         run: |
           curl -L -o det_2.5g.onnx \
-            https://github.com/Kumar2421/scrfd_arcface_facerecognition/raw/main/weights/det_2.5g.onnx
+            https://github.com/yakhyo/face-reidentification/releases/latest/download/det_2.5g.onnx
           ls -la det_2.5g.onnx
           sha256sum det_2.5g.onnx
-          # Sanity check: a valid ONNX is several MB; an LFS pointer is ~130 bytes
+          # Sanity check: a valid ONNX is several MB; an error page is tiny
           SIZE=$(stat -c%s det_2.5g.onnx)
           if [ "$SIZE" -lt 1000000 ]; then
-            echo "Downloaded file too small ($SIZE bytes) – possibly a Git-LFS pointer. Aborting."
+            echo "Downloaded file too small ($SIZE bytes). Aborting."
             head -c 300 det_2.5g.onnx
             exit 1
           fi
