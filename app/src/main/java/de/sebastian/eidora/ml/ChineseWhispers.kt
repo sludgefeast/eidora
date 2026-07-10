@@ -101,7 +101,7 @@ object ChineseWhispers {
         for (i in 0 until n) {
             val embI = embeddings[i]
             for (j in i + 1 until n) {
-                val dist = FaceNetModel.cosineDistance(embI, embeddings[j])
+                val dist = EmbeddingModel.cosineDistance(embI, embeddings[j])
                 if (dist < edgeThreshold) {
                     val weight = 1f - dist
                     addEdge(neighborsIdx, neighborsWeight, neighborCount, i, j, weight)
@@ -173,7 +173,7 @@ object ChineseWhispers {
                         val v = if (i < j) j else i
                         if (seen[u] == v) continue
                         seen[u] = v
-                        val dist = FaceNetModel.cosineDistance(embeddings[u], embeddings[v])
+                        val dist = EmbeddingModel.cosineDistance(embeddings[u], embeddings[v])
                         if (dist < edgeThreshold) {
                             val weight = 1f - dist
                             addEdge(neighborsIdx, neighborsWeight, neighborCount, u, v, weight)

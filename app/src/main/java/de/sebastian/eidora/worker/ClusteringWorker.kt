@@ -7,7 +7,7 @@ import de.sebastian.eidora.data.db.DatabaseProvider
 import de.sebastian.eidora.data.db.EidoraDatabase
 import de.sebastian.eidora.data.db.PersonEntity
 import de.sebastian.eidora.ml.ChineseWhispers
-import de.sebastian.eidora.ml.FaceNetModel
+import de.sebastian.eidora.ml.EmbeddingModel
 import java.util.UUID
 
 private const val TAG = "ClusteringWorker"
@@ -67,9 +67,9 @@ class ClusteringWorker(
                 .mapNotNull { person ->
                     val confirmedEmbeddings = faceDao.findByPersonId(person.id)
                         .filter { it.name != null && !it.ignored && it.embedding != null }
-                        .map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
+                        .map { EmbeddingModel.bytesToFloatArray(it.embedding!!) }
                     if (confirmedEmbeddings.isEmpty()) null
-                    else person.id to FaceNetModel.centroid(confirmedEmbeddings)
+                    else person.id to EmbeddingModel.centroid(confirmedEmbeddings)
                 }.toMap()
 
             // ----- Phase 1: Individual matching (0-30%) -----
@@ -88,11 +88,11 @@ class ClusteringWorker(
                         }
                     }
                     try {
-                        val embedding = FaceNetModel.bytesToFloatArray(face.embedding!!)
+                        val embedding = EmbeddingModel.bytesToFloatArray(face.embedding!!)
                         var bestId: String? = null
                         var bestDist = config.individualMatchThreshold
                         personCentroids.forEach { (personId, centroid) ->
-                            val d = FaceNetModel.cosineDistance(embedding, centroid)
+                            val d = EmbeddingModel.cosineDistance(embedding, centroid)
                             if (d < bestDist) { bestDist = d; bestId = personId }
                         }
                         bestId?.let { personId ->
@@ -113,7 +113,7 @@ class ClusteringWorker(
 
             val candidates: List<Pair<String, FloatArray>> = unknownFacesAll
                 .filter { it.id !in individuallyAssigned }
-                .map { face -> Pair(face.id, FaceNetModel.bytesToFloatArray(face.embedding!!)) }
+                .map { face -> Pair(face.id, EmbeddingModel.bytesToFloatArray(face.embedding!!)) }
 
             if (candidates.isEmpty()) {
                 reportProgress(80, applicationContext.getString(de.sebastian.eidora.R.string.notif_updating_centroids))
@@ -148,7 +148,7 @@ class ClusteringWorker(
                     val memberEmbeddings: List<FloatArray> = members.mapNotNull { result ->
                         candidates.find { it.first == result.faceRegionId }?.second
                     }
-                    val clusterCentroid = FaceNetModel.centroid(memberEmbeddings)
+                    val clusterCentroid = EmbeddingModel.centroid(memberEmbeddings)
 
                     var bestPerson: PersonEntity? = null
                     var bestDistance = config.clusterMatchThreshold
@@ -159,10 +159,10 @@ class ClusteringWorker(
                                 .filter { it.embedding != null && !it.ignored }
                             if (personFaces.isEmpty()) return@forEach
                             val personEmbeddings: List<FloatArray> = personFaces
-                                .map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
-                            val dist = FaceNetModel.cosineDistance(
+                                .map { EmbeddingModel.bytesToFloatArray(it.embedding!!) }
+                            val dist = EmbeddingModel.cosineDistance(
                                 clusterCentroid,
-                                FaceNetModel.centroid(personEmbeddings)
+                                EmbeddingModel.centroid(personEmbeddings)
                             )
                             if (dist < bestDistance) { bestDistance = dist; bestPerson = person }
                         } catch (t: Throwable) {
@@ -236,12 +236,12 @@ class ClusteringWorker(
                 if (allFaces.isNotEmpty()) {
                     val basisFaces = allFaces.filter { it.name != null }.ifEmpty { allFaces }
                     val embeddings: List<FloatArray> = basisFaces
-                        .map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
-                    val centroid = FaceNetModel.centroid(embeddings)
+                        .map { EmbeddingModel.bytesToFloatArray(it.embedding!!) }
+                    val centroid = EmbeddingModel.centroid(embeddings)
 
                     val representative = basisFaces.minByOrNull { face ->
-                        FaceNetModel.cosineDistance(
-                            FaceNetModel.bytesToFloatArray(face.embedding!!),
+                        EmbeddingModel.cosineDistance(
+                            EmbeddingModel.bytesToFloatArray(face.embedding!!),
                             centroid
                         )
                     }

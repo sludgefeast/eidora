@@ -16,21 +16,15 @@ object ModelDownloader {
         val sha256: String
     )
 
-    val FACENET = ModelInfo(
-        filename = "facenet_512.tflite",
-        url = "https://github.com/shubham0204/OnDevice-Face-Recognition-Android/raw/v0.0.1/app/src/main/assets/facenet_512.tflite",
-        sha256 = "82b2083e7f0e4c4d9ebcd309b3f08c3ca4d1a7963806bb67a410fa9bb32e9e8e"
-    )
+    // All ML models (SCRFD detector, ArcFace embedding) are bundled as APK
+    // assets at build time. No runtime model downloads remain; the list is
+    // kept empty so the download worker is a no-op.
+    private val ALL_MODELS = emptyList<ModelInfo>()
 
-    private val ALL_MODELS = listOf(FACENET)
-
-    /** Kept for backwards compatibility with existing callers. */
-    val MODEL_URL: String get() = FACENET.url
-
-    fun modelFile(context: Context, info: ModelInfo = FACENET): File =
+    fun modelFile(context: Context, info: ModelInfo): File =
         File(context.filesDir, info.filename)
 
-    fun isDownloaded(context: Context, info: ModelInfo = FACENET): Boolean {
+    fun isDownloaded(context: Context, info: ModelInfo): Boolean {
         val file = modelFile(context, info)
         return file.exists() && verify(file, info) == VerifyResult.OK
     }

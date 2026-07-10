@@ -41,6 +41,17 @@ jobs:
             --clobber
           ls -la app/src/main/assets/
 
+      - name: Download ArcFace model from models-v3 release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download models-v3 \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "arcface_w600k_mbf_float32.tflite" \
+            --dir app/src/main/assets \
+            --clobber
+          ls -la app/src/main/assets/
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 

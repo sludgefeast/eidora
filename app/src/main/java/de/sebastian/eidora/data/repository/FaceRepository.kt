@@ -2,7 +2,7 @@ package de.sebastian.eidora.data.repository
 
 import android.content.Context
 import de.sebastian.eidora.data.db.*
-import de.sebastian.eidora.ml.FaceNetModel
+import de.sebastian.eidora.ml.EmbeddingModel
 import de.sebastian.eidora.util.*
 import java.io.File
 import java.util.UUID
@@ -194,11 +194,11 @@ class FaceRepository(
         }
         val confirmedFaces = allFaces.filter { it.name != null }
         val basisFaces = confirmedFaces.ifEmpty { allFaces }
-        val embeddings = basisFaces.map { FaceNetModel.bytesToFloatArray(it.embedding!!) }
-        val centroid = FaceNetModel.centroid(embeddings)
+        val embeddings = basisFaces.map { EmbeddingModel.bytesToFloatArray(it.embedding!!) }
+        val centroid = EmbeddingModel.centroid(embeddings)
         val representative = basisFaces.minByOrNull { face ->
-            FaceNetModel.cosineDistance(
-                FaceNetModel.bytesToFloatArray(face.embedding!!),
+            EmbeddingModel.cosineDistance(
+                EmbeddingModel.bytesToFloatArray(face.embedding!!),
                 centroid
             )
         }

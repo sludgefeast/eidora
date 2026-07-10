@@ -106,7 +106,7 @@ object ThumbnailHelper {
     }
 
     /**
-     * Crops the face region WITHOUT padding, scaled to 160x160 for FaceNet embedding input.
+     * Crops the face region WITHOUT padding, scaled square crop for the embedding model input.
      * Coords are in the rotated (visually correct) image space.
      */
     fun cropForEmbedding(photoFile: File, coords: FaceRegionCoords): Bitmap? {

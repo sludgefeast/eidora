@@ -5,7 +5,7 @@ import android.util.Log
 import androidx.work.*
 import de.sebastian.eidora.data.db.DatabaseProvider
 import de.sebastian.eidora.data.db.FaceRegionEntity
-import de.sebastian.eidora.ml.FaceNetModel
+import de.sebastian.eidora.ml.EmbeddingModel
 import de.sebastian.eidora.util.ThumbnailHelper
 import de.sebastian.eidora.util.toFaceRegionCoords
 import kotlinx.coroutines.Dispatchers
@@ -37,12 +37,12 @@ class EmbeddingWorker(
         val photoDao = db.photoDao()
 
         val model = try {
-            FaceNetModel(applicationContext)
+            EmbeddingModel(applicationContext)
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to initialize FaceNet model", t)
+            Log.e(TAG, "Failed to initialize embedding model", t)
             return Result.failure()
         }
-        Log.i(TAG, "FaceNet model initialized on backend: ${model.backend}")
+        Log.i(TAG, "Embedding model initialized on backend: ${model.backend}")
 
         return try {
             val pending: List<FaceRegionEntity> = faceDao.findWithoutEmbedding()
@@ -112,7 +112,7 @@ class EmbeddingWorker(
                 .collect { (face, bitmap) ->
                     try {
                         val embedding = model.computeEmbedding(bitmap)
-                        faceDao.updateEmbedding(face.id, FaceNetModel.floatArrayToBytes(embedding))
+                        faceDao.updateEmbedding(face.id, EmbeddingModel.floatArrayToBytes(embedding))
                     } catch (t: Throwable) {
                         Log.e(TAG, "Failed embedding for face ${face.id}, skipping", t)
                     } finally {
