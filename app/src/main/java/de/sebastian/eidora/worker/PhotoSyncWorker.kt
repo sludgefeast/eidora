@@ -91,22 +91,23 @@ class PhotoSyncWorker(
 
         // Aves-style reconciliation: the MediaStore is the source of truth.
         // deleted = DB minus MediaStore; work set = new or modified entries.
-        val dbModifiedByPath = try {
-            photoDao.getAllPathsWithModified().associate { it.path to it.modifiedAt }
+        val dbStateByPath = try {
+            photoDao.getAllPathsWithModified().associateBy { it.path }
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to read DB paths", t); return Result.failure()
         }
         val fsPaths = mediaEntries.map { it.file.absolutePath }.toSet()
 
-        (dbModifiedByPath.keys - fsPaths).forEach { path ->
+        (dbStateByPath.keys - fsPaths).forEach { path ->
             try { deletePhoto(path) } catch (t: Throwable) { Log.e(TAG, "Failed to delete photo $path", t) }
         }
 
-        // Keep only new or changed photos (second-resolution comparison;
-        // processFile re-checks precisely and skips false positives).
+        // Keep new, changed, AND not-yet-analyzed photos. The analyzed check
+        // makes an interrupted sync self-healing: photos whose processing was
+        // cut short (killed app) are picked up again on the next run.
         val jpegFiles = mediaEntries.filter { entry ->
-            val dbModified = dbModifiedByPath[entry.file.absolutePath]
-            dbModified == null || dbModified / 1000 != entry.modifiedSec
+            val db = dbStateByPath[entry.file.absolutePath]
+            db == null || db.modifiedAt / 1000 != entry.modifiedSec || !db.analyzed
         }.map { it.file }
         Log.i(TAG, "Sync work set: ${jpegFiles.size} of ${mediaEntries.size} photos (new or modified)")
 
@@ -263,6 +264,13 @@ class PhotoSyncWorker(
             }
             existing.modifiedAt != modifiedAt -> {
                 photoDao.update(existing.id, modifiedAt, takenAt, analyzed = false)
+                deleteFaceRegionsForPhoto(existing.id)
+                importXmpAndAnalyze(file, existing.id)
+            }
+            !existing.analyzed -> {
+                // Recovery: a previous run was interrupted after registering
+                // the photo but before finishing analysis. Clear any partial
+                // face regions and re-run the import/detection from scratch.
                 deleteFaceRegionsForPhoto(existing.id)
                 importXmpAndAnalyze(file, existing.id)
             }
