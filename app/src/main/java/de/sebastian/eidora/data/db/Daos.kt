@@ -151,6 +151,12 @@ interface FaceRegionDao {
     suspend fun findByPhotoId(photoId: String): List<FaceRegionEntity>
 
     @Query("SELECT * FROM face_regions WHERE personId = :personId")
+    @Query("SELECT f.*, ph.takenAt as photoTakenAt FROM face_regions f JOIN photos ph ON f.photoId = ph.id WHERE f.personId = :personId")
+    suspend fun findByPersonIdWithDate(personId: String): List<FaceRegionWithPhoto>
+
+    @Query("SELECT f.*, ph.takenAt as photoTakenAt FROM face_regions f JOIN photos ph ON f.photoId = ph.id WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding IS NOT NULL")
+    suspend fun findUnclusteredWithDate(): List<FaceRegionWithPhoto>
+
     suspend fun findByPersonId(personId: String): List<FaceRegionEntity>
 
     @Query("SELECT * FROM face_regions WHERE embedding IS NULL AND ignored = 0")

@@ -18,6 +18,7 @@ private val KEY_CLUSTER_EDGE_THRESHOLD = floatPreferencesKey("cluster_edge_thres
 private val KEY_CLUSTER_MATCH_THRESHOLD = floatPreferencesKey("cluster_match_threshold")
 private val KEY_INDIVIDUAL_MATCH_THRESHOLD = floatPreferencesKey("individual_match_threshold")
 private val KEY_MIN_CLUSTER_SIZE = intPreferencesKey("min_cluster_size")
+private val KEY_TIME_WEIGHT = floatPreferencesKey("clustering_time_weight")
 private val KEY_MIN_BATTERY_PERCENT = intPreferencesKey("min_battery_percent")
 private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius")
 private val KEY_ALLOW_MOBILE_MODEL_DOWNLOAD = androidx.datastore.preferences.core.booleanPreferencesKey("allow_mobile_model_download")
@@ -26,7 +27,8 @@ data class ClusteringConfig(
     val edgeThreshold: Float,
     val clusterMatchThreshold: Float,
     val individualMatchThreshold: Float,
-    val minClusterSize: Int
+    val minClusterSize: Int,
+    val timeWeight: Float
 )
 
 data class PowerConfig(
@@ -58,7 +60,8 @@ class SettingsRepository(private val context: Context) {
             edgeThreshold = prefs[KEY_CLUSTER_EDGE_THRESHOLD] ?: DEFAULT_EDGE_THRESHOLD,
             clusterMatchThreshold = prefs[KEY_CLUSTER_MATCH_THRESHOLD] ?: DEFAULT_CLUSTER_MATCH_THRESHOLD,
             individualMatchThreshold = prefs[KEY_INDIVIDUAL_MATCH_THRESHOLD] ?: DEFAULT_INDIVIDUAL_MATCH_THRESHOLD,
-            minClusterSize = prefs[KEY_MIN_CLUSTER_SIZE] ?: DEFAULT_MIN_CLUSTER_SIZE
+            minClusterSize = prefs[KEY_MIN_CLUSTER_SIZE] ?: DEFAULT_MIN_CLUSTER_SIZE,
+            timeWeight = prefs[KEY_TIME_WEIGHT] ?: DEFAULT_TIME_WEIGHT
         )
     }
 
@@ -70,6 +73,7 @@ class SettingsRepository(private val context: Context) {
             prefs[KEY_CLUSTER_MATCH_THRESHOLD] = config.clusterMatchThreshold
             prefs[KEY_INDIVIDUAL_MATCH_THRESHOLD] = config.individualMatchThreshold
             prefs[KEY_MIN_CLUSTER_SIZE] = config.minClusterSize
+            prefs[KEY_TIME_WEIGHT] = config.timeWeight
         }
     }
 
@@ -110,6 +114,7 @@ class SettingsRepository(private val context: Context) {
         const val DEFAULT_CLUSTER_MATCH_THRESHOLD = 0.30f
         const val DEFAULT_INDIVIDUAL_MATCH_THRESHOLD = 0.25f
         const val DEFAULT_MIN_CLUSTER_SIZE = 2
+        const val DEFAULT_TIME_WEIGHT = 1.0f
         const val DEFAULT_MIN_BATTERY_PERCENT = 20
         const val DEFAULT_MAX_BATTERY_TEMP = 40.0f
 

@@ -105,4 +105,6 @@
     <string name="permission_notifications">Grant notification access</string>
     <string name="model_download_failed_title">Model download failed</string>
     <string name="model_download_failed_message">Could not download the face recognition model after several attempts. Check for an app update or your network connection.</string>
+    <string name="setting_time_weight">Temporal weight</string>
+    <string name="setting_time_weight_description">How strongly the time between photos influences clustering. 0 = ignore time, 1 = default (half-life 3 years), 2 = strong influence. Helps separate siblings and track ageing.</string>
 </resources>

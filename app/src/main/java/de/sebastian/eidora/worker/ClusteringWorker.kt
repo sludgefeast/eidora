@@ -59,20 +59,28 @@ class ClusteringWorker(
                 return Result.retry()
             }
 
-            val unknownFacesAll = faceDao.findUnclusteredAndNotIgnored()
-                .filter { it.embedding != null }
+            val timeWeight = config.timeWeight
+            val unknownFacesAll = faceDao.findUnclusteredWithDate()
+                .filter { it.faceRegion.embedding != null }
 
-            val personCentroids: Map<String, FloatArray> = personDao.getAll()
+            // personCentroids: centroid + median takenAt for temporal penalty
+            data class PersonData(val centroid: FloatArray, val medianTakenAt: Long?)
+            val personData: Map<String, PersonData> = personDao.getAll()
                 .filter { it.name != null }
                 .mapNotNull { person ->
-                    val confirmedFaces = faceDao.findByPersonId(person.id)
-                        .filter { it.name != null && !it.ignored && it.embedding != null }
+                    val confirmedFaces = faceDao.findByPersonIdWithDate(person.id)
+                        .filter { it.faceRegion.name != null && !it.faceRegion.ignored && it.faceRegion.embedding != null }
                     if (confirmedFaces.isEmpty()) null
-                    else person.id to EmbeddingModel.weightedCentroid(
-                        confirmedFaces.map {
-                            EmbeddingModel.bytesToFloatArray(it.embedding!!) to (it.qualityScore ?: 0.5f)
-                        }
-                    )
+                    else {
+                        val centroid = EmbeddingModel.weightedCentroid(
+                            confirmedFaces.map {
+                                EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!) to (it.faceRegion.qualityScore ?: 0.5f)
+                            }
+                        )
+                        val dates = confirmedFaces.mapNotNull { it.photoTakenAt }.sorted()
+                        val median = if (dates.isEmpty()) null else dates[dates.size / 2]
+                        person.id to PersonData(centroid, median)
+                    }
                 }.toMap()
 
             // ----- Phase 1: Individual matching (0-30%) -----
@@ -91,19 +99,23 @@ class ClusteringWorker(
                         }
                     }
                     try {
-                        val embedding = EmbeddingModel.bytesToFloatArray(face.embedding!!)
+                        val embedding = EmbeddingModel.bytesToFloatArray(face.faceRegion.embedding!!)
                         var bestId: String? = null
                         var bestDist = config.individualMatchThreshold
-                        personCentroids.forEach { (personId, centroid) ->
-                            val d = EmbeddingModel.cosineDistance(embedding, centroid)
+                        personData.forEach { (personId, pd) ->
+                            val cosD = EmbeddingModel.cosineDistance(embedding, pd.centroid)
+                            val penalty = de.sebastian.eidora.ml.TemporalDistance.penalty(
+                                face.photoTakenAt, pd.medianTakenAt, timeWeight, config.individualMatchThreshold
+                            )
+                            val d = cosD + penalty
                             if (d < bestDist) { bestDist = d; bestId = personId }
                         }
                         bestId?.let { personId ->
-                            faceDao.updatePersonId(face.id, personId)
-                            individuallyAssigned.add(face.id)
+                            faceDao.updatePersonId(face.faceRegion.id, personId)
+                            individuallyAssigned.add(face.faceRegion.id)
                         }
                     } catch (t: Throwable) {
-                        Log.w(TAG, "Individual match failed for face ${face.id}", t)
+                        Log.w(TAG, "Individual match failed for face ${face.faceRegion.id}", t)
                     }
                     if (index % 10 == 0) {
                         val phaseProgress = (index * 30) / unknownFacesAll.size
@@ -115,8 +127,12 @@ class ClusteringWorker(
             reportProgress(30, applicationContext.getString(de.sebastian.eidora.R.string.notif_matching_persons_done))
 
             val candidates: List<Pair<String, FloatArray>> = unknownFacesAll
-                .filter { it.id !in individuallyAssigned }
-                .map { face -> Pair(face.id, EmbeddingModel.bytesToFloatArray(face.embedding!!)) }
+                .filter { it.faceRegion.id !in individuallyAssigned }
+                .map { face -> Pair(face.faceRegion.id, EmbeddingModel.bytesToFloatArray(face.faceRegion.embedding!!)) }
+            // takenAt lookup for ChineseWhispers temporal penalty
+            val candidateTakenAt: Map<String, Long?> = unknownFacesAll
+                .filter { it.faceRegion.id !in individuallyAssigned }
+                .associate { it.faceRegion.id to it.photoTakenAt }
 
             if (candidates.isEmpty()) {
                 reportProgress(80, applicationContext.getString(de.sebastian.eidora.R.string.notif_updating_centroids))
@@ -129,7 +145,7 @@ class ClusteringWorker(
             // ----- Phase 2: Chinese Whispers (30-40%) -----
             reportProgress(30, applicationContext.getString(de.sebastian.eidora.R.string.notif_grouping, candidates.size))
             val clusterResults = try {
-                ChineseWhispers.cluster(candidates, config.edgeThreshold)
+                ChineseWhispers.cluster(candidates, config.edgeThreshold, candidateTakenAt, timeWeight)
             } catch (t: Throwable) {
                 Log.e(TAG, "Clustering algorithm failed", t)
                 return Result.failure()

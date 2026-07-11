@@ -105,4 +105,6 @@
     <string name="permission_notifications">Benachrichtigungen erlauben</string>
     <string name="model_download_failed_title">Modell-Download fehlgeschlagen</string>
     <string name="model_download_failed_message">Das Gesichtserkennungsmodell konnte nach mehreren Versuchen nicht heruntergeladen werden. Prüfe ob eine App-Aktualisierung verfügbar ist oder deine Netzwerkverbindung.</string>
+    <string name="setting_time_weight">Zeitlicher Einfluss</string>
+    <string name="setting_time_weight_description">Wie stark der zeitliche Abstand zwischen Fotos das Clustering beeinflusst. 0 = Zeit ignorieren, 1 = Standard (Halbwertszeit 3 Jahre), 2 = starker Einfluss. Hilft Geschwister zu trennen und Alterung zu berücksichtigen.</string>
 </resources>

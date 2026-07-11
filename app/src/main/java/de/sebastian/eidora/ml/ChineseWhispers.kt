@@ -1,6 +1,7 @@
 package de.sebastian.eidora.ml
 
 import kotlin.random.Random
+import de.sebastian.eidora.ml.TemporalDistance
 
 /**
  * Chinese Whispers graph clustering for face embeddings.
@@ -30,7 +31,12 @@ object ChineseWhispers {
         val clusterId: Int
     )
 
-    fun cluster(nodes: List<Pair<String, FloatArray>>, edgeThreshold: Float = 0.30f): List<ClusterResult> {
+    fun cluster(
+        nodes: List<Pair<String, FloatArray>>,
+        edgeThreshold: Float = 0.30f,
+        takenAt: Map<String, Long?> = emptyMap(),
+        timeWeight: Float = 0f
+    ): List<ClusterResult> {
         if (nodes.isEmpty()) return emptyList()
         if (nodes.size == 1) return listOf(ClusterResult(nodes[0].first, 0))
 
@@ -41,12 +47,13 @@ object ChineseWhispers {
         val neighborCount = IntArray(n)
 
         val embeddings = Array(n) { nodes[it].second }
+        val nodeIds = Array(n) { nodes[it].first }
 
         // Choose candidate-pair strategy based on size.
         if (n < LSH_THRESHOLD) {
-            buildEdgesExhaustive(embeddings, edgeThreshold, neighborsIdx, neighborsWeight, neighborCount)
+            buildEdgesExhaustive(embeddings, nodeIds, edgeThreshold, takenAt, timeWeight, neighborsIdx, neighborsWeight, neighborCount)
         } else {
-            buildEdgesLsh(embeddings, edgeThreshold, neighborsIdx, neighborsWeight, neighborCount)
+            buildEdgesLsh(embeddings, nodeIds, edgeThreshold, takenAt, timeWeight, neighborsIdx, neighborsWeight, neighborCount)
         }
 
         // Iterative label propagation
@@ -92,7 +99,10 @@ object ChineseWhispers {
 
     private fun buildEdgesExhaustive(
         embeddings: Array<FloatArray>,
+        nodeIds: Array<String>,
         edgeThreshold: Float,
+        takenAt: Map<String, Long?>,
+        timeWeight: Float,
         neighborsIdx: Array<IntArray?>,
         neighborsWeight: Array<FloatArray?>,
         neighborCount: IntArray
@@ -101,7 +111,11 @@ object ChineseWhispers {
         for (i in 0 until n) {
             val embI = embeddings[i]
             for (j in i + 1 until n) {
-                val dist = EmbeddingModel.cosineDistance(embI, embeddings[j])
+                val cosD = EmbeddingModel.cosineDistance(embI, embeddings[j])
+                val penalty = TemporalDistance.penalty(
+                    takenAt[nodeIds[i]], takenAt[nodeIds[j]], timeWeight, edgeThreshold
+                )
+                val dist = cosD + penalty
                 if (dist < edgeThreshold) {
                     val weight = 1f - dist
                     addEdge(neighborsIdx, neighborsWeight, neighborCount, i, j, weight)
@@ -123,7 +137,10 @@ object ChineseWhispers {
      */
     private fun buildEdgesLsh(
         embeddings: Array<FloatArray>,
+        nodeIds: Array<String>,
         edgeThreshold: Float,
+        takenAt: Map<String, Long?>,
+        timeWeight: Float,
         neighborsIdx: Array<IntArray?>,
         neighborsWeight: Array<FloatArray?>,
         neighborCount: IntArray
@@ -173,7 +190,11 @@ object ChineseWhispers {
                         val v = if (i < j) j else i
                         if (seen[u] == v) continue
                         seen[u] = v
-                        val dist = EmbeddingModel.cosineDistance(embeddings[u], embeddings[v])
+                        val cosD = EmbeddingModel.cosineDistance(embeddings[u], embeddings[v])
+                        val penalty = TemporalDistance.penalty(
+                            takenAt[nodeIds[u]], takenAt[nodeIds[v]], timeWeight, edgeThreshold
+                        )
+                        val dist = cosD + penalty
                         if (dist < edgeThreshold) {
                             val weight = 1f - dist
                             addEdge(neighborsIdx, neighborsWeight, neighborCount, u, v, weight)

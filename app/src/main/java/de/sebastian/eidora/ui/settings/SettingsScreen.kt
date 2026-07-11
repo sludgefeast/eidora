@@ -148,6 +148,13 @@ fun SettingsScreen(
                 default = SettingsRepository.DEFAULT_MIN_CLUSTER_SIZE,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(minClusterSize = it)) }
             )
+            FloatSetting(
+                label = stringResource(R.string.setting_time_weight),
+                description = stringResource(R.string.setting_time_weight_description),
+                value = cfg.timeWeight,
+                default = SettingsRepository.DEFAULT_TIME_WEIGHT,
+                onValueChange = { viewModel.setClusteringConfig(cfg.copy(timeWeight = it)) }
+            )
 
             Spacer(Modifier.height(24.dp))
 

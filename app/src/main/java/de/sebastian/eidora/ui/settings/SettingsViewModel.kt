@@ -16,7 +16,8 @@ data class SettingsUiState(
         edgeThreshold = SettingsRepository.DEFAULT_EDGE_THRESHOLD,
         clusterMatchThreshold = SettingsRepository.DEFAULT_CLUSTER_MATCH_THRESHOLD,
         individualMatchThreshold = SettingsRepository.DEFAULT_INDIVIDUAL_MATCH_THRESHOLD,
-        minClusterSize = SettingsRepository.DEFAULT_MIN_CLUSTER_SIZE
+        minClusterSize = SettingsRepository.DEFAULT_MIN_CLUSTER_SIZE,
+        timeWeight = SettingsRepository.DEFAULT_TIME_WEIGHT
     ),
     val powerConfig: PowerConfig = PowerConfig(
         minBatteryPercent = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
