@@ -59,7 +59,7 @@ fun RenamePersonSheet(
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(onClick = {
                     if (text.isNotBlank()) { onConfirm(text.trim()); onDismiss() }
-                }) { Text(stringResource(R.string.action_confirm_ok)) }
+                }) { Text(stringResource(R.string.action_confirm)) }
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -100,7 +100,7 @@ fun MergePersonsSheet(
                             )
                         },
                         headlineContent = { Text(personWithCount.person.name ?: "") },
-                        supportingContent = { Text("${personWithCount.confirmedCount} confirmed") },
+                        supportingContent = { Text(stringResource(R.string.person_face_count_confirmed, personWithCount.confirmedCount)) },
                         modifier = Modifier.combinedClickable(onClick = {
                             onConfirm(personWithCount.person.id)
                             onDismiss()

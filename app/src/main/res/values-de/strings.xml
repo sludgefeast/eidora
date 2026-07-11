@@ -24,7 +24,6 @@
     <string name="action_merge">Zusammenführen</string>
     <string name="action_rename">Umbenennen</string>
     <string name="action_cancel">Abbrechen</string>
-    <string name="action_confirm_ok">Bestätigen</string>
 
     <!-- Assign to person sheet -->
     <string name="sheet_assign_title">Person zuordnen</string>
@@ -109,5 +108,5 @@
     <string name="setting_time_weight_description">Wie stark der zeitliche Abstand zwischen Fotos das Clustering beeinflusst. 0 = Zeit ignorieren, 1 = Standard (Halbwertszeit 3 Jahre), 2 = starker Einfluss. Hilft Geschwister zu trennen und Alterung zu berücksichtigen.</string>
     <string name="action_delete_face">Gesicht löschen (Falsch-Positiv)</string>
     <string name="delete_face_confirm_message">Dieses Gesicht wird dauerhaft gelöscht und beim nächsten Sync nicht erneut erkannt. Verwende diese Aktion um falsch erkannte Gesichter zu entfernen.</string>
-    <string name="action_delete">Löschen</string>
+    <string name="person_face_count_confirmed">%1$d bestätigt</string>
 </resources>
