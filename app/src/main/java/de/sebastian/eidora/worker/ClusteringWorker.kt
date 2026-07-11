@@ -34,7 +34,8 @@ class ClusteringWorker(
                     edgeThreshold = 0.30f,
                     clusterMatchThreshold = 0.30f,
                     individualMatchThreshold = 0.25f,
-                    minClusterSize = 2
+                    minClusterSize = 2,
+                    timeWeight = 1.0f
                 )
             }
 
@@ -85,7 +86,7 @@ class ClusteringWorker(
 
             // ----- Phase 1: Individual matching (0-30%) -----
             val individuallyAssigned = mutableSetOf<String>()
-            if (personCentroids.isNotEmpty() && unknownFacesAll.isNotEmpty()) {
+            if (personData.isNotEmpty() && unknownFacesAll.isNotEmpty()) {
                 for ((index, face) in unknownFacesAll.withIndex()) {
                     if (isStopped) {
                         Log.i(TAG, "Clustering was cancelled at index $index, exiting")

@@ -9,7 +9,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraints
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
