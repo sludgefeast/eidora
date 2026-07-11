@@ -39,10 +39,59 @@ object XmpHelper {
         }
     }
 
+    /**
+     * Reads the raw XMP bytes from the JPEG and decodes them as UTF-8.
+     * XMP is defined by Adobe as always UTF-8; we enforce this explicitly
+     * rather than relying on the system default charset.
+     */
+    private fun readXmpString(exif: ExifInterface): String? {
+        // ExifInterface exposes XMP either via getAttributeBytes (raw) or
+        // getAttribute (String). We prefer the raw bytes so we can decode
+        // with an explicit charset and detect the BOM if present.
+        return try {
+            val bytes: ByteArray? = exif.getAttributeBytes(ExifInterface.TAG_XMP)
+            if (bytes != null && bytes.isNotEmpty()) {
+                // Strip UTF-8 BOM (EF BB BF) if present – some writers add it
+                val start = if (bytes.size >= 3 &&
+                    bytes[0] == 0xEF.toByte() &&
+                    bytes[1] == 0xBB.toByte() &&
+                    bytes[2] == 0xBF.toByte()) 3 else 0
+                String(bytes, start, bytes.size - start, Charsets.UTF_8)
+            } else {
+                // Fallback: getAttribute() returns a String already decoded by
+                // ExifInterface; force re-encode + decode to guarantee UTF-8.
+                val s = exif.getAttribute(ExifInterface.TAG_XMP) ?: return null
+                String(s.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Could not read raw XMP bytes, falling back to string API", t)
+            exif.getAttribute(ExifInterface.TAG_XMP)
+        }
+    }
+
+    /**
+     * Serialises XMP to a UTF-8 string and writes it back via ExifInterface.
+     * We set the attribute as a UTF-8 string; ExifInterface.saveAttributes()
+     * writes the JPEG APP1 segment as-is.
+     */
+    private fun writeXmpString(exif: ExifInterface, xmp: XMPMeta) {
+        val serialized = XMPMetaFactory.serializeToString(
+            xmp, SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true)
+        )
+        // Verify round-trip: ensure the string contains no characters that
+        // would be lost if encoded as UTF-8.
+        val utf8Bytes = serialized.toByteArray(Charsets.UTF_8)
+        val roundTripped = String(utf8Bytes, Charsets.UTF_8)
+        if (roundTripped != serialized) {
+            Log.w(TAG, "XMP UTF-8 round-trip mismatch – data may be corrupted")
+        }
+        exif.setAttribute(ExifInterface.TAG_XMP, serialized)
+    }
+
     fun readFaceRegions(file: File): List<XmpFaceRegion> {
         return try {
             val exif = ExifInterface(file.absolutePath)
-            val xmpString = exif.getAttribute(ExifInterface.TAG_XMP) ?: return emptyList()
+            val xmpString = readXmpString(exif) ?: return emptyList()
             val xmp: XMPMeta = XMPMetaFactory.parseFromString(xmpString)
             val regions = mutableListOf<XmpFaceRegion>()
             val count = xmp.countArrayItems(NS_MWG_RS, "mwg-rs:Regions/mwg-rs:RegionList")
@@ -75,7 +124,7 @@ object XmpHelper {
     fun writeFaceRegions(file: File, regions: List<XmpFaceRegion>) {
         try {
             val exif = ExifInterface(file.absolutePath)
-            val xmpString = exif.getAttribute(ExifInterface.TAG_XMP)
+            val xmpString = readXmpString(exif)
             val xmp: XMPMeta = if (xmpString != null)
                 XMPMetaFactory.parseFromString(xmpString)
             else
@@ -115,10 +164,7 @@ object XmpHelper {
                 Log.e(TAG, "Failed to write person tags", t)
             }
 
-            val serialized = XMPMetaFactory.serializeToString(
-                xmp, SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true)
-            )
-            exif.setAttribute(ExifInterface.TAG_XMP, serialized)
+            writeXmpString(exif, xmp)
             exif.saveAttributes()
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to write face regions to ${file.name}", t)
@@ -128,17 +174,14 @@ object XmpHelper {
     fun clearFaceData(file: File) {
         try {
             val exif = ExifInterface(file.absolutePath)
-            val xmpString = exif.getAttribute(ExifInterface.TAG_XMP) ?: return
+            val xmpString = readXmpString(exif) ?: return
             val xmp: XMPMeta = XMPMetaFactory.parseFromString(xmpString)
             xmp.deleteProperty(NS_MWG_RS, "mwg-rs:Regions")
             xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
             xmp.deleteProperty(NS_DIGIKAM, "digiKam:TagsList")
             xmp.deleteProperty(NS_LR, "lr:hierarchicalSubject")
             try { clearPeopleSubjects(xmp) } catch (t: Throwable) { Log.w(TAG, "clearPeopleSubjects failed", t) }
-            val serialized = XMPMetaFactory.serializeToString(
-                xmp, SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true)
-            )
-            exif.setAttribute(ExifInterface.TAG_XMP, serialized)
+            writeXmpString(exif, xmp)
             exif.saveAttributes()
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to clear face data from ${file.name}", t)
