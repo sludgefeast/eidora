@@ -205,7 +205,19 @@ class FaceRepository(
             )
         }
         XmpHelper.writeFaceRegions(file, xmpRegions)
-        photoDao.updateModifiedAt(photoId, file.lastModified())
+        val newModifiedAt = file.lastModified()
+        photoDao.updateModifiedAt(photoId, newModifiedAt)
+
+        // Notify the MediaStore so other apps (Aves, DigiKam) see the
+        // updated XMP immediately. We do this AFTER updating our own DB so
+        // the next Eidora sync sees db.modifiedAt == file.lastModified()
+        // and skips the photo instead of re-analysing it.
+        android.media.MediaScannerConnection.scanFile(
+            context,
+            arrayOf(file.absolutePath),
+            arrayOf("image/jpeg"),
+            null
+        )
     }
 
     suspend fun recomputeCentroid(personId: String) {
