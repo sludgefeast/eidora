@@ -150,13 +150,13 @@ interface FaceRegionDao {
     @Query("SELECT * FROM face_regions WHERE photoId = :photoId")
     suspend fun findByPhotoId(photoId: String): List<FaceRegionEntity>
 
-    @Query("SELECT * FROM face_regions WHERE personId = :personId")
     @Query("SELECT f.*, ph.takenAt as photoTakenAt FROM face_regions f JOIN photos ph ON f.photoId = ph.id WHERE f.personId = :personId")
     suspend fun findByPersonIdWithDate(personId: String): List<FaceRegionWithPhoto>
 
     @Query("SELECT f.*, ph.takenAt as photoTakenAt FROM face_regions f JOIN photos ph ON f.photoId = ph.id WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding IS NOT NULL")
     suspend fun findUnclusteredWithDate(): List<FaceRegionWithPhoto>
 
+    @Query("SELECT * FROM face_regions WHERE personId = :personId")
     suspend fun findByPersonId(personId: String): List<FaceRegionEntity>
 
     @Query("SELECT * FROM face_regions WHERE embedding IS NULL AND ignored = 0")
@@ -165,10 +165,10 @@ interface FaceRegionDao {
     @Query("SELECT * FROM face_regions WHERE personId IS NULL AND ignored = 0")
     suspend fun findUnclusteredAndNotIgnored(): List<FaceRegionEntity>
 
-    @Query("UPDATE face_regions SET embedding = :embedding WHERE id = :id")
     @Query("UPDATE face_regions SET quality_score = :score WHERE id = :id")
     suspend fun updateQualityScore(id: String, score: Float)
 
+    @Query("UPDATE face_regions SET embedding = :embedding WHERE id = :id")
     suspend fun updateEmbedding(id: String, embedding: ByteArray)
 
     @Query("UPDATE face_regions SET personId = :personId WHERE id = :id")
