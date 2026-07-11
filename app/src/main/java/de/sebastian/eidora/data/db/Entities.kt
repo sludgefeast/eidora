@@ -52,7 +52,8 @@ data class FaceRegionEntity(
     val name: String? = null,
     val regionJson: String,
     val embedding: ByteArray? = null,
-    val ignored: Boolean = false
+    val ignored: Boolean = false,
+    @ColumnInfo(name = "quality_score") val qualityScore: Float? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

@@ -65,11 +65,14 @@ class ClusteringWorker(
             val personCentroids: Map<String, FloatArray> = personDao.getAll()
                 .filter { it.name != null }
                 .mapNotNull { person ->
-                    val confirmedEmbeddings = faceDao.findByPersonId(person.id)
+                    val confirmedFaces = faceDao.findByPersonId(person.id)
                         .filter { it.name != null && !it.ignored && it.embedding != null }
-                        .map { EmbeddingModel.bytesToFloatArray(it.embedding!!) }
-                    if (confirmedEmbeddings.isEmpty()) null
-                    else person.id to EmbeddingModel.centroid(confirmedEmbeddings)
+                    if (confirmedFaces.isEmpty()) null
+                    else person.id to EmbeddingModel.weightedCentroid(
+                        confirmedFaces.map {
+                            EmbeddingModel.bytesToFloatArray(it.embedding!!) to (it.qualityScore ?: 0.5f)
+                        }
+                    )
                 }.toMap()
 
             // ----- Phase 1: Individual matching (0-30%) -----
@@ -145,10 +148,15 @@ class ClusteringWorker(
                 }
 
                 try {
-                    val memberEmbeddings: List<FloatArray> = members.mapNotNull { result ->
-                        candidates.find { it.first == result.faceRegionId }?.second
+                    val memberPairs: List<Pair<FloatArray, Float>> = members.mapNotNull { result ->
+                        candidates.find { it.first == result.faceRegionId }
+                            ?.let { (_, emb) ->
+                                // quality is stored in faceDao but not in the candidates list;
+                                // fall back to equal weight for clustering pass
+                                emb to 0.5f
+                            }
                     }
-                    val clusterCentroid = EmbeddingModel.centroid(memberEmbeddings)
+                    val clusterCentroid = EmbeddingModel.weightedCentroid(memberPairs)
 
                     var bestPerson: PersonEntity? = null
                     var bestDistance = config.clusterMatchThreshold
@@ -158,12 +166,12 @@ class ClusteringWorker(
                             val personFaces = faceDao.findByPersonId(person.id)
                                 .filter { it.embedding != null && !it.ignored }
                             if (personFaces.isEmpty()) return@forEach
-                            val personEmbeddings: List<FloatArray> = personFaces
-                                .map { EmbeddingModel.bytesToFloatArray(it.embedding!!) }
-                            val dist = EmbeddingModel.cosineDistance(
-                                clusterCentroid,
-                                EmbeddingModel.centroid(personEmbeddings)
+                            val personCentroid = EmbeddingModel.weightedCentroid(
+                                personFaces.map {
+                                    EmbeddingModel.bytesToFloatArray(it.embedding!!) to (it.qualityScore ?: 0.5f)
+                                }
                             )
+                            val dist = EmbeddingModel.cosineDistance(clusterCentroid, personCentroid)
                             if (dist < bestDistance) { bestDistance = dist; bestPerson = person }
                         } catch (t: Throwable) {
                             Log.w(TAG, "Error comparing person ${person.id}", t)
@@ -235,9 +243,11 @@ class ClusteringWorker(
                     .filter { !it.ignored && it.embedding != null }
                 if (allFaces.isNotEmpty()) {
                     val basisFaces = allFaces.filter { it.name != null }.ifEmpty { allFaces }
-                    val embeddings: List<FloatArray> = basisFaces
-                        .map { EmbeddingModel.bytesToFloatArray(it.embedding!!) }
-                    val centroid = EmbeddingModel.centroid(embeddings)
+                    val centroid = EmbeddingModel.weightedCentroid(
+                        basisFaces.map {
+                            EmbeddingModel.bytesToFloatArray(it.embedding!!) to (it.qualityScore ?: 0.5f)
+                        }
+                    )
 
                     val representative = basisFaces.minByOrNull { face ->
                         EmbeddingModel.cosineDistance(

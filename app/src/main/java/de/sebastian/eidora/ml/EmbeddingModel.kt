@@ -135,14 +135,27 @@ class EmbeddingModel(context: Context) : Closeable {
             return if (denom < 1e-10f) 1f else 1f - (dot / denom)
         }
 
-        fun centroid(embeddings: List<FloatArray>): FloatArray {
-            if (embeddings.isEmpty()) return FloatArray(EMBEDDING_DIM)
+        fun centroid(embeddings: List<FloatArray>): FloatArray =
+            weightedCentroid(embeddings.map { it to 1f })
+
+        /**
+         * Weighted centroid: each embedding is weighted by its quality score.
+         * Falls back to equal weights if all weights are zero or the list is empty.
+         *
+         * @param embeddingsWithWeights list of (embedding, qualityScore) pairs
+         */
+        fun weightedCentroid(embeddingsWithWeights: List<Pair<FloatArray, Float>>): FloatArray {
+            if (embeddingsWithWeights.isEmpty()) return FloatArray(EMBEDDING_DIM)
+
+            val totalWeight = embeddingsWithWeights.sumOf { it.second.toDouble() }.toFloat()
+            val norm = if (totalWeight > 1e-6f) totalWeight else embeddingsWithWeights.size.toFloat()
+
             val result = FloatArray(EMBEDDING_DIM)
-            embeddings.forEach { emb ->
-                for (i in emb.indices) result[i] += emb[i]
+            embeddingsWithWeights.forEach { (emb, weight) ->
+                val w = if (totalWeight > 1e-6f) weight else 1f
+                for (i in emb.indices) result[i] += emb[i] * w
             }
-            val n = embeddings.size.toFloat()
-            for (i in result.indices) result[i] /= n
+            for (i in result.indices) result[i] /= norm
             return result
         }
     }

@@ -160,6 +160,9 @@ interface FaceRegionDao {
     suspend fun findUnclusteredAndNotIgnored(): List<FaceRegionEntity>
 
     @Query("UPDATE face_regions SET embedding = :embedding WHERE id = :id")
+    @Query("UPDATE face_regions SET quality_score = :score WHERE id = :id")
+    suspend fun updateQualityScore(id: String, score: Float)
+
     suspend fun updateEmbedding(id: String, embedding: ByteArray)
 
     @Query("UPDATE face_regions SET personId = :personId WHERE id = :id")

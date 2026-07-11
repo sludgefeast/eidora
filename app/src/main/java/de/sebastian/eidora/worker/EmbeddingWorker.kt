@@ -113,6 +113,23 @@ class EmbeddingWorker(
                     try {
                         val embedding = model.computeEmbedding(bitmap)
                         faceDao.updateEmbedding(face.id, EmbeddingModel.floatArrayToBytes(embedding))
+                        // Refine quality score now that we have the crop bitmap:
+                        // add sharpness signal on top of the size+rotation score
+                        // already computed at detection time.
+                        try {
+                            val coords = face.regionJson.toFaceRegionCoords()
+                            val refined = de.sebastian.eidora.util.FaceQuality.compute(
+                                coords = coords,
+                                rotationRad = null, // rotation already baked into initial score
+                                faceBitmap = bitmap
+                            )
+                            // Blend detection-time score (2/3) with sharpness (1/3)
+                            val prev = face.qualityScore ?: refined
+                            val blended = prev * 0.667f + refined * 0.333f
+                            faceDao.updateQualityScore(face.id, blended)
+                        } catch (t: Throwable) {
+                            Log.w(TAG, "Quality score refinement failed for ${face.id}", t)
+                        }
                     } catch (t: Throwable) {
                         Log.e(TAG, "Failed embedding for face ${face.id}, skipping", t)
                     } finally {

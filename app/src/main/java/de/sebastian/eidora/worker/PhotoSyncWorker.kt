@@ -290,10 +290,17 @@ class PhotoSyncWorker(
                 try {
                     val faceId = UUID.randomUUID().toString()
                     val person = xmpRegion.name?.let { name -> findOrCreatePerson(name) }
+                    // No SCRFD data available → derive quality from bbox size only.
+                    // Sharpness will be refined in EmbeddingWorker when the crop
+                    // bitmap is available. rotationRad = null → frontalScore defaults to 0.5.
+                    val qualityScore = de.sebastian.eidora.util.FaceQuality.computeFast(
+                        xmpRegion.coords, rotationRad = null
+                    )
                     faceDao.insert(FaceRegionEntity(
                         id = faceId, photoId = photoId,
                         personId = person?.id, name = xmpRegion.name,
-                        regionJson = xmpRegion.coords.toJson(), ignored = false
+                        regionJson = xmpRegion.coords.toJson(), ignored = false,
+                        qualityScore = qualityScore
                     ))
                     ThumbnailHelper.createThumbnail(applicationContext, file, xmpRegion.coords, faceId)
                 } catch (t: Throwable) {
@@ -347,9 +354,6 @@ class PhotoSyncWorker(
             val xmpRegions = mutableListOf<XmpFaceRegion>()
             faces.forEach { face ->
                 try {
-                    // Detector returns normalized [0..1] coords already; we
-                    // convert to center-based FaceRegionCoords as expected by
-                    // the rest of the app.
                     val coords = FaceRegionCoords(
                         x = face.xMin + face.width / 2f,
                         y = face.yMin + face.height / 2f,
@@ -357,10 +361,17 @@ class PhotoSyncWorker(
                         h = face.height
                     )
                     val faceId = UUID.randomUUID().toString()
+                    // Compute quality score from bbox size and rotation angle.
+                    // Sharpness requires loading the crop which is expensive here
+                    // and will be refined later (EmbeddingWorker has the bitmap).
+                    val qualityScore = de.sebastian.eidora.util.FaceQuality.computeFast(
+                        coords, face.rotationRadians
+                    )
                     faceDao.insert(FaceRegionEntity(
                         id = faceId, photoId = photoId,
                         personId = null, name = null,
-                        regionJson = coords.toJson(), ignored = false
+                        regionJson = coords.toJson(), ignored = false,
+                        qualityScore = qualityScore
                     ))
                     ThumbnailHelper.createThumbnail(applicationContext, file, coords, faceId)
                     xmpRegions.add(XmpFaceRegion(name = null, coords = coords))
