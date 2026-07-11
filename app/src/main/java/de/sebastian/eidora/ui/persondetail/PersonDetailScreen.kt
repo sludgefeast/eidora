@@ -237,30 +237,20 @@ fun PersonDetailScreen(
                 }
             }
             if (state.unconfirmedFaces.isNotEmpty()) {
-                items(state.unconfirmedFaces, key = { it.faceRegion.id }) { faceWithPhoto ->
-                    FaceGridItem(
-                        face = faceWithPhoto,
-                        isSelected = state.selectedFaceIds.contains(faceWithPhoto.faceRegion.id),
-                        borderColor = if (state.viewMode == PersonDetailViewMode.NORMAL)
-                            Color(0xFF4CAF50)
-                        else null,
-                        onTap = {
-                            if (state.isMultiSelectActive)
-                                viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id)
-                            else
-                                viewModel.showFaceActions(faceWithPhoto.faceRegion.id)
-                        },
-                        onLongPress = {
-                            if (state.isMultiSelectActive)
-                                viewModel.rangeSelectFace(faceWithPhoto.faceRegion.id)
-                            else
-                                viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id)
-                        },
-                        onImageTap = {
-                            onFaceClick(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId)
-                        }
-                    )
-                }
+                faceItemsWithMonthHeaders(
+                    faces = state.unconfirmedFaces,
+                    isSelected = { state.selectedFaceIds.contains(it) },
+                    borderColorFor = { if (state.viewMode == PersonDetailViewMode.NORMAL) Color(0xFF4CAF50) else null },
+                    onTap = { id ->
+                        if (state.isMultiSelectActive) viewModel.toggleFaceSelection(id)
+                        else viewModel.showFaceActions(id)
+                    },
+                    onLongPress = { id ->
+                        if (state.isMultiSelectActive) viewModel.rangeSelectFace(id)
+                        else viewModel.toggleFaceSelection(id)
+                    },
+                    onImageTap = { faceId, photoId -> onFaceClick(faceId, photoId) }
+                )
             }
 
             if (state.confirmedFaces.isNotEmpty()) {
@@ -274,28 +264,20 @@ fun PersonDetailScreen(
                         )
                     }
                 }
-                items(state.confirmedFaces, key = { it.faceRegion.id }) { faceWithPhoto ->
-                    FaceGridItem(
-                        face = faceWithPhoto,
-                        isSelected = state.selectedFaceIds.contains(faceWithPhoto.faceRegion.id),
-                        borderColor = null,
-                        onTap = {
-                            if (state.isMultiSelectActive)
-                                viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id)
-                            else
-                                viewModel.showFaceActions(faceWithPhoto.faceRegion.id)
-                        },
-                        onLongPress = {
-                            if (state.isMultiSelectActive)
-                                viewModel.rangeSelectFace(faceWithPhoto.faceRegion.id)
-                            else
-                                viewModel.toggleFaceSelection(faceWithPhoto.faceRegion.id)
-                        },
-                        onImageTap = {
-                            onFaceClick(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId)
-                        }
-                    )
-                }
+                faceItemsWithMonthHeaders(
+                    faces = state.confirmedFaces,
+                    isSelected = { state.selectedFaceIds.contains(it) },
+                    borderColorFor = { null },
+                    onTap = { id ->
+                        if (state.isMultiSelectActive) viewModel.toggleFaceSelection(id)
+                        else viewModel.showFaceActions(id)
+                    },
+                    onLongPress = { id ->
+                        if (state.isMultiSelectActive) viewModel.rangeSelectFace(id)
+                        else viewModel.toggleFaceSelection(id)
+                    },
+                    onImageTap = { faceId, photoId -> onFaceClick(faceId, photoId) }
+                )
             }
         }
         // Drag scrollbar
@@ -561,6 +543,60 @@ private fun PersonDetailScrollbar(
                     .width(4.dp)
                     .fillMaxHeight()
                     .background(Color.White.copy(alpha = 0.6f), shape = MaterialTheme.shapes.small)
+            )
+        }
+    }
+}
+
+private fun LazyGridScope.faceItemsWithMonthHeaders(
+    faces: List<de.sebastian.eidora.data.db.FaceRegionWithPhoto>,
+    isSelected: (String) -> Boolean,
+    borderColorFor: (String) -> androidx.compose.ui.graphics.Color?,
+    onTap: (String) -> Unit,
+    onLongPress: (String) -> Unit,
+    onImageTap: (faceId: String, photoId: String) -> Unit
+) {
+    val formatter = java.time.format.DateTimeFormatter.ofPattern(
+        "MMMM yyyy", java.util.Locale.getDefault()
+    )
+    var lastMonthKey = ""
+
+    faces.forEach { faceWithPhoto ->
+        val takenAt = faceWithPhoto.photoTakenAt
+        val monthKey = if (takenAt != null && takenAt > 0L) {
+            val date = java.time.Instant.ofEpochMilli(takenAt)
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalDate()
+            "${date.year}-${date.monthValue}"
+        } else "unknown"
+
+        if (monthKey != lastMonthKey) {
+            lastMonthKey = monthKey
+            val label = if (takenAt != null && takenAt > 0L) {
+                val date = java.time.Instant.ofEpochMilli(takenAt)
+                    .atZone(java.time.ZoneId.systemDefault())
+                formatter.format(date)
+            } else "–"
+            item(key = "month_${monthKey}_${faceWithPhoto.faceRegion.id}", span = { GridItemSpan(3) }) {
+                androidx.compose.material3.Text(
+                    text = label,
+                    style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = androidx.compose.ui.Modifier.padding(
+                        start = 4.dp, end = 4.dp, top = 12.dp, bottom = 4.dp
+                    )
+                )
+            }
+        }
+
+        item(key = faceWithPhoto.faceRegion.id) {
+            FaceGridItem(
+                face = faceWithPhoto,
+                isSelected = isSelected(faceWithPhoto.faceRegion.id),
+                borderColor = borderColorFor(faceWithPhoto.faceRegion.id),
+                onTap = { onTap(faceWithPhoto.faceRegion.id) },
+                onLongPress = { onLongPress(faceWithPhoto.faceRegion.id) },
+                onImageTap = { onImageTap(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId) }
             )
         }
     }
