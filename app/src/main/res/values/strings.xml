@@ -107,4 +107,7 @@
     <string name="model_download_failed_message">Could not download the face recognition model after several attempts. Check for an app update or your network connection.</string>
     <string name="setting_time_weight">Temporal weight</string>
     <string name="setting_time_weight_description">How strongly the time between photos influences clustering. 0 = ignore time, 1 = default (half-life 3 years), 2 = strong influence. Helps separate siblings and track ageing.</string>
+    <string name="action_delete_face">Delete face (false positive)</string>
+    <string name="delete_face_confirm_message">This face will be permanently deleted and will not be detected again during the next sync. Use this to remove false positive detections.</string>
+    <string name="action_delete">Delete</string>
 </resources>

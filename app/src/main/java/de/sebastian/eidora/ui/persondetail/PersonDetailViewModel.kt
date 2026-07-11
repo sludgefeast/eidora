@@ -160,6 +160,10 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.removeFaceFromPerson(faceId) }
     }
 
+    fun permanentlyDeleteFace(faceId: String) {
+        viewModelScope.launch { repo.permanentlyDeleteFace(faceId) }
+    }
+
     fun unignoreFace(faceId: String) {
         viewModelScope.launch { repo.unignoreFace(faceId) }
     }

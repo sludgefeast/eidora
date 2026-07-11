@@ -107,4 +107,7 @@
     <string name="model_download_failed_message">Das Gesichtserkennungsmodell konnte nach mehreren Versuchen nicht heruntergeladen werden. Prüfe ob eine App-Aktualisierung verfügbar ist oder deine Netzwerkverbindung.</string>
     <string name="setting_time_weight">Zeitlicher Einfluss</string>
     <string name="setting_time_weight_description">Wie stark der zeitliche Abstand zwischen Fotos das Clustering beeinflusst. 0 = Zeit ignorieren, 1 = Standard (Halbwertszeit 3 Jahre), 2 = starker Einfluss. Hilft Geschwister zu trennen und Alterung zu berücksichtigen.</string>
+    <string name="action_delete_face">Gesicht löschen (Falsch-Positiv)</string>
+    <string name="delete_face_confirm_message">Dieses Gesicht wird dauerhaft gelöscht und beim nächsten Sync nicht erneut erkannt. Verwende diese Aktion um falsch erkannte Gesichter zu entfernen.</string>
+    <string name="action_delete">Löschen</string>
 </resources>

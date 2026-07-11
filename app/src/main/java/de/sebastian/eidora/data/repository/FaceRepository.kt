@@ -66,6 +66,29 @@ class FaceRepository(
     }
 
     // -----------------------------------------------------------------------
+    // Permanently delete face (false positive removal)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Deletes a face region completely: removes the DB row, the thumbnail,
+     * and rewrites the photo's XMP so the region no longer appears in DigiKam/Aves.
+     * The photo itself stays in the DB as analyzed=true so the sync does not
+     * re-detect it. If the face belonged to a person, that person's centroid
+     * is recomputed and the person is deleted if it becomes empty.
+     */
+    suspend fun permanentlyDeleteFace(faceRegionId: String) {
+        val face = faceDao.findById(faceRegionId) ?: return
+        val previousPersonId = face.personId
+        faceDao.deleteById(faceRegionId)
+        ThumbnailHelper.deleteThumbnail(context, faceRegionId)
+        rewriteXmpForPhoto(face.photoId)
+        previousPersonId?.let {
+            recomputeCentroid(it)
+            deletePersonIfOrphaned(it)
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Remove face from person
     // -----------------------------------------------------------------------
 

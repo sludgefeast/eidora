@@ -323,6 +323,7 @@ fun PersonDetailScreen(
                 else
                     viewModel.removeFace(faceId)
             },
+            onPermanentlyDelete = { viewModel.permanentlyDeleteFace(faceId) },
             onRedetect = { viewModel.redetectFace(faceId) },
             onAssign = { viewModel.showAssignSheet(faceId) },
             onDismiss = { viewModel.dismissActions() }
@@ -401,10 +402,33 @@ private fun FaceActionsSheet(
     onConfirm: () -> Unit,
     onIgnore: () -> Unit,
     onRemove: () -> Unit,
+    onPermanentlyDelete: () -> Unit,
     onRedetect: () -> Unit,
     onAssign: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(stringResource(R.string.action_delete_face)) },
+            text = { Text(stringResource(R.string.delete_face_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onPermanentlyDelete()
+                    onDismiss()
+                }) { Text(stringResource(R.string.action_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(bottom = 32.dp)) {
             val actions = buildList<Pair<String, () -> Unit>> {
@@ -432,12 +456,23 @@ private fun FaceActionsSheet(
 
                 add(stringResource(R.string.action_redetect) to onRedetect)
                 add(stringResource(R.string.action_assign_to_person) to onAssign)
+                // Permanently delete – always available, shown last with destructive colour
+                add(stringResource(R.string.action_delete_face) to { showDeleteConfirm = true })
             }
 
-            actions.forEach { (label, action) ->
+            actions.forEachIndexed { index, (label, action) ->
+                val isDestructive = index == actions.lastIndex
                 ListItem(
-                    headlineContent = { Text(label) },
-                    modifier = Modifier.combinedClickable(onClick = { action(); onDismiss() })
+                    headlineContent = {
+                        Text(
+                            text = label,
+                            color = if (isDestructive)
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    modifier = Modifier.combinedClickable(onClick = { action() ; if (!isDestructive) onDismiss() })
                 )
             }
         }
