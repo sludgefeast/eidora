@@ -72,7 +72,7 @@ class PhotoSyncWorker(
             Log.w(TAG, "Failed to load filename patterns, using empty list (no filter)", t)
             emptyList()
         }
-        val jpegFiles = try {
+        val mediaEntries = try {
             collectJpegsFromMediaStore(patterns) { count ->
                 try {
                     setForegroundAsync(
@@ -89,14 +89,26 @@ class PhotoSyncWorker(
 
         setProgress(workDataOf(KEY_STATUS to applicationContext.getString(de.sebastian.eidora.R.string.notif_scanning_start)))
 
-        val dbPaths = try { photoDao.getAllPaths().toSet() } catch (t: Throwable) {
+        // Aves-style reconciliation: the MediaStore is the source of truth.
+        // deleted = DB minus MediaStore; work set = new or modified entries.
+        val dbModifiedByPath = try {
+            photoDao.getAllPathsWithModified().associate { it.path to it.modifiedAt }
+        } catch (t: Throwable) {
             Log.e(TAG, "Failed to read DB paths", t); return Result.failure()
         }
-        val fsPaths = jpegFiles.map { it.absolutePath }.toSet()
+        val fsPaths = mediaEntries.map { it.file.absolutePath }.toSet()
 
-        (dbPaths - fsPaths).forEach { path ->
+        (dbModifiedByPath.keys - fsPaths).forEach { path ->
             try { deletePhoto(path) } catch (t: Throwable) { Log.e(TAG, "Failed to delete photo $path", t) }
         }
+
+        // Keep only new or changed photos (second-resolution comparison;
+        // processFile re-checks precisely and skips false positives).
+        val jpegFiles = mediaEntries.filter { entry ->
+            val dbModified = dbModifiedByPath[entry.file.absolutePath]
+            dbModified == null || dbModified / 1000 != entry.modifiedSec
+        }.map { it.file }
+        Log.i(TAG, "Sync work set: ${jpegFiles.size} of ${mediaEntries.size} photos (new or modified)")
 
         val doneCount = java.util.concurrent.atomic.AtomicInteger(0)
         val currentFile = java.util.concurrent.atomic.AtomicReference<String>("")
@@ -195,27 +207,31 @@ class PhotoSyncWorker(
      * Filter patterns are applied to the display name (filename).
      * Much faster than walking the file system for large photo collections.
      */
+    data class MediaEntry(val file: File, val modifiedSec: Long)
+
     private fun collectJpegsFromMediaStore(
         patterns: List<String>,
         onProgress: (Int) -> Unit
-    ): List<File> {
+    ): List<MediaEntry> {
         val uri = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             android.provider.MediaStore.Images.Media._ID,
             android.provider.MediaStore.Images.Media.DATA,
             android.provider.MediaStore.Images.Media.DISPLAY_NAME,
+            android.provider.MediaStore.Images.Media.DATE_MODIFIED,
             android.provider.MediaStore.Images.Media.MIME_TYPE
         )
         val selection = "${android.provider.MediaStore.Images.Media.MIME_TYPE} = ?"
         val selectionArgs = arrayOf("image/jpeg")
 
-        val result = mutableListOf<File>()
+        val result = mutableListOf<MediaEntry>()
         applicationContext.contentResolver.query(
             uri, projection, selection, selectionArgs,
             "${android.provider.MediaStore.Images.Media.DATE_TAKEN} DESC"
         )?.use { cursor ->
             val dataCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DATA)
             val nameCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DISPLAY_NAME)
+            val modCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DATE_MODIFIED)
             var scanned = 0
             while (cursor.moveToNext()) {
                 scanned++
@@ -225,7 +241,7 @@ class PhotoSyncWorker(
                         .matchesAnyPattern(name, patterns)) continue
                 val path = cursor.getString(dataCol) ?: continue
                 val file = File(path)
-                if (file.isFile) result.add(file)
+                if (file.isFile) result.add(MediaEntry(file, cursor.getLong(modCol)))
             }
         }
         return result

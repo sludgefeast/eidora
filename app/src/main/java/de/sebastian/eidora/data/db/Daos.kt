@@ -19,6 +19,9 @@ interface PhotoDao {
     @Query("SELECT path FROM photos")
     suspend fun getAllPaths(): List<String>
 
+    @Query("SELECT path, modifiedAt FROM photos")
+    suspend fun getAllPathsWithModified(): List<PathModified>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(photo: PhotoEntity)
 
@@ -226,4 +229,9 @@ interface FaceRegionDao {
 data class FaceRegionWithPhoto(
     @Embedded val faceRegion: FaceRegionEntity,
     val photoTakenAt: Long?
+)
+
+data class PathModified(
+    val path: String,
+    val modifiedAt: Long
 )
