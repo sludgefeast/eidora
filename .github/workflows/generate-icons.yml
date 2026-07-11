@@ -1,0 +1,95 @@
+name: Generate App Icons from SVG
+
+# Renders the app icon SVG into the full Android mipmap PNG family.
+# Only runs when eidora_icon.svg actually changes – the existing PNGs in the
+# repo are the authoritative source when the SVG has not changed.
+#
+# Rendering uses CairoSVG (deterministic, no browser engine) with explicit
+# sizes and no padding adjustment. If you need to tweak padding, edit the
+# SVG viewBox/transform and let the action regenerate.
+on:
+  push:
+    paths:
+      - 'eidora_icon.svg'
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Python + CairoSVG
+        run: |
+          sudo apt-get install -y libcairo2 libcairo2-dev
+          pip install cairosvg pillow
+
+      - name: Render mipmap PNGs
+        run: |
+          python - << 'PYEOF'
+          import cairosvg
+          from PIL import Image
+          import io, os, shutil
+
+          SVG = "eidora_icon.svg"
+
+          # Standard Android launcher icon sizes
+          SIZES = {
+              "mipmap-mdpi":    48,
+              "mipmap-hdpi":    72,
+              "mipmap-xhdpi":   96,
+              "mipmap-xxhdpi":  144,
+              "mipmap-xxxhdpi": 192,
+          }
+
+          # Adaptive icon layers – rendered at 1024 for maximum quality
+          ADAPTIVE_SIZE = 1024
+
+          base = "app/src/main/res"
+
+          def render(size):
+              png_bytes = cairosvg.svg2png(
+                  url=SVG,
+                  output_width=size,
+                  output_height=size,
+              )
+              return Image.open(io.BytesIO(png_bytes)).convert("RGBA")
+
+          # Launcher PNGs (square and round are identical for this icon)
+          for density, px in SIZES.items():
+              img = render(px)
+              for name in ("ic_launcher.png", "ic_launcher_round.png"):
+                  dest = os.path.join(base, density, name)
+                  os.makedirs(os.path.dirname(dest), exist_ok=True)
+                  img.save(dest, "PNG")
+                  print(f"wrote {dest} ({px}x{px})")
+
+          # Adaptive icon foreground layer: icon on transparent background
+          fg = render(ADAPTIVE_SIZE)
+          fg.save(f"{base}/drawable/ic_launcher_foreground.png", "PNG")
+          print(f"wrote adaptive foreground ({ADAPTIVE_SIZE}x{ADAPTIVE_SIZE})")
+
+          # Adaptive icon background: solid color matching the SVG background
+          bg = Image.new("RGBA", (ADAPTIVE_SIZE, ADAPTIVE_SIZE), "#1A0A2E")
+          bg.save(f"{base}/drawable/ic_launcher_background.png", "PNG")
+          print(f"wrote adaptive background ({ADAPTIVE_SIZE}x{ADAPTIVE_SIZE})")
+
+          print("Done.")
+          PYEOF
+
+      - name: Commit updated icons
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/res/mipmap-*/ic_launcher*.png
+          git add app/src/main/res/drawable/ic_launcher_*.png
+          if git diff --cached --quiet; then
+            echo "No icon changes to commit."
+          else
+            git commit -m "chore: regenerate app icons from eidora_icon.svg"
+            git push
+          fi
