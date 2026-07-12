@@ -22,7 +22,9 @@ data class SettingsUiState(
     val powerConfig: PowerConfig = PowerConfig(
         minBatteryPercent = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
         maxBatteryTempCelsius = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP
-    )
+    ),
+    val availableFolders: List<String> = emptyList(),
+    val folderBlacklist: Set<String> = SettingsRepository.DEFAULT_FOLDER_BLACKLIST
 )
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
