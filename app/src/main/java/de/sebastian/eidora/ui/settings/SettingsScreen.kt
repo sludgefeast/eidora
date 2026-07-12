@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -182,6 +183,52 @@ fun SettingsScreen(
                 default = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
                 onValueChange = { viewModel.setPowerConfig(pwr.copy(maxBatteryTempCelsius = it)) }
             )
+
+            Spacer(Modifier.height(24.dp))
+
+            // Section: folder filter
+            SectionHeader(stringResource(R.string.settings_folders_title))
+            Text(
+                text = stringResource(R.string.settings_folders_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            val context = androidx.compose.ui.platform.LocalContext.current
+            LaunchedEffect(Unit) { viewModel.loadAvailableFolders(context) }
+
+            if (state.availableFolders.isEmpty()) {
+                Text(
+                    stringResource(R.string.settings_folders_loading),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                state.availableFolders.forEach { folder ->
+                    val isBlacklisted = folder in state.folderBlacklist
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                    ) {
+                        Checkbox(
+                            checked = !isBlacklisted,
+                            onCheckedChange = { included ->
+                                val newBl = if (included)
+                                    state.folderBlacklist - folder
+                                else
+                                    state.folderBlacklist + folder
+                                viewModel.setFolderBlacklist(newBl)
+                            }
+                        )
+                        Text(
+                            text = folder,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+                }
+            }
 
             Spacer(Modifier.height(32.dp))
         }

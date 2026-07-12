@@ -61,6 +61,8 @@ class EmbeddingWorker(
 
             val done = AtomicInteger(0)
             val startedAt = System.currentTimeMillis()
+            // Shared status: either "X%" or a pause reason – the notifier reads this
+            val currentStatus = java.util.concurrent.atomic.AtomicReference<String>("")
 
             val notifierScope = kotlinx.coroutines.CoroutineScope(
                 kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob()
@@ -70,7 +72,13 @@ class EmbeddingWorker(
                     val current = done.get()
                     val progress = if (total == 0) 0 else (current * 100) / total
                     val eta = PhotoSyncWorker.formatEta(applicationContext, startedAt, current, total)
-                    val message = if (eta.isNotEmpty()) "$progress% – $eta" else "$progress%"
+                    // If a pause reason is set, show that; otherwise show progress + ETA
+                    val status = currentStatus.get()
+                    val message = when {
+                        status.isNotEmpty() -> status
+                        eta.isNotEmpty() -> "$progress% – $eta"
+                        else -> "$progress%"
+                    }
                     try {
                         setForeground(
                             NotificationHelper.embeddingForegroundInfoWithMessage(applicationContext, progress, message)
@@ -90,12 +98,10 @@ class EmbeddingWorker(
                             powerConfig.minBatteryPercent,
                             powerConfig.maxBatteryTempCelsius
                         ) { reason ->
-                            try {
-                                setForegroundAsync(
-                                    NotificationHelper.embeddingForegroundInfoWithMessage(applicationContext, 0, reason)
-                                )
-                            } catch (t: Throwable) { /* ignore */ }
+                            // Only update the shared status – the notifier handles display
+                            currentStatus.set(reason)
                         }
+                        currentStatus.set("") // clear pause reason when gate opens
                         val bitmap = try {
                             val photo = photoDao.findById(face.photoId) ?: return@flow
                             val photoFile = File(photo.path)

@@ -72,8 +72,14 @@ class PhotoSyncWorker(
             Log.w(TAG, "Failed to load filename patterns, using empty list (no filter)", t)
             emptyList()
         }
+        val folderBlacklist = try {
+            de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext).getFolderBlacklist()
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to load folder blacklist, using defaults", t)
+            de.sebastian.eidora.data.settings.SettingsRepository.DEFAULT_FOLDER_BLACKLIST
+        }
         val mediaEntries = try {
-            collectJpegsFromMediaStore(patterns) { count ->
+            collectJpegsFromMediaStore(patterns, folderBlacklist) { count ->
                 try {
                     setForegroundAsync(
                         NotificationHelper.syncForegroundInfo(
@@ -212,6 +218,7 @@ class PhotoSyncWorker(
 
     private fun collectJpegsFromMediaStore(
         patterns: List<String>,
+        folderBlacklist: Set<String>,
         onProgress: (Int) -> Unit
     ): List<MediaEntry> {
         val uri = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
@@ -219,6 +226,7 @@ class PhotoSyncWorker(
             android.provider.MediaStore.Images.Media._ID,
             android.provider.MediaStore.Images.Media.DATA,
             android.provider.MediaStore.Images.Media.DISPLAY_NAME,
+            android.provider.MediaStore.Images.Media.RELATIVE_PATH,
             android.provider.MediaStore.Images.Media.DATE_MODIFIED,
             android.provider.MediaStore.Images.Media.MIME_TYPE
         )
@@ -232,11 +240,15 @@ class PhotoSyncWorker(
         )?.use { cursor ->
             val dataCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DATA)
             val nameCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DISPLAY_NAME)
+            val relPathCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.RELATIVE_PATH)
             val modCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DATE_MODIFIED)
             var scanned = 0
             while (cursor.moveToNext()) {
                 scanned++
                 if (scanned % 500 == 0) onProgress(scanned)
+                // Folder blacklist check (normalize trailing slash)
+                val relPath = cursor.getString(relPathCol)?.trimEnd('/') ?: ""
+                if (folderBlacklist.any { relPath == it || relPath.startsWith("$it/") }) continue
                 val name = cursor.getString(nameCol) ?: continue
                 if (!de.sebastian.eidora.data.settings.SettingsRepository
                         .matchesAnyPattern(name, patterns)) continue

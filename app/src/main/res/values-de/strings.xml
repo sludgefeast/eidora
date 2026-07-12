@@ -111,4 +111,7 @@
     <string name="person_face_count_confirmed">%1$d bestätigt</string>
     <string name="action_reject_all_suggestions">Alle Vorschläge löschen</string>
     <string name="reject_all_suggestions_confirm">Alle unbenannten Vorschläge werden gelöscht. Die Gesichter werden in Unbekannt verschoben. Dies kann nicht rückgängig gemacht werden.</string>
+    <string name="settings_folders_title">Ordner</string>
+    <string name="settings_folders_description">Wähle welche Ordner beim Sync berücksichtigt werden. Abgehakte Ordner werden ignoriert. Standardmäßig sind Screenshots und App-Caches ausgeschlossen.</string>
+    <string name="settings_folders_loading">Lade Ordner…</string>
 </resources>

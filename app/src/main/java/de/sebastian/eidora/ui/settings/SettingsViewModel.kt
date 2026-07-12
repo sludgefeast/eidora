@@ -48,6 +48,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 _uiState.update { it.copy(powerConfig = config) }
             }
         }
+        viewModelScope.launch {
+            repo.folderBlacklist.collect { bl ->
+                _uiState.update { it.copy(folderBlacklist = bl) }
+            }
+        }
     }
 
     fun setPatterns(patterns: List<String>) {
@@ -62,5 +67,26 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setPowerConfig(config: PowerConfig) {
         viewModelScope.launch { repo.setPowerConfig(config) }
+    }
+
+    fun setFolderBlacklist(folders: Set<String>) {
+        viewModelScope.launch { repo.setFolderBlacklist(folders) }
+    }
+
+    fun loadAvailableFolders(context: android.content.Context) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val folders = mutableSetOf<String>()
+            val uri = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            val projection = arrayOf(android.provider.MediaStore.Images.Media.RELATIVE_PATH)
+            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                val col = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.RELATIVE_PATH)
+                while (cursor.moveToNext()) {
+                    val raw = cursor.getString(col) ?: continue
+                    // Normalize: strip trailing slash, e.g. "DCIM/Camera/" → "DCIM/Camera"
+                    folders.add(raw.trimEnd('/'))
+                }
+            }
+            _uiState.update { it.copy(availableFolders = folders.sorted()) }
+        }
     }
 }

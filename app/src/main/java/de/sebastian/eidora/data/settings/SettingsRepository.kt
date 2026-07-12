@@ -22,6 +22,7 @@ private val KEY_TIME_WEIGHT = floatPreferencesKey("clustering_time_weight")
 private val KEY_MIN_BATTERY_PERCENT = intPreferencesKey("min_battery_percent")
 private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius")
 private val KEY_ALLOW_MOBILE_MODEL_DOWNLOAD = androidx.datastore.preferences.core.booleanPreferencesKey("allow_mobile_model_download")
+private val KEY_FOLDER_BLACKLIST = stringPreferencesKey("folder_blacklist")
 
 data class ClusteringConfig(
     val edgeThreshold: Float,
@@ -95,6 +96,25 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
+    // ---- Folder blacklist --------------------------------------------------
+
+    /**
+     * Folders (MediaStore RELATIVE_PATH) to exclude from syncing.
+     * Stored as newline-separated list. Empty path = no filter.
+     */
+    val folderBlacklist: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[KEY_FOLDER_BLACKLIST]?.split("\n")?.filter { it.isNotBlank() }?.toSet()
+            ?: DEFAULT_FOLDER_BLACKLIST
+    }
+
+    suspend fun getFolderBlacklist(): Set<String> = folderBlacklist.first()
+
+    suspend fun setFolderBlacklist(folders: Set<String>) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_FOLDER_BLACKLIST] = folders.joinToString("\n")
+        }
+    }
+
     // ---- Model download over mobile network ---------------------------------
 
     val allowMobileModelDownload: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -113,8 +133,15 @@ class SettingsRepository(private val context: Context) {
         const val DEFAULT_EDGE_THRESHOLD = 0.30f
         const val DEFAULT_CLUSTER_MATCH_THRESHOLD = 0.30f
         const val DEFAULT_INDIVIDUAL_MATCH_THRESHOLD = 0.25f
-        const val DEFAULT_MIN_CLUSTER_SIZE = 2
+        const val DEFAULT_MIN_CLUSTER_SIZE = 5
         const val DEFAULT_TIME_WEIGHT = 1.0f
+
+        val DEFAULT_FOLDER_BLACKLIST: Set<String> = setOf(
+            "Pictures/Screenshots",
+            "Pictures/Screenshot",
+            "Android/media",
+            "Android/data"
+        )
         const val DEFAULT_MIN_BATTERY_PERCENT = 20
         const val DEFAULT_MAX_BATTERY_TEMP = 40.0f
 
