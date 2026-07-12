@@ -151,6 +151,28 @@ fun EidoraApp() {
             // Show top bar only on main tabs, not on detail screens
             if (currentRoute == "persons" || currentRoute == "photos") {
                 var menuExpanded by remember { mutableStateOf(false) }
+                var showRejectAllConfirm by remember { mutableStateOf(false) }
+                val personsVm: de.sebastian.eidora.ui.persons.PersonsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+
+                if (showRejectAllConfirm) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showRejectAllConfirm = false },
+                        title = { Text(stringResource(R.string.action_reject_all_suggestions)) },
+                        text = { Text(stringResource(R.string.reject_all_suggestions_confirm)) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                personsVm.rejectAllSuggestions()
+                                showRejectAllConfirm = false
+                            }) { Text(stringResource(R.string.action_delete)) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showRejectAllConfirm = false }) {
+                                Text(stringResource(R.string.action_cancel))
+                            }
+                        }
+                    )
+                }
+
                 TopAppBar(
                     title = { Text(stringResource(R.string.app_name)) },
                     actions = {
@@ -166,6 +188,18 @@ fun EidoraApp() {
                                 onClick = {
                                     menuExpanded = false
                                     navController.navigate("settings")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(R.string.action_reject_all_suggestions),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    showRejectAllConfirm = true
                                 }
                             )
                         }

@@ -45,6 +45,15 @@ class FaceRepository(
         personDao.deleteById(personId)
     }
 
+    suspend fun rejectAllSuggestions() {
+        val suggestions = personDao.getAll().filter { it.name == null }
+        suggestions.forEach { person ->
+            val faces = faceDao.findByPersonId(person.id)
+            faces.forEach { face -> faceDao.updatePersonId(face.id, null) }
+            personDao.deleteById(person.id)
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Ignore face
     // -----------------------------------------------------------------------

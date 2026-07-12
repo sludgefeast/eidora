@@ -109,4 +109,6 @@
     <string name="action_delete_face">Delete face (false positive)</string>
     <string name="delete_face_confirm_message">This face will be permanently deleted and will not be detected again during the next sync. Use this to remove false positive detections.</string>
     <string name="person_face_count_confirmed">%1$d confirmed</string>
+    <string name="action_reject_all_suggestions">Delete all suggestions</string>
+    <string name="reject_all_suggestions_confirm">All unnamed suggestions will be deleted. The faces will move back to Unknown. This cannot be undone.</string>
 </resources>
