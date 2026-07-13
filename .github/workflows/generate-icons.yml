@@ -33,7 +33,7 @@ jobs:
           python - << 'PYEOF'
           import cairosvg
           from PIL import Image
-          import io, os, shutil
+          import io, os
 
           SVG = "eidora_icon.svg"
 
@@ -46,34 +46,46 @@ jobs:
               "mipmap-xxxhdpi": 192,
           }
 
-          # Adaptive icon layers – rendered at 1024 for maximum quality
+          # Adaptive icon foreground rendered at 1024 for maximum quality
           ADAPTIVE_SIZE = 1024
+
+          # Android adaptive icon safe zone: the launcher masks to a circle/squircle
+          # that covers the central 72dp of the 108dp canvas (66.7%).
+          # To ensure nothing is clipped, we render the SVG at 66.7% of the canvas
+          # size and paste it centred on a transparent background.
+          SAFE_ZONE_RATIO = 72 / 108  # ≈ 0.667
 
           base = "app/src/main/res"
 
-          def render(size):
+          def render_with_safe_zone(target_canvas_px):
+              """Render SVG into safe zone, centred on a transparent canvas."""
+              motif_px = round(target_canvas_px * SAFE_ZONE_RATIO)
               png_bytes = cairosvg.svg2png(
                   url=SVG,
-                  output_width=size,
-                  output_height=size,
+                  output_width=motif_px,
+                  output_height=motif_px,
               )
-              return Image.open(io.BytesIO(png_bytes)).convert("RGBA")
+              motif = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
+              canvas = Image.new("RGBA", (target_canvas_px, target_canvas_px), (0, 0, 0, 0))
+              offset = (target_canvas_px - motif_px) // 2
+              canvas.paste(motif, (offset, offset), motif)
+              return canvas
 
-          # Launcher PNGs (square and round are identical for this icon)
+          # Launcher PNGs (square and round)
           for density, px in SIZES.items():
-              img = render(px)
+              img = render_with_safe_zone(px)
               for name in ("ic_launcher.png", "ic_launcher_round.png"):
                   dest = os.path.join(base, density, name)
                   os.makedirs(os.path.dirname(dest), exist_ok=True)
                   img.save(dest, "PNG")
                   print(f"wrote {dest} ({px}x{px})")
 
-          # Adaptive icon foreground layer: icon on transparent background
-          fg = render(ADAPTIVE_SIZE)
+          # Adaptive foreground: SVG centred in safe zone on transparent canvas
+          fg = render_with_safe_zone(ADAPTIVE_SIZE)
           fg.save(f"{base}/drawable/ic_launcher_foreground.png", "PNG")
           print(f"wrote adaptive foreground ({ADAPTIVE_SIZE}x{ADAPTIVE_SIZE})")
 
-          # Adaptive icon background: solid color matching the SVG background
+          # Adaptive background: solid colour matching the SVG background rect
           bg = Image.new("RGBA", (ADAPTIVE_SIZE, ADAPTIVE_SIZE), "#1A0A2E")
           bg.save(f"{base}/drawable/ic_launcher_background.png", "PNG")
           print(f"wrote adaptive background ({ADAPTIVE_SIZE}x{ADAPTIVE_SIZE})")
