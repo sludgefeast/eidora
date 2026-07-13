@@ -1,6 +1,7 @@
 package de.sebastian.eidora.data.repository
 
 import android.content.Context
+import android.util.Log
 import de.sebastian.eidora.data.db.*
 import de.sebastian.eidora.ml.EmbeddingModel
 import de.sebastian.eidora.util.*
@@ -12,6 +13,8 @@ class FaceRepository(
     private val context: Context,
     private val db: EidoraDatabase
 ) {
+    private val TAG = "FaceRepository"
+
     private val photoDao = db.photoDao()
     private val personDao = db.personDao()
     private val faceDao = db.faceRegionDao()

@@ -170,9 +170,7 @@ fun EidoraApp() {
                                 reanalyseScope.launch {
                                     val repo = de.sebastian.eidora.data.repository.FaceRepository(
                                         context,
-                                        DatabaseProvider.getInstance(context).photoDao(),
-                                        DatabaseProvider.getInstance(context).faceRegionDao(),
-                                        DatabaseProvider.getInstance(context).personDao()
+                                        DatabaseProvider.getInstance(context)
                                     )
                                     repo.resetAllFaces()
                                     SyncPipeline.enqueueForce(context)
