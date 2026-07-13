@@ -41,6 +41,8 @@ import de.sebastian.eidora.ui.persons.PersonsViewModel
 import de.sebastian.eidora.ui.photos.PhotosScreen
 import de.sebastian.eidora.ui.photos.PhotosViewModel
 import de.sebastian.eidora.ui.theme.EidoraTheme
+import de.sebastian.eidora.data.db.DatabaseProvider
+import de.sebastian.eidora.data.repository.FaceRepository
 import de.sebastian.eidora.worker.SyncPipeline
 import kotlinx.coroutines.launch
 
@@ -152,7 +154,37 @@ fun EidoraApp() {
             if (currentRoute == "persons" || currentRoute == "photos") {
                 var menuExpanded by remember { mutableStateOf(false) }
                 var showRejectAllConfirm by remember { mutableStateOf(false) }
+                var showReanalyseAllConfirm by remember { mutableStateOf(false) }
                 val personsVm: de.sebastian.eidora.ui.persons.PersonsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+                val reanalyseScope = rememberCoroutineScope()
+
+                if (showReanalyseAllConfirm) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showReanalyseAllConfirm = false },
+                        title = { Text(stringResource(R.string.action_reanalyse_all)) },
+                        text = { Text(stringResource(R.string.reanalyse_all_confirm)) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showReanalyseAllConfirm = false
+                                reanalyseScope.launch {
+                                    val repo = de.sebastian.eidora.data.repository.FaceRepository(
+                                        context,
+                                        DatabaseProvider.getInstance(context).photoDao(),
+                                        DatabaseProvider.getInstance(context).faceRegionDao(),
+                                        DatabaseProvider.getInstance(context).personDao()
+                                    )
+                                    repo.resetAllFaces()
+                                    SyncPipeline.enqueueForce(context)
+                                }
+                            }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showReanalyseAllConfirm = false }) {
+                                Text(stringResource(R.string.action_cancel))
+                            }
+                        }
+                    )
+                }
 
                 if (showRejectAllConfirm) {
                     androidx.compose.material3.AlertDialog(
@@ -200,6 +232,18 @@ fun EidoraApp() {
                                 onClick = {
                                     menuExpanded = false
                                     showRejectAllConfirm = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(R.string.action_reanalyse_all),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    showReanalyseAllConfirm = true
                                 }
                             )
                         }

@@ -212,6 +212,37 @@ class FaceRepository(
         photoDao.updateAnalyzed(photoId, false)
     }
 
+    /**
+     * Resets every photo as if it were new: deletes all face regions,
+     * thumbnails, persons and XMP face data, then marks all photos as
+     * unanalyzed so the next sync re-detects everything from scratch.
+     */
+    suspend fun resetAllFaces() {
+        val allPhotos = photoDao.getAll()
+
+        // Delete all thumbnails
+        val allFaces = faceDao.getAll()
+        allFaces.forEach { ThumbnailHelper.deleteThumbnail(context, it.id) }
+
+        // Delete all face regions and persons
+        faceDao.deleteAll()
+        personDao.deleteAll()
+
+        // Clear XMP face data on disk and mark all photos as unanalyzed
+        allPhotos.forEach { photo ->
+            try {
+                val file = File(photo.path)
+                if (file.exists()) {
+                    XmpHelper.clearFaceData(file)
+                    photoDao.updateModifiedAt(photo.id, file.lastModified())
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "XMP clear failed for ${photo.path}", t)
+            }
+            photoDao.updateAnalyzed(photo.id, false)
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Observe
     // -----------------------------------------------------------------------

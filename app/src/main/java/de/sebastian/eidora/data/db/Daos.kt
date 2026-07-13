@@ -19,6 +19,9 @@ interface PhotoDao {
     @Query("SELECT path FROM photos")
     suspend fun getAllPaths(): List<String>
 
+    @Query("SELECT * FROM photos")
+    suspend fun getAll(): List<PhotoEntity>
+
     @Query("SELECT path, modifiedAt, analyzed FROM photos")
     suspend fun getAllPathsWithModified(): List<PathModified>
 
@@ -69,6 +72,9 @@ interface PersonDao {
 
     @Query("SELECT * FROM persons WHERE name IS NOT NULL")
     suspend fun getAll(): List<PersonEntity>
+
+    @Query("DELETE FROM persons")
+    suspend fun deleteAll()
 
     @Query("SELECT * FROM persons WHERE name IS NOT NULL")
     fun observeAll(): Flow<List<PersonEntity>>
@@ -170,6 +176,12 @@ interface FaceRegionDao {
 
     @Query("UPDATE face_regions SET name = NULL WHERE id = :id")
     suspend fun clearName(id: String)
+
+    @Query("SELECT * FROM face_regions")
+    suspend fun getAll(): List<FaceRegionEntity>
+
+    @Query("DELETE FROM face_regions")
+    suspend fun deleteAll()
 
     @Query("UPDATE face_regions SET embedding = :embedding WHERE id = :id")
     suspend fun updateEmbedding(id: String, embedding: ByteArray)

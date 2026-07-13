@@ -116,4 +116,6 @@
     <string name="settings_folders_loading">Lade Ordner…</string>
     <string name="action_delete_person">Person löschen</string>
     <string name="delete_person_confirm_message">"%1$s" wird gelöscht. Alle Gesichter werden in Unbekannt verschoben und die XMP-Metadaten werden zurückgesetzt. Dies kann nicht rückgängig gemacht werden.</string>
+    <string name="action_reanalyse_all">Alle Fotos neu analysieren</string>
+    <string name="reanalyse_all_confirm">Alle Gesichtserkennung, Embeddings und Clustering-Ergebnisse werden gelöscht und neu berechnet. XMP-Metadaten werden zurückgesetzt. Dies kann lange dauern. Fortfahren?</string>
 </resources>
