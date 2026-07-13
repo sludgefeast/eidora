@@ -173,6 +173,14 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.rejectSuggestion(personId) }
     }
 
+    fun deleteCurrentPerson(onDeleted: () -> Unit) {
+        val personId = currentPersonId ?: return
+        viewModelScope.launch {
+            repo.deletePerson(personId)
+            onDeleted()
+        }
+    }
+
     fun renameCurrentPerson(newName: String) {
         val personId = currentPersonId ?: return
         viewModelScope.launch {

@@ -168,6 +168,9 @@ interface FaceRegionDao {
     @Query("UPDATE face_regions SET quality_score = :score WHERE id = :id")
     suspend fun updateQualityScore(id: String, score: Float)
 
+    @Query("UPDATE face_regions SET name = NULL WHERE id = :id")
+    suspend fun clearName(id: String)
+
     @Query("UPDATE face_regions SET embedding = :embedding WHERE id = :id")
     suspend fun updateEmbedding(id: String, embedding: ByteArray)
 

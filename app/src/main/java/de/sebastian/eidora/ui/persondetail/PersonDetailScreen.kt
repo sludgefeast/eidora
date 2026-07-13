@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -55,6 +56,26 @@ fun PersonDetailScreen(
 
     var isEditingName by remember { mutableStateOf(false) }
     var editedName by remember(state.personName) { mutableStateOf(state.personName) }
+    var showDeletePersonConfirm by remember { mutableStateOf(false) }
+
+    if (showDeletePersonConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeletePersonConfirm = false },
+            title = { Text(stringResource(R.string.action_delete_person)) },
+            text = { Text(stringResource(R.string.delete_person_confirm_message, state.personName)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeletePersonConfirm = false
+                    viewModel.deleteCurrentPerson { onBack() }
+                }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeletePersonConfirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
 
     // Auto-start editing when opening a suggestion; leave editing when it becomes a named person
     LaunchedEffect(state.viewMode) {
@@ -158,6 +179,13 @@ fun PersonDetailScreen(
                                     )
                                 }
                             } else {
+                                IconButton(onClick = { showDeletePersonConfirm = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = stringResource(R.string.action_delete_person),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
                                 IconButton(onClick = {
                                     editedName = state.personName
                                     isEditingName = true

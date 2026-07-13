@@ -45,6 +45,36 @@ class FaceRepository(
         personDao.deleteById(personId)
     }
 
+    /**
+     * Deletes a named person: moves all their faces (confirmed + unconfirmed)
+     * back to Unknown, clears XMP metadata for every affected photo, and
+     * removes the person record.
+     */
+    suspend fun deletePerson(personId: String) {
+        val person = personDao.findById(personId) ?: return
+        val faces = faceDao.findByPersonId(personId)
+
+        // Collect affected photo IDs before touching anything
+        val affectedPhotoIds = faces.map { it.photoId }.distinct()
+
+        // Detach all faces from this person (confirmed + unconfirmed)
+        faces.forEach { face ->
+            faceDao.updatePersonId(face.id, null)
+            if (face.name != null) {
+                faceDao.clearName(face.id)
+            }
+        }
+
+        personDao.deleteById(personId)
+
+        // Rewrite XMP for each affected photo so DigiKam/Aves no longer
+        // show the person's name in the face regions.
+        affectedPhotoIds.forEach { photoId ->
+            try { rewriteXmpForPhoto(photoId) }
+            catch (t: Throwable) { Log.w(TAG, "XMP rewrite failed for $photoId", t) }
+        }
+    }
+
     suspend fun rejectAllSuggestions() {
         val suggestions = personDao.getAll().filter { it.name == null }
         suggestions.forEach { person ->

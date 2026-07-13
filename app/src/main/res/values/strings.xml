@@ -114,4 +114,6 @@
     <string name="settings_folders_title">Folders</string>
     <string name="settings_folders_description">Select which folders are included in the sync. Unchecked folders are ignored. Defaults exclude Screenshots and app caches.</string>
     <string name="settings_folders_loading">Loading folders…</string>
+    <string name="action_delete_person">Delete person</string>
+    <string name="delete_person_confirm_message">"%1$s" will be deleted. All faces will be moved back to Unknown and the XMP metadata will be reset. This cannot be undone.</string>
 </resources>

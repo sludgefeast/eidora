@@ -114,4 +114,6 @@
     <string name="settings_folders_title">Ordner</string>
     <string name="settings_folders_description">Wähle welche Ordner beim Sync berücksichtigt werden. Abgehakte Ordner werden ignoriert. Standardmäßig sind Screenshots und App-Caches ausgeschlossen.</string>
     <string name="settings_folders_loading">Lade Ordner…</string>
+    <string name="action_delete_person">Person löschen</string>
+    <string name="delete_person_confirm_message">"%1$s" wird gelöscht. Alle Gesichter werden in Unbekannt verschoben und die XMP-Metadaten werden zurückgesetzt. Dies kann nicht rückgängig gemacht werden.</string>
 </resources>
