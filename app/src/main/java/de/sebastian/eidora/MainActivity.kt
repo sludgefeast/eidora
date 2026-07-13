@@ -148,62 +148,60 @@ fun EidoraApp() {
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
     val personsVm: PersonsViewModel = viewModel()
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showRejectAllConfirm by remember { mutableStateOf(false) }
+    var showReanalyseAllConfirm by remember { mutableStateOf(false) }
+    val reanalyseScope = rememberCoroutineScope()
+
+    if (showRejectAllConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRejectAllConfirm = false },
+            title = { Text(stringResource(R.string.action_reject_all_suggestions)) },
+            text = { Text(stringResource(R.string.reject_all_suggestions_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    personsVm.rejectAllSuggestions()
+                    showRejectAllConfirm = false
+                }) { Text(stringResource(R.string.action_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRejectAllConfirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
+    if (showReanalyseAllConfirm) {
+        AlertDialog(
+            onDismissRequest = { showReanalyseAllConfirm = false },
+            title = { Text(stringResource(R.string.action_reanalyse_all)) },
+            text = { Text(stringResource(R.string.reanalyse_all_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showReanalyseAllConfirm = false
+                    reanalyseScope.launch {
+                        val repo = de.sebastian.eidora.data.repository.FaceRepository(
+                            context,
+                            DatabaseProvider.getInstance(context)
+                        )
+                        repo.resetAllFaces()
+                        SyncPipeline.enqueueForce(context)
+                    }
+                }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReanalyseAllConfirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
 
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
-            // Show top bar only on main tabs, not on detail screens
             if (currentRoute == "persons" || currentRoute == "photos") {
-                var menuExpanded by remember { mutableStateOf(false) }
-                var showRejectAllConfirm by remember { mutableStateOf(false) }
-                var showReanalyseAllConfirm by remember { mutableStateOf(false) }
-                val reanalyseScope = rememberCoroutineScope()
-
-                if (showReanalyseAllConfirm) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { showReanalyseAllConfirm = false },
-                        title = { Text(stringResource(R.string.action_reanalyse_all)) },
-                        text = { Text(stringResource(R.string.reanalyse_all_confirm)) },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                showReanalyseAllConfirm = false
-                                reanalyseScope.launch {
-                                    val repo = de.sebastian.eidora.data.repository.FaceRepository(
-                                        context,
-                                        DatabaseProvider.getInstance(context)
-                                    )
-                                    repo.resetAllFaces()
-                                    SyncPipeline.enqueueForce(context)
-                                }
-                            }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showReanalyseAllConfirm = false }) {
-                                Text(stringResource(R.string.action_cancel))
-                            }
-                        }
-                    )
-                }
-
-                if (showRejectAllConfirm) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { showRejectAllConfirm = false },
-                        title = { Text(stringResource(R.string.action_reject_all_suggestions)) },
-                        text = { Text(stringResource(R.string.reject_all_suggestions_confirm)) },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                personsVm.rejectAllSuggestions()
-                                showRejectAllConfirm = false
-                            }) { Text(stringResource(R.string.action_delete)) }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showRejectAllConfirm = false }) {
-                                Text(stringResource(R.string.action_cancel))
-                            }
-                        }
-                    )
-                }
-
                 TopAppBar(
                     title = { Text(stringResource(R.string.app_name)) },
                     actions = {

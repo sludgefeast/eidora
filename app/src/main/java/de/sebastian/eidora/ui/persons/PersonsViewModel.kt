@@ -141,6 +141,9 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun rejectAllSuggestions() {
-        viewModelScope.launch { repo.rejectAllSuggestions() }
+        viewModelScope.launch {
+            repo.rejectAllSuggestions()
+            de.sebastian.eidora.worker.SyncPipeline.enqueueClustering(getApplication())
+        }
     }
 }

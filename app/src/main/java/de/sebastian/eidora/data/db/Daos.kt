@@ -73,6 +73,9 @@ interface PersonDao {
     @Query("SELECT * FROM persons WHERE name IS NOT NULL")
     suspend fun getAll(): List<PersonEntity>
 
+    @Query("SELECT * FROM persons WHERE name IS NULL")
+    suspend fun getSuggestions(): List<PersonEntity>
+
     @Query("DELETE FROM persons")
     suspend fun deleteAll()
 

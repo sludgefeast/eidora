@@ -79,7 +79,7 @@ class FaceRepository(
     }
 
     suspend fun rejectAllSuggestions() {
-        val suggestions = personDao.getAll().filter { it.name == null }
+        val suggestions = personDao.getSuggestions()
         suggestions.forEach { person ->
             val faces = faceDao.findByPersonId(person.id)
             faces.forEach { face -> faceDao.updatePersonId(face.id, null) }
