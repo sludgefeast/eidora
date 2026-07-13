@@ -147,6 +147,8 @@ fun EidoraApp() {
     val navController = rememberNavController()
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
+    val personsVm: PersonsViewModel = viewModel()
+
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
@@ -155,7 +157,6 @@ fun EidoraApp() {
                 var menuExpanded by remember { mutableStateOf(false) }
                 var showRejectAllConfirm by remember { mutableStateOf(false) }
                 var showReanalyseAllConfirm by remember { mutableStateOf(false) }
-                val personsVm: de.sebastian.eidora.ui.persons.PersonsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
                 val reanalyseScope = rememberCoroutineScope()
 
                 if (showReanalyseAllConfirm) {
@@ -270,9 +271,8 @@ fun EidoraApp() {
     ) { padding ->
         NavHost(navController, startDestination = "persons", modifier = Modifier.padding(padding)) {
             composable("persons") {
-                val vm: PersonsViewModel = viewModel()
                 PersonsScreen(
-                    viewModel = vm,
+                    viewModel = personsVm,
                     onPersonClick = { navController.navigate("person_detail/$it") },
                     onPersonLongClick = { }
                 )
