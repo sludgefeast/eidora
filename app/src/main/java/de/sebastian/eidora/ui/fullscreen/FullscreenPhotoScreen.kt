@@ -20,6 +20,11 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BrokenImage
 import coil.compose.AsyncImage
 import de.sebastian.eidora.R
 import de.sebastian.eidora.domain.model.FaceRegionCoords
@@ -37,8 +42,27 @@ fun FullscreenPhotoScreen(
     onRedetect: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val photoFile = remember(state.photoPath) { state.photoPath?.let { File(it) } }
+    val fileExists = remember(photoFile) { photoFile?.exists() == true }
 
-    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    if (!fileExists) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Default.BrokenImage,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    stringResource(R.string.photo_not_found),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        return
+    }
     var intrinsicSize by remember { mutableStateOf(IntSize.Zero) }
 
     // Zoom/pan state

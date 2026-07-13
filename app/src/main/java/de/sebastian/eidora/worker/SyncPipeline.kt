@@ -24,11 +24,14 @@ object SyncPipeline {
     }
 
     fun enqueueForce(context: Context) {
+        // Reset persisted generation so the worker ignores the fast-path check
+        context.getSharedPreferences("sync_state", android.content.Context.MODE_PRIVATE)
+            .edit().remove("media_generation").apply()
         WorkManager.getInstance(context)
             .beginUniqueWork(
                 UNIQUE_WORK_NAME,
                 ExistingWorkPolicy.REPLACE,
-                PhotoSyncWorker.buildRequest()
+                PhotoSyncWorker.buildForceRequest()
             )
             .then(ModelDownloadWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())

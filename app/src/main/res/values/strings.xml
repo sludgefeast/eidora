@@ -118,4 +118,5 @@
     <string name="delete_person_confirm_message">"%1$s" will be deleted. All faces will be moved back to Unknown and the XMP metadata will be reset. This cannot be undone.</string>
     <string name="action_reanalyse_all">Re-analyse all photos</string>
     <string name="reanalyse_all_confirm">All face detections, embeddings and clustering results will be deleted and recalculated from scratch. XMP metadata will be cleared. This may take a long time. Continue?</string>
+    <string name="photo_not_found">Photo no longer exists on this device</string>
 </resources>

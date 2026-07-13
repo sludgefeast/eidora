@@ -66,6 +66,7 @@ class PhotoSyncWorker(
 
     private suspend fun doFullSync(): Result {
         try { setForeground(NotificationHelper.syncForegroundInfo(applicationContext, 0, applicationContext.getString(de.sebastian.eidora.R.string.notif_scanning_start))) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
+
         val patterns = try {
             de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext).getFilenamePatterns()
         } catch (t: Throwable) {
@@ -93,29 +94,74 @@ class PhotoSyncWorker(
             return Result.failure()
         }
 
-        setProgress(workDataOf(KEY_STATUS to applicationContext.getString(de.sebastian.eidora.R.string.notif_scanning_start)))
+        val prefs = applicationContext.getSharedPreferences("sync_state", android.content.Context.MODE_PRIVATE)
+        val nowSec = System.currentTimeMillis() / 1000
+        val lastSyncSec = prefs.getLong("last_sync_timestamp_sec", 0L)
+        val isForce = inputData.getBoolean(KEY_FORCE, false)
 
-        // Aves-style reconciliation: the MediaStore is the source of truth.
-        // deleted = DB minus MediaStore; work set = new or modified entries.
-        val dbStateByPath = try {
-            photoDao.getAllPathsWithModified().associateBy { it.path }
+        // -----------------------------------------------------------------------
+        // Step 1: Incremental scan – only new/modified entries since last sync.
+        // Fast: MediaStore returns a tiny result set on normal app starts.
+        // -----------------------------------------------------------------------
+        val changedEntries = try {
+            collectJpegsFromMediaStore(
+                patterns, folderBlacklist,
+                sinceModifiedSec = if (isForce) 0L else lastSyncSec
+            ) { count ->
+                try {
+                    setForegroundAsync(NotificationHelper.syncForegroundInfo(
+                        applicationContext, 0,
+                        applicationContext.getString(de.sebastian.eidora.R.string.notif_scanning, count)
+                    ))
+                } catch (t: Throwable) { }
+            }
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to read DB paths", t); return Result.failure()
-        }
-        val fsPaths = mediaEntries.map { it.file.absolutePath }.toSet()
-
-        (dbStateByPath.keys - fsPaths).forEach { path ->
-            try { deletePhoto(path) } catch (t: Throwable) { Log.e(TAG, "Failed to delete photo $path", t) }
+            Log.e(TAG, "Failed to query MediaStore for JPEGs", t)
+            return Result.failure()
         }
 
-        // Keep new, changed, AND not-yet-analyzed photos. The analyzed check
-        // makes an interrupted sync self-healing: photos whose processing was
-        // cut short (killed app) are picked up again on the next run.
-        val jpegFiles = mediaEntries.filter { entry ->
-            val db = dbStateByPath[entry.file.absolutePath]
-            db == null || db.modifiedAt / 1000 != entry.modifiedSec || !db.analyzed
-        }.map { it.file }
-        Log.i(TAG, "Sync work set: ${jpegFiles.size} of ${mediaEntries.size} photos (new or modified)")
+        // Also include not-yet-analyzed photos from a previous interrupted run.
+        val unanalyzed = try {
+            photoDao.getAllPathsWithModified()
+                .filter { !it.analyzed }
+                .map { MediaEntry(java.io.File(it.path), it.modifiedAt / 1000) }
+        } catch (t: Throwable) { emptyList() }
+
+        val workEntries = (changedEntries + unanalyzed)
+            .distinctBy { it.file.absolutePath }
+
+        Log.i(TAG, "Sync work set: ${workEntries.size} entries " +
+            "(${changedEntries.size} changed since ${lastSyncSec}s, ${unanalyzed.size} unanalyzed)")
+
+        // -----------------------------------------------------------------------
+        // Step 2: Deletion check – only run periodically (every ~24h) or on force.
+        // Compares full DB against full MediaStore to find deleted files.
+        // -----------------------------------------------------------------------
+        val lastDeletionCheck = prefs.getLong("last_deletion_check_sec", 0L)
+        val nowSec = System.currentTimeMillis() / 1000
+        val deletionCheckIntervalSec = 24 * 3600L
+        // Periodic WorkManager runs have no input data – always do deletion check
+        val isPeriodic = inputData.keyValueMap.isEmpty()
+        if (isForce || isPeriodic || nowSec - lastDeletionCheck > deletionCheckIntervalSec) {
+            Log.i(TAG, "Running deletion check")
+            try {
+                val allMediaPaths = collectJpegsFromMediaStore(
+                    patterns, folderBlacklist, sinceModifiedSec = 0L
+                ) { }.map { it.file.absolutePath }.toSet()
+
+                val dbPaths = photoDao.getAllPathsWithModified().map { it.path }.toSet()
+                (dbPaths - allMediaPaths).forEach { path ->
+                    try { deletePhoto(path) }
+                    catch (t: Throwable) { Log.e(TAG, "Failed to delete photo $path", t) }
+                }
+                prefs.edit().putLong("last_deletion_check_sec", nowSec).apply()
+            } catch (t: Throwable) {
+                Log.e(TAG, "Deletion check failed", t)
+            }
+        }
+
+        setProgress(workDataOf(KEY_STATUS to applicationContext.getString(de.sebastian.eidora.R.string.notif_scanning_start)))
+        val jpegFiles = workEntries.map { it.file }
 
         val doneCount = java.util.concurrent.atomic.AtomicInteger(0)
         val currentFile = java.util.concurrent.atomic.AtomicReference<String>("")
@@ -175,6 +221,12 @@ class PhotoSyncWorker(
 
         try { personDao.deleteOrphaned() } catch (t: Throwable) { Log.e(TAG, "Failed to delete orphaned persons", t) }
 
+        // Persist sync timestamp so next run only fetches newer entries
+        prefs.edit().putLong("last_sync_timestamp_sec", nowSec).apply()
+
+        // Remove old generation-based fast path key if present
+        prefs.edit().remove("media_generation").apply()
+
         setProgress(workDataOf(KEY_PROGRESS to 100, KEY_STATUS to applicationContext.getString(de.sebastian.eidora.R.string.notif_done)))
         return Result.success()
     }
@@ -219,24 +271,32 @@ class PhotoSyncWorker(
     private fun collectJpegsFromMediaStore(
         patterns: List<String>,
         folderBlacklist: Set<String>,
+        sinceModifiedSec: Long = 0L,
         onProgress: (Int) -> Unit
     ): List<MediaEntry> {
         val uri = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
-            android.provider.MediaStore.Images.Media._ID,
             android.provider.MediaStore.Images.Media.DATA,
             android.provider.MediaStore.Images.Media.DISPLAY_NAME,
             android.provider.MediaStore.Images.Media.RELATIVE_PATH,
             android.provider.MediaStore.Images.Media.DATE_MODIFIED,
-            android.provider.MediaStore.Images.Media.MIME_TYPE
         )
-        val selection = "${android.provider.MediaStore.Images.Media.MIME_TYPE} = ?"
-        val selectionArgs = arrayOf("image/jpeg")
+        val selection = if (sinceModifiedSec > 0L) {
+            "${android.provider.MediaStore.Images.Media.MIME_TYPE} = ? AND " +
+            "${android.provider.MediaStore.Images.Media.DATE_MODIFIED} > ?"
+        } else {
+            "${android.provider.MediaStore.Images.Media.MIME_TYPE} = ?"
+        }
+        val selectionArgs = if (sinceModifiedSec > 0L) {
+            arrayOf("image/jpeg", sinceModifiedSec.toString())
+        } else {
+            arrayOf("image/jpeg")
+        }
 
         val result = mutableListOf<MediaEntry>()
         applicationContext.contentResolver.query(
             uri, projection, selection, selectionArgs,
-            "${android.provider.MediaStore.Images.Media.DATE_TAKEN} DESC"
+            "${android.provider.MediaStore.Images.Media.DATE_MODIFIED} DESC"
         )?.use { cursor ->
             val dataCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DATA)
             val nameCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DISPLAY_NAME)
@@ -246,7 +306,6 @@ class PhotoSyncWorker(
             while (cursor.moveToNext()) {
                 scanned++
                 if (scanned % 500 == 0) onProgress(scanned)
-                // Folder blacklist check (normalize trailing slash)
                 val relPath = cursor.getString(relPathCol)?.trimEnd('/') ?: ""
                 if (folderBlacklist.any { relPath == it || relPath.startsWith("$it/") }) continue
                 val name = cursor.getString(nameCol) ?: continue
@@ -435,9 +494,15 @@ class PhotoSyncWorker(
         const val KEY_PROGRESS = "progress"
         const val KEY_STATUS = "status"
         const val KEY_PHOTO_ID = "photo_id"
+        const val KEY_FORCE = "force"
 
         fun buildRequest(): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<PhotoSyncWorker>().build()
+
+        fun buildForceRequest(): OneTimeWorkRequest =
+            OneTimeWorkRequestBuilder<PhotoSyncWorker>()
+                .setInputData(workDataOf(KEY_FORCE to true))
+                .build()
 
         /**
          * Estimates remaining time from throughput so far.
