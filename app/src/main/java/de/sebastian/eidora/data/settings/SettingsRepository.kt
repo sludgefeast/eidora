@@ -22,7 +22,7 @@ private val KEY_TIME_WEIGHT = floatPreferencesKey("clustering_time_weight")
 private val KEY_MIN_BATTERY_PERCENT = intPreferencesKey("min_battery_percent")
 private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius")
 private val KEY_ALLOW_MOBILE_MODEL_DOWNLOAD = androidx.datastore.preferences.core.booleanPreferencesKey("allow_mobile_model_download")
-private val KEY_FOLDER_BLACKLIST = stringPreferencesKey("folder_blacklist")
+private val KEY_FOLDER_WHITELIST = stringPreferencesKey("folder_whitelist")
 
 data class ClusteringConfig(
     val edgeThreshold: Float,
@@ -36,6 +36,8 @@ data class PowerConfig(
     val minBatteryPercent: Int,
     val maxBatteryTempCelsius: Float
 )
+
+enum class FolderCategory { CAMERA, COMMON, APPS, OTHER }
 
 class SettingsRepository(private val context: Context) {
 
@@ -96,22 +98,23 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
-    // ---- Folder blacklist --------------------------------------------------
+    // ---- Folder whitelist --------------------------------------------------
 
     /**
-     * Folders (MediaStore RELATIVE_PATH) to exclude from syncing.
-     * Stored as newline-separated list. Empty path = no filter.
+     * Folders (MediaStore RELATIVE_PATH) included in syncing.
+     * Stored as newline-separated list.
+     * null / empty = only DEFAULT_FOLDER_WHITELIST (first-run default).
      */
-    val folderBlacklist: Flow<Set<String>> = context.dataStore.data.map { prefs ->
-        prefs[KEY_FOLDER_BLACKLIST]?.split("\n")?.filter { it.isNotBlank() }?.toSet()
-            ?: DEFAULT_FOLDER_BLACKLIST
+    val folderWhitelist: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[KEY_FOLDER_WHITELIST]?.split("\n")?.filter { it.isNotBlank() }?.toSet()
+            ?: DEFAULT_FOLDER_WHITELIST
     }
 
-    suspend fun getFolderBlacklist(): Set<String> = folderBlacklist.first()
+    suspend fun getFolderWhitelist(): Set<String> = folderWhitelist.first()
 
-    suspend fun setFolderBlacklist(folders: Set<String>) {
+    suspend fun setFolderWhitelist(folders: Set<String>) {
         context.dataStore.edit { prefs ->
-            prefs[KEY_FOLDER_BLACKLIST] = folders.joinToString("\n")
+            prefs[KEY_FOLDER_WHITELIST] = folders.joinToString("\n")
         }
     }
 
@@ -136,12 +139,20 @@ class SettingsRepository(private val context: Context) {
         const val DEFAULT_MIN_CLUSTER_SIZE = 5
         const val DEFAULT_TIME_WEIGHT = 1.0f
 
-        val DEFAULT_FOLDER_BLACKLIST: Set<String> = setOf(
-            "Pictures/Screenshots",
-            "Pictures/Screenshot",
-            "Android/media",
-            "Android/data"
-        )
+        // Only Camera is selected by default
+        val DEFAULT_FOLDER_WHITELIST: Set<String> = setOf("DCIM/Camera")
+
+        // Category patterns for grouping folders in the settings UI
+        val CAMERA_PATTERNS = listOf("DCIM/")
+        val APPS_PATTERNS = listOf("Android/media/", "Android/data/")
+        val COMMON_PATTERNS = listOf("Pictures/", "Download/", "Downloads/")
+
+        fun categorize(relativePath: String): FolderCategory = when {
+            APPS_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.APPS
+            CAMERA_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.CAMERA
+            COMMON_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.COMMON
+            else -> FolderCategory.OTHER
+        }
         const val DEFAULT_MIN_BATTERY_PERCENT = 20
         const val DEFAULT_MAX_BATTERY_TEMP = 40.0f
 

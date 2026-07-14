@@ -112,7 +112,6 @@
     <string name="action_reject_all_suggestions">Alle Vorschläge löschen</string>
     <string name="reject_all_suggestions_confirm">Alle unbenannten Vorschläge werden gelöscht. Die Gesichter werden in Unbekannt verschoben. Dies kann nicht rückgängig gemacht werden.</string>
     <string name="settings_folders_title">Ordner</string>
-    <string name="settings_folders_description">Wähle welche Ordner beim Sync berücksichtigt werden. Abgehakte Ordner werden ignoriert. Standardmäßig sind Screenshots und App-Caches ausgeschlossen.</string>
     <string name="settings_folders_loading">Lade Ordner…</string>
     <string name="action_delete_person">Person löschen</string>
     <string name="delete_person_confirm_message">"%1$s" wird gelöscht. Alle Gesichter werden in Unbekannt verschoben und die XMP-Metadaten werden zurückgesetzt. Dies kann nicht rückgängig gemacht werden.</string>
@@ -124,4 +123,9 @@
     <string name="setting_individual_match_threshold_hint">Höher = einzelne Gesichter werden leichter bestehenden Personen zugeordnet. Niedriger = nur sehr enge Treffer werden zugeordnet (mehr Gesichter landen in Unbekannt).</string>
     <string name="setting_min_cluster_size_hint">Höher = nur große Gruppen werden als Vorschläge angezeigt (weniger, aber zuverlässigere Vorschläge). Niedriger = auch kleine Gruppen werden als Vorschläge angezeigt.</string>
     <string name="setting_time_weight_hint">Höher = zeitlich weit entfernte Fotos werden seltener verknüpft (hilft bei Geschwistern und Alterung). Auf 0 setzen um den Zeitfaktor zu ignorieren.</string>
+    <string name="settings_folders_description">Wähle welche Ordner beim Sync berücksichtigt werden. Nur markierte Ordner werden analysiert. Standardmäßig ist nur der Kamera-Ordner ausgewählt.</string>
+    <string name="folder_category_camera">Kamera</string>
+    <string name="folder_category_common">Fotos &amp; Downloads</string>
+    <string name="folder_category_apps">Apps</string>
+    <string name="folder_category_other">Sonstiges</string>
 </resources>

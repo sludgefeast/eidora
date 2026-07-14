@@ -210,27 +210,47 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                state.availableFolders.forEach { folder ->
-                    val isBlacklisted = folder in state.folderBlacklist
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
-                    ) {
-                        Checkbox(
-                            checked = !isBlacklisted,
-                            onCheckedChange = { included ->
-                                val newBl = if (included)
-                                    state.folderBlacklist - folder
-                                else
-                                    state.folderBlacklist + folder
-                                viewModel.setFolderBlacklist(newBl)
-                            }
-                        )
-                        Text(
-                            text = folder,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(start = 4.dp)
-                        )
+                val categories = listOf(
+                    de.sebastian.eidora.data.settings.FolderCategory.CAMERA to stringResource(R.string.folder_category_camera),
+                    de.sebastian.eidora.data.settings.FolderCategory.COMMON to stringResource(R.string.folder_category_common),
+                    de.sebastian.eidora.data.settings.FolderCategory.APPS to stringResource(R.string.folder_category_apps),
+                    de.sebastian.eidora.data.settings.FolderCategory.OTHER to stringResource(R.string.folder_category_other),
+                )
+                val grouped = state.availableFolders.groupBy {
+                    de.sebastian.eidora.data.settings.SettingsRepository.categorize(it)
+                }
+                categories.forEach { (category, label) ->
+                    val folders = grouped[category] ?: return@forEach
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                    )
+                    folders.forEach { folder ->
+                        val isIncluded = folder in state.folderWhitelist
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Checkbox(
+                                checked = isIncluded,
+                                onCheckedChange = { included ->
+                                    val newWl = if (included)
+                                        state.folderWhitelist + folder
+                                    else
+                                        state.folderWhitelist - folder
+                                    viewModel.setFolderWhitelist(newWl)
+                                }
+                            )
+                            Text(
+                                text = folder,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                        }
                     }
                 }
             }

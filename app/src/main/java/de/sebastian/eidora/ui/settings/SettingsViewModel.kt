@@ -24,7 +24,7 @@ data class SettingsUiState(
         maxBatteryTempCelsius = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP
     ),
     val availableFolders: List<String> = emptyList(),
-    val folderBlacklist: Set<String> = SettingsRepository.DEFAULT_FOLDER_BLACKLIST
+    val folderWhitelist: Set<String> = SettingsRepository.DEFAULT_FOLDER_WHITELIST
 )
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
@@ -51,8 +51,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
-            repo.folderBlacklist.collect { bl ->
-                _uiState.update { it.copy(folderBlacklist = bl) }
+            repo.folderWhitelist.collect { wl ->
+                _uiState.update { it.copy(folderWhitelist = wl) }
             }
         }
     }
@@ -71,8 +71,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.setPowerConfig(config) }
     }
 
-    fun setFolderBlacklist(folders: Set<String>) {
-        viewModelScope.launch { repo.setFolderBlacklist(folders) }
+    fun setFolderWhitelist(folders: Set<String>) {
+        viewModelScope.launch { repo.setFolderWhitelist(folders) }
     }
 
     fun loadAvailableFolders(context: android.content.Context) {

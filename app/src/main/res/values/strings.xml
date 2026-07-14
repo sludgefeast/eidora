@@ -112,7 +112,6 @@
     <string name="action_reject_all_suggestions">Delete all suggestions</string>
     <string name="reject_all_suggestions_confirm">All unnamed suggestions will be deleted. The faces will move back to Unknown. This cannot be undone.</string>
     <string name="settings_folders_title">Folders</string>
-    <string name="settings_folders_description">Select which folders are included in the sync. Unchecked folders are ignored. Defaults exclude Screenshots and app caches.</string>
     <string name="settings_folders_loading">Loading folders…</string>
     <string name="action_delete_person">Delete person</string>
     <string name="delete_person_confirm_message">"%1$s" will be deleted. All faces will be moved back to Unknown and the XMP metadata will be reset. This cannot be undone.</string>
@@ -124,4 +123,9 @@
     <string name="setting_individual_match_threshold_hint">Higher = single faces are assigned to existing persons more easily. Lower = only very close matches are assigned (more faces land in Unknown).</string>
     <string name="setting_min_cluster_size_hint">Higher = only large groups become suggestions (fewer but more reliable). Lower = even small groups of faces become suggestions.</string>
     <string name="setting_time_weight_hint">Higher = photos far apart in time are less likely to be linked (helps with siblings and ageing). Set to 0 to ignore time completely.</string>
+    <string name="settings_folders_description">Select which folders are included in the sync. Only checked folders will be analysed. Only the Camera folder is selected by default.</string>
+    <string name="folder_category_camera">Camera</string>
+    <string name="folder_category_common">Photos &amp; Downloads</string>
+    <string name="folder_category_apps">Apps</string>
+    <string name="folder_category_other">Other</string>
 </resources>

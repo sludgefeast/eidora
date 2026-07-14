@@ -73,11 +73,11 @@ class PhotoSyncWorker(
             Log.w(TAG, "Failed to load filename patterns, using empty list (no filter)", t)
             emptyList()
         }
-        val folderBlacklist = try {
-            de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext).getFolderBlacklist()
+        val folderWhitelist = try {
+            de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext).getFolderWhitelist()
         } catch (t: Throwable) {
-            Log.w(TAG, "Failed to load folder blacklist, using defaults", t)
-            de.sebastian.eidora.data.settings.SettingsRepository.DEFAULT_FOLDER_BLACKLIST
+            Log.w(TAG, "Failed to load folder whitelist, using defaults", t)
+            de.sebastian.eidora.data.settings.SettingsRepository.DEFAULT_FOLDER_WHITELIST
         }
         val mediaEntries = try {
             collectJpegsFromMediaStore(patterns, folderBlacklist) { count ->
@@ -146,7 +146,7 @@ class PhotoSyncWorker(
             Log.i(TAG, "Running deletion check")
             try {
                 val allMediaPaths = collectJpegsFromMediaStore(
-                    patterns, folderBlacklist, sinceModifiedSec = 0L
+                    patterns, folderWhitelist, sinceModifiedSec = 0L
                 ) { }.map { it.file.absolutePath }.toSet()
 
                 val dbPaths = photoDao.getAllPathsWithModified().map { it.path }.toSet()
@@ -270,7 +270,7 @@ class PhotoSyncWorker(
 
     private fun collectJpegsFromMediaStore(
         patterns: List<String>,
-        folderBlacklist: Set<String>,
+        folderWhitelist: Set<String>,
         sinceModifiedSec: Long = 0L,
         onProgress: (Int) -> Unit
     ): List<MediaEntry> {
@@ -307,7 +307,8 @@ class PhotoSyncWorker(
                 scanned++
                 if (scanned % 500 == 0) onProgress(scanned)
                 val relPath = cursor.getString(relPathCol)?.trimEnd('/') ?: ""
-                if (folderBlacklist.any { relPath == it || relPath.startsWith("$it/") }) continue
+                if (folderWhitelist.isNotEmpty() &&
+                    !folderWhitelist.any { relPath == it || relPath.startsWith("$it/") }) continue
                 val name = cursor.getString(nameCol) ?: continue
                 if (!de.sebastian.eidora.data.settings.SettingsRepository
                         .matchesAnyPattern(name, patterns)) continue
