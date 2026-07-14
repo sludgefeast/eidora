@@ -119,4 +119,9 @@
     <string name="action_reanalyse_all">Alle Fotos neu analysieren</string>
     <string name="reanalyse_all_confirm">Alle Gesichtserkennung, Embeddings und Clustering-Ergebnisse werden gelöscht und neu berechnet. XMP-Metadaten werden zurückgesetzt. Dies kann lange dauern. Fortfahren?</string>
     <string name="photo_not_found">Foto existiert nicht mehr auf diesem Gerät</string>
+    <string name="setting_edge_threshold_hint">Höher = mehr Gesichter werden pro Cluster verknüpft (lockerere Gruppierung, Risiko Personen zu vermischen). Niedriger = nur sehr ähnliche Gesichter werden verknüpft (engere Cluster, mehr Vorschläge).</string>
+    <string name="setting_cluster_match_threshold_hint">Höher = Cluster werden leichter bestehenden Personen zugeordnet (weniger neue Vorschläge). Niedriger = nur sehr ähnliche Cluster werden mit einer Person zusammengeführt.</string>
+    <string name="setting_individual_match_threshold_hint">Höher = einzelne Gesichter werden leichter bestehenden Personen zugeordnet. Niedriger = nur sehr enge Treffer werden zugeordnet (mehr Gesichter landen in Unbekannt).</string>
+    <string name="setting_min_cluster_size_hint">Höher = nur große Gruppen werden als Vorschläge angezeigt (weniger, aber zuverlässigere Vorschläge). Niedriger = auch kleine Gruppen werden als Vorschläge angezeigt.</string>
+    <string name="setting_time_weight_hint">Höher = zeitlich weit entfernte Fotos werden seltener verknüpft (hilft bei Geschwistern und Alterung). Auf 0 setzen um den Zeitfaktor zu ignorieren.</string>
 </resources>

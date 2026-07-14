@@ -124,6 +124,7 @@ fun SettingsScreen(
             FloatSetting(
                 label = stringResource(R.string.setting_edge_threshold),
                 description = stringResource(R.string.setting_edge_threshold_description),
+                hint = stringResource(R.string.setting_edge_threshold_hint),
                 value = cfg.edgeThreshold,
                 default = SettingsRepository.DEFAULT_EDGE_THRESHOLD,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(edgeThreshold = it)) }
@@ -131,6 +132,7 @@ fun SettingsScreen(
             FloatSetting(
                 label = stringResource(R.string.setting_cluster_match_threshold),
                 description = stringResource(R.string.setting_cluster_match_threshold_description),
+                hint = stringResource(R.string.setting_cluster_match_threshold_hint),
                 value = cfg.clusterMatchThreshold,
                 default = SettingsRepository.DEFAULT_CLUSTER_MATCH_THRESHOLD,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(clusterMatchThreshold = it)) }
@@ -138,6 +140,7 @@ fun SettingsScreen(
             FloatSetting(
                 label = stringResource(R.string.setting_individual_match_threshold),
                 description = stringResource(R.string.setting_individual_match_threshold_description),
+                hint = stringResource(R.string.setting_individual_match_threshold_hint),
                 value = cfg.individualMatchThreshold,
                 default = SettingsRepository.DEFAULT_INDIVIDUAL_MATCH_THRESHOLD,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(individualMatchThreshold = it)) }
@@ -145,6 +148,7 @@ fun SettingsScreen(
             IntSetting(
                 label = stringResource(R.string.setting_min_cluster_size),
                 description = stringResource(R.string.setting_min_cluster_size_description),
+                hint = stringResource(R.string.setting_min_cluster_size_hint),
                 value = cfg.minClusterSize,
                 default = SettingsRepository.DEFAULT_MIN_CLUSTER_SIZE,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(minClusterSize = it)) }
@@ -152,6 +156,7 @@ fun SettingsScreen(
             FloatSetting(
                 label = stringResource(R.string.setting_time_weight),
                 description = stringResource(R.string.setting_time_weight_description),
+                hint = stringResource(R.string.setting_time_weight_hint),
                 value = cfg.timeWeight,
                 default = SettingsRepository.DEFAULT_TIME_WEIGHT,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(timeWeight = it)) }
@@ -251,6 +256,7 @@ private fun FloatSetting(
     description: String,
     value: Float,
     default: Float,
+    hint: String? = null,
     onValueChange: (Float) -> Unit
 ) {
     var text by remember(value) { mutableStateOf("%.2f".format(value)) }
@@ -261,6 +267,16 @@ private fun FloatSetting(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (hint != null) {
+            Text(
+                text = hint,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = text,
@@ -290,6 +306,7 @@ private fun IntSetting(
     description: String,
     value: Int,
     default: Int,
+    hint: String? = null,
     onValueChange: (Int) -> Unit
 ) {
     var text by remember(value) { mutableStateOf(value.toString()) }
@@ -300,6 +317,16 @@ private fun IntSetting(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (hint != null) {
+            Text(
+                text = hint,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = text,

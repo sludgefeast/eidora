@@ -130,9 +130,9 @@ class SettingsRepository(private val context: Context) {
     }
 
     companion object {
-        const val DEFAULT_EDGE_THRESHOLD = 0.30f
-        const val DEFAULT_CLUSTER_MATCH_THRESHOLD = 0.30f
-        const val DEFAULT_INDIVIDUAL_MATCH_THRESHOLD = 0.25f
+        const val DEFAULT_EDGE_THRESHOLD = 0.50f
+        const val DEFAULT_CLUSTER_MATCH_THRESHOLD = 0.55f
+        const val DEFAULT_INDIVIDUAL_MATCH_THRESHOLD = 0.50f
         const val DEFAULT_MIN_CLUSTER_SIZE = 5
         const val DEFAULT_TIME_WEIGHT = 1.0f
 

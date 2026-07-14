@@ -119,4 +119,9 @@
     <string name="action_reanalyse_all">Re-analyse all photos</string>
     <string name="reanalyse_all_confirm">All face detections, embeddings and clustering results will be deleted and recalculated from scratch. XMP metadata will be cleared. This may take a long time. Continue?</string>
     <string name="photo_not_found">Photo no longer exists on this device</string>
+    <string name="setting_edge_threshold_hint">Higher = more faces linked per cluster (looser grouping, risk of mixing persons). Lower = only very similar faces linked (tighter clusters, more suggestions).</string>
+    <string name="setting_cluster_match_threshold_hint">Higher = clusters are assigned to existing persons more easily (fewer new suggestions). Lower = only very similar clusters are merged with a person.</string>
+    <string name="setting_individual_match_threshold_hint">Higher = single faces are assigned to existing persons more easily. Lower = only very close matches are assigned (more faces land in Unknown).</string>
+    <string name="setting_min_cluster_size_hint">Higher = only large groups become suggestions (fewer but more reliable). Lower = even small groups of faces become suggestions.</string>
+    <string name="setting_time_weight_hint">Higher = photos far apart in time are less likely to be linked (helps with siblings and ageing). Set to 0 to ignore time completely.</string>
 </resources>

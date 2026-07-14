@@ -69,16 +69,19 @@ class ClusteringWorker(
             val personData: Map<String, PersonData> = personDao.getAll()
                 .filter { it.name != null }
                 .mapNotNull { person ->
-                    val confirmedFaces = faceDao.findByPersonIdWithDate(person.id)
-                        .filter { it.faceRegion.name != null && !it.faceRegion.ignored && it.faceRegion.embedding != null }
-                    if (confirmedFaces.isEmpty()) null
+                    val allFaces = faceDao.findByPersonIdWithDate(person.id)
+                        .filter { !it.faceRegion.ignored && it.faceRegion.embedding != null }
+                    if (allFaces.isEmpty()) null
                     else {
+                        // Weight confirmed faces (name != null) higher than clustered ones
                         val centroid = EmbeddingModel.weightedCentroid(
-                            confirmedFaces.map {
-                                EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!) to (it.faceRegion.qualityScore ?: 0.5f)
+                            allFaces.map {
+                                val quality = it.faceRegion.qualityScore ?: 0.5f
+                                val confirmBoost = if (it.faceRegion.name != null) 1.5f else 1.0f
+                                EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!) to (quality * confirmBoost)
                             }
                         )
-                        val dates = confirmedFaces.mapNotNull { it.photoTakenAt }.sorted()
+                        val dates = allFaces.mapNotNull { it.photoTakenAt }.sorted()
                         val median = if (dates.isEmpty()) null else dates[dates.size / 2]
                         person.id to PersonData(centroid, median)
                     }
@@ -177,21 +180,22 @@ class ClusteringWorker(
 
                     var bestPerson: PersonEntity? = null
                     var bestDistance = config.clusterMatchThreshold
+                    val clusterMedian = members.mapNotNull { candidateTakenAt[it.faceRegionId] }
+                        .sorted().let { if (it.isEmpty()) null else it[it.size / 2] }
 
-                    personDao.getAll().forEach { person ->
+                    personData.forEach { (personId, pd) ->
                         try {
-                            val personFaces = faceDao.findByPersonId(person.id)
-                                .filter { it.embedding != null && !it.ignored }
-                            if (personFaces.isEmpty()) return@forEach
-                            val personCentroid = EmbeddingModel.weightedCentroid(
-                                personFaces.map {
-                                    EmbeddingModel.bytesToFloatArray(it.embedding!!) to (it.qualityScore ?: 0.5f)
-                                }
+                            val cosD = EmbeddingModel.cosineDistance(clusterCentroid, pd.centroid)
+                            val penalty = de.sebastian.eidora.ml.TemporalDistance.penalty(
+                                clusterMedian, pd.medianTakenAt, timeWeight, config.clusterMatchThreshold
                             )
-                            val dist = EmbeddingModel.cosineDistance(clusterCentroid, personCentroid)
-                            if (dist < bestDistance) { bestDistance = dist; bestPerson = person }
+                            val d = cosD + penalty
+                            if (d < bestDistance) {
+                                bestDistance = d
+                                bestPerson = personDao.findById(personId)
+                            }
                         } catch (t: Throwable) {
-                            Log.w(TAG, "Error comparing person ${person.id}", t)
+                            Log.w(TAG, "Error comparing person $personId", t)
                         }
                     }
 
