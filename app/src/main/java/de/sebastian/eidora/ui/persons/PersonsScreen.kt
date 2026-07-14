@@ -2,9 +2,6 @@ package de.sebastian.eidora.ui.persons
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
@@ -37,6 +34,7 @@ import de.sebastian.eidora.data.db.PersonWithCount
 import de.sebastian.eidora.ui.common.CircleColorLabel
 import de.sebastian.eidora.ui.common.CircleThumbnail
 import de.sebastian.eidora.util.ThumbnailHelper
+import de.sebastian.eidora.ui.common.LazyGridScrollbar
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -154,7 +152,7 @@ fun PersonsScreen(
             onDismiss = { viewModel.cancelRename() }
         )
     }
-    PersonsScrollbar(
+    LazyGridScrollbar(
         state = gridState,
         scope = scope,
         modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
@@ -308,62 +306,3 @@ private fun SuggestionRow(
 const val VIRTUAL_UNKNOWN = "virtual_unknown"
 const val VIRTUAL_IGNORED = "virtual_ignored"
 
-@Composable
-private fun PersonsScrollbar(
-    state: androidx.compose.foundation.lazy.grid.LazyGridState,
-    scope: kotlinx.coroutines.CoroutineScope,
-    modifier: Modifier = Modifier
-) {
-    var isDragging by remember { mutableStateOf(false) }
-    val isScrolling by remember { derivedStateOf { state.isScrollInProgress } }
-    val alpha by animateFloatAsState(
-        targetValue = if (isScrolling || isDragging) 0.7f else 0f,
-        animationSpec = androidx.compose.animation.core.tween(
-            durationMillis = if (isScrolling || isDragging) 100 else 800
-        ),
-        label = "scrollbar-alpha"
-    )
-    val totalItems by remember { derivedStateOf { state.layoutInfo.totalItemsCount } }
-    val visibleItems by remember { derivedStateOf { state.layoutInfo.visibleItemsInfo.size } }
-    val firstVisible by remember { derivedStateOf { state.firstVisibleItemIndex } }
-
-    if (totalItems == 0 || visibleItems >= totalItems) return
-
-    BoxWithConstraints(modifier = modifier.alpha(alpha)) {
-        val density = androidx.compose.ui.platform.LocalDensity.current
-        val heightPx = with(density) { maxHeight.toPx() }
-        val handleFraction = (visibleItems.toFloat() / totalItems.toFloat()).coerceAtLeast(0.05f)
-        val positionFraction = firstVisible.toFloat() / (totalItems - visibleItems).toFloat().coerceAtLeast(1f)
-        val handleHeight = maxHeight * handleFraction
-        val handleHeightPx = heightPx * handleFraction
-        val handleOffset = (maxHeight - handleHeight) * positionFraction
-
-        Box(
-            modifier = Modifier
-                .offset(y = handleOffset)
-                .width(24.dp)
-                .height(handleHeight)
-                .draggable(
-                    orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
-                    state = androidx.compose.foundation.gestures.rememberDraggableState { dragAmount ->
-                        val trackPx = heightPx - handleHeightPx
-                        if (trackPx <= 0f) return@rememberDraggableState
-                        val currentPos = firstVisible.toFloat() +
-                            (dragAmount / trackPx) * (totalItems - visibleItems).toFloat()
-                        val targetIndex = currentPos.toInt().coerceIn(0, totalItems - 1)
-                        scope.launch { state.scrollToItem(targetIndex) }
-                    },
-                    onDragStarted = { isDragging = true },
-                    onDragStopped = { isDragging = false }
-                ),
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .fillMaxHeight()
-                    .background(Color.White.copy(alpha = 0.6f), shape = MaterialTheme.shapes.small)
-            )
-        }
-    }
-}

@@ -1,11 +1,8 @@
 package de.sebastian.eidora.ui.photos
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material3.*
@@ -24,6 +21,7 @@ import coil.compose.AsyncImage
 import de.sebastian.eidora.R
 import java.io.File
 import kotlinx.coroutines.launch
+import de.sebastian.eidora.ui.common.LazyGridScrollbar
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

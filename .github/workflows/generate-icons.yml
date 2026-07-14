@@ -103,6 +103,10 @@ jobs:
 
           SVG = "eidora_notification_icon.svg"
 
+          if not os.path.exists(SVG):
+              print(f"Skipping notification icons: {SVG} not found in repo root")
+              exit(0)
+
           # Android notification icon sizes (mdpi baseline = 24dp)
           SIZES = {
               "drawable-mdpi":    24,
