@@ -5,6 +5,7 @@ on:
     branches: [ main, develop ]
     paths-ignore:
       - 'eidora_icon.svg'
+      - 'eidora_notification_icon.svg'
   pull_request:
     branches: [ main ]
   workflow_dispatch:

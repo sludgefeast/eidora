@@ -11,6 +11,7 @@ on:
   push:
     paths:
       - 'eidora_icon.svg'
+      - 'eidora_notification_icon.svg'
   workflow_dispatch:
 
 jobs:
@@ -93,12 +94,48 @@ jobs:
           print("Done.")
           PYEOF
 
+      - name: Render notification icons
+        run: |
+          python - << 'PYEOF'
+          import cairosvg
+          from PIL import Image
+          import io, os
+
+          SVG = "eidora_notification_icon.svg"
+
+          # Android notification icon sizes (mdpi baseline = 24dp)
+          SIZES = {
+              "drawable-mdpi":    24,
+              "drawable-hdpi":    36,
+              "drawable-xhdpi":   48,
+              "drawable-xxhdpi":  72,
+              "drawable-xxxhdpi": 96,
+          }
+
+          base = "app/src/main/res"
+
+          for density, px in SIZES.items():
+              png_bytes = cairosvg.svg2png(
+                  url=SVG,
+                  output_width=px,
+                  output_height=px,
+              )
+              img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
+              dest = os.path.join(base, density, "ic_notification.png")
+              os.makedirs(os.path.dirname(dest), exist_ok=True)
+              img.save(dest, "PNG")
+              print(f"wrote {dest} ({px}x{px})")
+
+          print("Notification icons done.")
+          PYEOF
+
       - name: Commit updated icons
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add app/src/main/res/mipmap-*/ic_launcher*.png
           git add app/src/main/res/drawable/ic_launcher_*.png
+          git add app/src/main/res/drawable-*/ic_notification.png
           if git diff --cached --quiet; then
             echo "No icon changes to commit."
           else

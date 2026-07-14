@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <defs>
+    <clipPath id="leftClip">
+      <circle cx="9" cy="11" r="6"/>
+    </clipPath>
+  </defs>
+  <!-- Left circle -->
+  <circle cx="9" cy="11" r="6" fill="white" opacity="0.85"/>
+  <!-- Right circle -->
+  <circle cx="15" cy="11" r="6" fill="white" opacity="0.85"/>
+  <!-- Intersection: brighter -->
+  <circle cx="15" cy="11" r="6" fill="white" opacity="0.6" clip-path="url(#leftClip)"/>
+  <!-- Gold bar -->
+  <rect x="5" y="19" width="14" height="2" rx="1" fill="white" opacity="0.95"/>
+</svg>
