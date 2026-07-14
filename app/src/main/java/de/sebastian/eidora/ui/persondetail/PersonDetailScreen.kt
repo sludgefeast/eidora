@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -55,6 +56,26 @@ fun PersonDetailScreen(
     var isEditingName by remember { mutableStateOf(false) }
     var editedName by remember(state.personName) { mutableStateOf(state.personName) }
     var showDeletePersonConfirm by remember { mutableStateOf(false) }
+    var showRemoveUnconfirmedConfirm by remember { mutableStateOf(false) }
+
+    if (showRemoveUnconfirmedConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRemoveUnconfirmedConfirm = false },
+            title = { Text(stringResource(R.string.action_remove_unconfirmed)) },
+            text = { Text(stringResource(R.string.remove_unconfirmed_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRemoveUnconfirmedConfirm = false
+                    viewModel.removeUnconfirmedFaces()
+                }) { Text(stringResource(R.string.action_remove_unconfirmed_short)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveUnconfirmedConfirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
 
     if (showDeletePersonConfirm) {
         AlertDialog(
@@ -160,10 +181,7 @@ fun PersonDetailScreen(
                                     isEditingName = false
                                     editedName = state.personName
                                 }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = stringResource(R.string.action_cancel)
-                                    )
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_cancel))
                                 }
                                 IconButton(onClick = {
                                     if (editedName.isNotBlank() && editedName != state.personName) {
@@ -171,26 +189,38 @@ fun PersonDetailScreen(
                                     }
                                     isEditingName = false
                                 }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = stringResource(R.string.action_edit_name)
-                                    )
+                                    Icon(Icons.Default.Check, contentDescription = stringResource(R.string.action_edit_name))
                                 }
                             } else {
+                                var overflowExpanded by remember { mutableStateOf(false) }
                                 IconButton(onClick = { showDeletePersonConfirm = true }) {
                                     Icon(
-                                        imageVector = Icons.Default.Delete,
+                                        Icons.Default.Delete,
                                         contentDescription = stringResource(R.string.action_delete_person),
                                         tint = MaterialTheme.colorScheme.error
                                     )
                                 }
-                                IconButton(onClick = {
-                                    editedName = state.personName
-                                    isEditingName = true
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = stringResource(R.string.action_edit_name)
+                                IconButton(onClick = { editedName = state.personName; isEditingName = true }) {
+                                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.action_edit_name))
+                                }
+                                IconButton(onClick = { overflowExpanded = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = null)
+                                }
+                                DropdownMenu(
+                                    expanded = overflowExpanded,
+                                    onDismissRequest = { overflowExpanded = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                stringResource(R.string.action_remove_unconfirmed),
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                        },
+                                        onClick = {
+                                            overflowExpanded = false
+                                            showRemoveUnconfirmedConfirm = true
+                                        }
                                     )
                                 }
                             }

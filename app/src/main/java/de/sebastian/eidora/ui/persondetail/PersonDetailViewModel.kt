@@ -181,6 +181,11 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun removeUnconfirmedFaces() {
+        val personId = currentPersonId ?: return
+        viewModelScope.launch { repo.removeUnconfirmedFaces(personId) }
+    }
+
     fun renameCurrentPerson(newName: String) {
         val personId = currentPersonId ?: return
         viewModelScope.launch {

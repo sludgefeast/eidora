@@ -78,6 +78,20 @@ class FaceRepository(
         }
     }
 
+    /**
+     * Removes all unconfirmed faces (name == null) from the given person.
+     * They move back to Unknown and will be re-clustered on the next run.
+     */
+    suspend fun removeUnconfirmedFaces(personId: String) {
+        val unconfirmed = faceDao.findByPersonId(personId)
+            .filter { it.name == null }
+        unconfirmed.forEach { face ->
+            faceDao.updatePersonId(face.id, null)
+        }
+        recomputeCentroid(personId)
+        deletePersonIfOrphaned(personId)
+    }
+
     suspend fun rejectAllSuggestions() {
         val suggestions = personDao.getSuggestions()
         suggestions.forEach { person ->

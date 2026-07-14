@@ -128,4 +128,7 @@
     <string name="folder_category_common">Fotos &amp; Downloads</string>
     <string name="folder_category_apps">Apps</string>
     <string name="folder_category_other">Sonstiges</string>
+    <string name="action_remove_unconfirmed">Unbestätigte Gesichter entfernen</string>
+    <string name="action_remove_unconfirmed_short">Entfernen</string>
+    <string name="remove_unconfirmed_confirm">Alle Gesichter die nicht explizit bestätigt wurden werden von dieser Person entfernt und nach Unbekannt verschoben. Bestätigte Gesichter bleiben erhalten.</string>
 </resources>
