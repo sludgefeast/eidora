@@ -80,7 +80,7 @@ class PhotoSyncWorker(
             de.sebastian.eidora.data.settings.SettingsRepository.DEFAULT_FOLDER_WHITELIST
         }
         val mediaEntries = try {
-            collectJpegsFromMediaStore(patterns, folderBlacklist) { count ->
+            collectJpegsFromMediaStore(patterns, folderWhitelist) { count ->
                 try {
                     setForegroundAsync(
                         NotificationHelper.syncForegroundInfo(
@@ -105,7 +105,7 @@ class PhotoSyncWorker(
         // -----------------------------------------------------------------------
         val changedEntries = try {
             collectJpegsFromMediaStore(
-                patterns, folderBlacklist,
+                patterns, folderWhitelist,
                 sinceModifiedSec = if (isForce) 0L else lastSyncSec
             ) { count ->
                 try {
@@ -138,7 +138,6 @@ class PhotoSyncWorker(
         // Compares full DB against full MediaStore to find deleted files.
         // -----------------------------------------------------------------------
         val lastDeletionCheck = prefs.getLong("last_deletion_check_sec", 0L)
-        val nowSec = System.currentTimeMillis() / 1000
         val deletionCheckIntervalSec = 24 * 3600L
         // Periodic WorkManager runs have no input data – always do deletion check
         val isPeriodic = inputData.keyValueMap.isEmpty()

@@ -64,6 +64,7 @@ fun FullscreenPhotoScreen(
         return
     }
     var intrinsicSize by remember { mutableStateOf(IntSize.Zero) }
+    var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
     // Zoom/pan state
     var scale by remember { mutableStateOf(1f) }
