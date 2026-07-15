@@ -21,8 +21,8 @@ import coil.compose.AsyncImage
 import de.sebastian.eidora.R
 import java.io.File
 import kotlinx.coroutines.launch
-import androidx.compose.animation.core.animateFloatAsState
 import de.sebastian.eidora.ui.common.LazyGridScrollbar
+import androidx.compose.runtime.rememberCoroutineScope
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -32,6 +32,7 @@ fun PhotosScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val gridState = rememberLazyGridState()
+    val scope = rememberCoroutineScope()
 
     val firstVisibleIndex by remember { derivedStateOf { gridState.firstVisibleItemIndex } }
     LaunchedEffect(firstVisibleIndex) {
@@ -88,12 +89,12 @@ fun PhotosScreen(
             }
         }
 
-        VerticalScrollbar(
+        LazyGridScrollbar(
             state = gridState,
+            scope = scope,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .width(24.dp)
         )
 
         if (state.currentYear.isNotBlank()) {
@@ -169,65 +170,4 @@ private fun PhotoGridItem(
     }
 }
 
-/**
- * Simple vertical scrollbar that appears while scrolling and fades out when idle.
- */
-@Composable
-private fun VerticalScrollbar(
-    state: LazyGridState,
-    modifier: Modifier = Modifier
-) {
-    var isDragging by remember { mutableStateOf(false) }
-    val isScrolling by remember { derivedStateOf { state.isScrollInProgress } }
-    val alpha by animateFloatAsState(
-        targetValue = if (isScrolling || isDragging) 0.7f else 0f,
-        animationSpec = tween(durationMillis = if (isScrolling || isDragging) 100 else 800),
-        label = "scrollbar-alpha"
-    )
 
-    val totalItems by remember { derivedStateOf { state.layoutInfo.totalItemsCount } }
-    val visibleItems by remember { derivedStateOf { state.layoutInfo.visibleItemsInfo.size } }
-    val firstVisible by remember { derivedStateOf { state.firstVisibleItemIndex } }
-
-    if (totalItems == 0 || visibleItems >= totalItems) return
-
-    val scope = rememberCoroutineScope()
-
-    BoxWithConstraints(modifier = modifier.alpha(alpha)) {
-        val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
-        val handleFraction = (visibleItems.toFloat() / totalItems.toFloat()).coerceAtLeast(0.05f)
-        val positionFraction = firstVisible.toFloat() / (totalItems - visibleItems).toFloat().coerceAtLeast(1f)
-
-        val handleHeight = maxHeight * handleFraction
-        val handleHeightPx = heightPx * handleFraction
-        val handleOffset = (maxHeight - handleHeight) * positionFraction
-
-        Box(
-            modifier = Modifier
-                .offset(y = handleOffset)
-                .width(24.dp)  // Bigger hit target than visible bar
-                .height(handleHeight)
-                .draggable(
-                    orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
-                    state = androidx.compose.foundation.gestures.rememberDraggableState { dragAmount ->
-                        val trackPx = heightPx - handleHeightPx
-                        if (trackPx <= 0f) return@rememberDraggableState
-                        val currentPos = firstVisible.toFloat() +
-                            (dragAmount / trackPx) * (totalItems - visibleItems).toFloat()
-                        val targetIndex = currentPos.toInt().coerceIn(0, totalItems - 1)
-                        scope.launch { state.scrollToItem(targetIndex) }
-                    },
-                    onDragStarted = { isDragging = true },
-                    onDragStopped = { isDragging = false }
-                ),
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .fillMaxHeight()
-                    .background(Color.White.copy(alpha = 0.6f), shape = MaterialTheme.shapes.small)
-            )
-        }
-    }
-}
