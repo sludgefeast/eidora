@@ -10,6 +10,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.*
@@ -51,6 +55,97 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp)
         ) {
 Spacer(Modifier.height(8.dp))
+
+            // Section: folder filter (top)
+            SectionHeader(stringResource(R.string.settings_folders_title))
+            Text(
+                text = stringResource(R.string.settings_folders_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            val context = androidx.compose.ui.platform.LocalContext.current
+            LaunchedEffect(Unit) { viewModel.loadAvailableFolders(context) }
+
+            if (state.availableFolders.isEmpty()) {
+                Text(
+                    stringResource(R.string.settings_folders_loading),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                val categories = listOf(
+                    de.sebastian.eidora.data.settings.FolderCategory.CAMERA to stringResource(R.string.folder_category_camera),
+                    de.sebastian.eidora.data.settings.FolderCategory.COMMON to stringResource(R.string.folder_category_common),
+                    de.sebastian.eidora.data.settings.FolderCategory.APPS to stringResource(R.string.folder_category_apps),
+                    de.sebastian.eidora.data.settings.FolderCategory.OTHER to stringResource(R.string.folder_category_other),
+                )
+                val grouped = state.availableFolders.groupBy {
+                    de.sebastian.eidora.data.settings.SettingsRepository.categorize(it)
+                }
+                // "Sonstiges" starts collapsed; all others start expanded
+                val collapsedByDefault = setOf(de.sebastian.eidora.data.settings.FolderCategory.OTHER)
+                val expandedCategories = remember {
+                    androidx.compose.runtime.mutableStateMapOf<de.sebastian.eidora.data.settings.FolderCategory, Boolean>().apply {
+                        categories.forEach { (cat, _) -> put(cat, cat !in collapsedByDefault) }
+                    }
+                }
+                categories.forEach { (category, label) ->
+                    val folders = grouped[category] ?: return@forEach
+                    val isExpanded = expandedCategories[category] == true
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp, bottom = 2.dp)
+                            .clickable { expandedCategories[category] = !isExpanded }
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                            imageVector = if (isExpanded)
+                                Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    if (isExpanded) {
+                        folders.forEach { folder ->
+                            val isIncluded = folder in state.folderWhitelist
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp)
+                            ) {
+                                Checkbox(
+                                    checked = isIncluded,
+                                    onCheckedChange = { included ->
+                                        val newWl = if (included)
+                                            state.folderWhitelist + folder
+                                        else
+                                            state.folderWhitelist - folder
+                                        viewModel.setFolderWhitelist(newWl)
+                                    }
+                                )
+                                Text(
+                                    text = folder,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(start = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
 
             // Section: clustering
             SectionHeader(stringResource(R.string.settings_clustering_title))
@@ -130,72 +225,6 @@ Spacer(Modifier.height(8.dp))
                 default = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
                 onValueChange = { viewModel.setPowerConfig(pwr.copy(maxBatteryTempCelsius = it)) }
             )
-
-            Spacer(Modifier.height(24.dp))
-
-            // Section: folder filter
-            SectionHeader(stringResource(R.string.settings_folders_title))
-            Text(
-                text = stringResource(R.string.settings_folders_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            val context = androidx.compose.ui.platform.LocalContext.current
-            LaunchedEffect(Unit) { viewModel.loadAvailableFolders(context) }
-
-            if (state.availableFolders.isEmpty()) {
-                Text(
-                    stringResource(R.string.settings_folders_loading),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                val categories = listOf(
-                    de.sebastian.eidora.data.settings.FolderCategory.CAMERA to stringResource(R.string.folder_category_camera),
-                    de.sebastian.eidora.data.settings.FolderCategory.COMMON to stringResource(R.string.folder_category_common),
-                    de.sebastian.eidora.data.settings.FolderCategory.APPS to stringResource(R.string.folder_category_apps),
-                    de.sebastian.eidora.data.settings.FolderCategory.OTHER to stringResource(R.string.folder_category_other),
-                )
-                val grouped = state.availableFolders.groupBy {
-                    de.sebastian.eidora.data.settings.SettingsRepository.categorize(it)
-                }
-                categories.forEach { (category, label) ->
-                    val folders = grouped[category] ?: return@forEach
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
-                    )
-                    folders.forEach { folder ->
-                        val isIncluded = folder in state.folderWhitelist
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp)
-                        ) {
-                            Checkbox(
-                                checked = isIncluded,
-                                onCheckedChange = { included ->
-                                    val newWl = if (included)
-                                        state.folderWhitelist + folder
-                                    else
-                                        state.folderWhitelist - folder
-                                    viewModel.setFolderWhitelist(newWl)
-                                }
-                            )
-                            Text(
-                                text = folder,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(start = 4.dp)
-                            )
-                        }
-                    }
-                }
-            }
 
             Spacer(Modifier.height(32.dp))
         }
