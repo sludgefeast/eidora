@@ -28,7 +28,7 @@ class FaceRepository(
         val person = personDao.findById(personId) ?: return
         val personName = person.name ?: return // can't confirm to unnamed suggestion person
         faceDao.updatePersonAndName(faceRegionId, personId, personName)
-        rewriteXmpForPhoto(face.photoId)
+        markPendingXmpWrite(face.photoId)
         recomputeCentroid(personId)
     }
 
@@ -70,12 +70,7 @@ class FaceRepository(
 
         personDao.deleteById(personId)
 
-        // Rewrite XMP for each affected photo so DigiKam/Aves no longer
-        // show the person's name in the face regions.
-        affectedPhotoIds.forEach { photoId ->
-            try { rewriteXmpForPhoto(photoId) }
-            catch (t: Throwable) { Log.w(TAG, "XMP rewrite failed for $photoId", t) }
-        }
+        affectedPhotoIds.forEach { markPendingXmpWrite(it) }
     }
 
     /**
@@ -137,7 +132,7 @@ class FaceRepository(
         val previousPersonId = face.personId
         faceDao.deleteById(faceRegionId)
         ThumbnailHelper.deleteThumbnail(context, faceRegionId)
-        rewriteXmpForPhoto(face.photoId)
+        markPendingXmpWrite(face.photoId)
         previousPersonId?.let {
             recomputeCentroid(it)
             deletePersonIfOrphaned(it)
@@ -152,7 +147,7 @@ class FaceRepository(
         val face = faceDao.findById(faceRegionId) ?: return
         val previousPersonId = face.personId ?: return
         faceDao.updatePersonAndName(faceRegionId, null, null)
-        rewriteXmpForPhoto(face.photoId)
+        markPendingXmpWrite(face.photoId)
         recomputeCentroid(previousPersonId)
         deletePersonIfOrphaned(previousPersonId)
     }
@@ -167,7 +162,7 @@ class FaceRepository(
         val person = personDao.findById(personId) ?: return
         val personName = person.name ?: return
         faceDao.updatePersonAndName(faceRegionId, personId, personName)
-        rewriteXmpForPhoto(face.photoId)
+        markPendingXmpWrite(face.photoId)
         previousPersonId?.let {
             recomputeCentroid(it)
             deletePersonIfOrphaned(it)
@@ -193,7 +188,7 @@ class FaceRepository(
         faceDao.updateConfirmedNamesForPerson(personId, newName)
         val faces = faceDao.findByPersonId(personId).filter { it.name != null }
         val photoIds = faces.map { it.photoId }.distinct()
-        photoIds.forEach { rewriteXmpForPhoto(it) }
+        photoIds.forEach { markPendingXmpWrite(it) }
     }
 
     // -----------------------------------------------------------------------
@@ -211,7 +206,7 @@ class FaceRepository(
         recomputeCentroid(winnerId)
         val faces = faceDao.findByPersonId(winnerId)
         val photoIds = faces.map { it.photoId }.distinct()
-        photoIds.forEach { rewriteXmpForPhoto(it) }
+        photoIds.forEach { markPendingXmpWrite(it) }
     }
 
     // -----------------------------------------------------------------------
@@ -280,31 +275,14 @@ class FaceRepository(
     // Private helpers
     // -----------------------------------------------------------------------
 
-    private suspend fun rewriteXmpForPhoto(photoId: String) {
-        val photo = photoDao.findById(photoId) ?: return
-        val file = File(photo.path)
-        if (!file.exists()) return
-        val faces = faceDao.findByPhotoId(photoId)
-        val xmpRegions = faces.map { face ->
-            XmpFaceRegion(
-                name = face.name,
-                coords = face.regionJson.toFaceRegionCoords()
-            )
-        }
-        XmpHelper.writeFaceRegions(file, xmpRegions)
-        val newModifiedAt = file.lastModified()
-        photoDao.updateModifiedAt(photoId, newModifiedAt)
-
-        // Notify the MediaStore so other apps (Aves, DigiKam) see the
-        // updated XMP immediately. We do this AFTER updating our own DB so
-        // the next Eidora sync sees db.modifiedAt == file.lastModified()
-        // and skips the photo instead of re-analysing it.
-        android.media.MediaScannerConnection.scanFile(
-            context,
-            arrayOf(file.absolutePath),
-            arrayOf("image/jpeg"),
-            null
-        )
+    /**
+     * Marks a photo as having pending XMP metadata to write,
+     * then enqueues the background [XmpWriteWorker].
+     * The actual file write happens asynchronously – UI returns immediately.
+     */
+    private suspend fun markPendingXmpWrite(photoId: String) {
+        photoDao.markPendingXmpWrite(photoId)
+        de.sebastian.eidora.worker.XmpWriteWorker.enqueue(context)
     }
 
     suspend fun recomputeCentroid(personId: String) {

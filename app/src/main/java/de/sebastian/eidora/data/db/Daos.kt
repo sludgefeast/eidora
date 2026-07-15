@@ -22,6 +22,15 @@ interface PhotoDao {
     @Query("SELECT * FROM photos")
     suspend fun getAll(): List<PhotoEntity>
 
+    @Query("SELECT * FROM photos WHERE pending_xmp_write = 1")
+    suspend fun getPendingXmpWrites(): List<PhotoEntity>
+
+    @Query("UPDATE photos SET pending_xmp_write = 1 WHERE id = :id")
+    suspend fun markPendingXmpWrite(id: String)
+
+    @Query("UPDATE photos SET pending_xmp_write = 0, modifiedAt = :modifiedAt WHERE id = :id")
+    suspend fun clearPendingXmpWrite(id: String, modifiedAt: Long)
+
     @Query("SELECT path, modifiedAt, analyzed FROM photos")
     suspend fun getAllPathsWithModified(): List<PathModified>
 

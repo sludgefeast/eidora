@@ -127,8 +127,15 @@ class PhotoSyncWorker(
                 .map { MediaEntry(java.io.File(it.path), it.modifiedAt / 1000) }
         } catch (t: Throwable) { emptyList() }
 
+        // Exclude photos with a pending XMP write – their mtime will change
+        // when XmpWriteWorker runs, so don't treat them as "modified" yet.
+        val pendingXmpPaths = try {
+            photoDao.getPendingXmpWrites().map { it.path }.toSet()
+        } catch (t: Throwable) { emptySet<String>() }
+
         val workEntries = (changedEntries + unanalyzed)
             .distinctBy { it.file.absolutePath }
+            .filter { it.file.absolutePath !in pendingXmpPaths }
 
         Log.i(TAG, "Sync work set: ${workEntries.size} entries " +
             "(${changedEntries.size} changed since ${lastSyncSec}s, ${unanalyzed.size} unanalyzed)")
