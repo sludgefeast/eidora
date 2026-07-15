@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
-    val filenamePatterns: List<String> = emptyList(),
     val clusteringConfig: ClusteringConfig = ClusteringConfig(
         edgeThreshold = SettingsRepository.DEFAULT_EDGE_THRESHOLD,
         clusterMatchThreshold = SettingsRepository.DEFAULT_CLUSTER_MATCH_THRESHOLD,
@@ -35,10 +34,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            repo.filenamePatterns.collect { patterns ->
-                _uiState.update { it.copy(filenamePatterns = patterns) }
-            }
+
         }
         viewModelScope.launch {
             repo.clusteringConfig.collect { config ->
@@ -57,11 +53,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setPatterns(patterns: List<String>) {
-        viewModelScope.launch {
-            repo.setFilenamePatterns(patterns.map { it.trim() }.filter { it.isNotBlank() })
-        }
-    }
+
 
     fun setClusteringConfig(config: ClusteringConfig) {
         viewModelScope.launch { repo.setClusteringConfig(config) }

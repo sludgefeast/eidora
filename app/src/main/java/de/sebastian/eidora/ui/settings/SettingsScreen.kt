@@ -29,18 +29,12 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
-    var editedPatterns by remember(state.filenamePatterns) {
-        mutableStateOf(state.filenamePatterns)
-    }
-    var newPattern by remember { mutableStateOf("") }
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = {
-                        viewModel.setPatterns(editedPatterns)
                         onBack()
                     }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = null)
@@ -56,59 +50,7 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
         ) {
-            // Section: filename patterns
-            SectionHeader(stringResource(R.string.settings_filename_patterns_title))
-            Text(
-                text = stringResource(R.string.settings_filename_patterns_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            editedPatterns.forEachIndexed { index, pattern ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                ) {
-                    OutlinedTextField(
-                        value = pattern,
-                        onValueChange = { new ->
-                            editedPatterns = editedPatterns.toMutableList().apply {
-                                set(index, new)
-                            }
-                        },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = {
-                        editedPatterns = editedPatterns.toMutableList().apply { removeAt(index) }
-                    }) {
-                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.action_delete))
-                    }
-                }
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            ) {
-                OutlinedTextField(
-                    value = newPattern,
-                    onValueChange = { newPattern = it },
-                    placeholder = { Text("IMG_*") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = {
-                    if (newPattern.isNotBlank()) {
-                        editedPatterns = editedPatterns + newPattern.trim()
-                        newPattern = ""
-                    }
-                }) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add))
-                }
-            }
-
-            Spacer(Modifier.height(24.dp))
+Spacer(Modifier.height(8.dp))
 
             // Section: clustering
             SectionHeader(stringResource(R.string.settings_clustering_title))

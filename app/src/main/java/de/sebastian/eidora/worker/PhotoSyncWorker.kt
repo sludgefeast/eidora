@@ -67,12 +67,6 @@ class PhotoSyncWorker(
     private suspend fun doFullSync(): Result {
         try { setForeground(NotificationHelper.syncForegroundInfo(applicationContext, 0, applicationContext.getString(de.sebastian.eidora.R.string.notif_scanning_start))) } catch (t: Throwable) { android.util.Log.w("FACES", "setForeground failed", t) }
 
-        val patterns = try {
-            de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext).getFilenamePatterns()
-        } catch (t: Throwable) {
-            Log.w(TAG, "Failed to load filename patterns, using empty list (no filter)", t)
-            emptyList()
-        }
         val folderWhitelist = try {
             de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext).getFolderWhitelist()
         } catch (t: Throwable) {
@@ -80,7 +74,7 @@ class PhotoSyncWorker(
             de.sebastian.eidora.data.settings.SettingsRepository.DEFAULT_FOLDER_WHITELIST
         }
         val mediaEntries = try {
-            collectJpegsFromMediaStore(patterns, folderWhitelist) { count ->
+            collectJpegsFromMediaStore(folderWhitelist) { count ->
                 try {
                     setForegroundAsync(
                         NotificationHelper.syncForegroundInfo(
@@ -105,7 +99,7 @@ class PhotoSyncWorker(
         // -----------------------------------------------------------------------
         val changedEntries = try {
             collectJpegsFromMediaStore(
-                patterns, folderWhitelist,
+                folderWhitelist,
                 sinceModifiedSec = if (isForce) 0L else lastSyncSec
             ) { count ->
                 try {
@@ -283,13 +277,11 @@ class PhotoSyncWorker(
 
     /**
      * Queries the MediaStore for JPEG images and returns them as File objects.
-     * Filter patterns are applied to the display name (filename).
      * Much faster than walking the file system for large photo collections.
      */
     data class MediaEntry(val file: File, val modifiedSec: Long)
 
     private fun collectJpegsFromMediaStore(
-        patterns: List<String>,
         folderWhitelist: Set<String>,
         sinceModifiedSec: Long = 0L,
         onProgress: (Int) -> Unit
@@ -297,7 +289,6 @@ class PhotoSyncWorker(
         val uri = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             android.provider.MediaStore.Images.Media.DATA,
-            android.provider.MediaStore.Images.Media.DISPLAY_NAME,
             android.provider.MediaStore.Images.Media.RELATIVE_PATH,
             android.provider.MediaStore.Images.Media.DATE_MODIFIED,
         )
@@ -319,7 +310,6 @@ class PhotoSyncWorker(
             "${android.provider.MediaStore.Images.Media.DATE_MODIFIED} DESC"
         )?.use { cursor ->
             val dataCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DATA)
-            val nameCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DISPLAY_NAME)
             val relPathCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.RELATIVE_PATH)
             val modCol = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DATE_MODIFIED)
             var scanned = 0
@@ -329,9 +319,6 @@ class PhotoSyncWorker(
                 val relPath = cursor.getString(relPathCol)?.trimEnd('/') ?: ""
                 if (folderWhitelist.isNotEmpty() &&
                     !folderWhitelist.any { relPath == it || relPath.startsWith("$it/") }) continue
-                val name = cursor.getString(nameCol) ?: continue
-                if (!de.sebastian.eidora.data.settings.SettingsRepository
-                        .matchesAnyPattern(name, patterns)) continue
                 val path = cursor.getString(dataCol) ?: continue
                 val file = File(path)
                 if (file.isFile) result.add(MediaEntry(file, cursor.getLong(modCol)))

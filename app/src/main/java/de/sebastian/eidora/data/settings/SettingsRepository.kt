@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "eidora_settings")
 
-private val KEY_FILENAME_PATTERNS = stringPreferencesKey("filename_patterns")
 private val KEY_CLUSTER_EDGE_THRESHOLD = floatPreferencesKey("cluster_edge_threshold")
 private val KEY_CLUSTER_MATCH_THRESHOLD = floatPreferencesKey("cluster_match_threshold")
 private val KEY_INDIVIDUAL_MATCH_THRESHOLD = floatPreferencesKey("individual_match_threshold")
@@ -43,18 +42,6 @@ class SettingsRepository(private val context: Context) {
 
     // ---- Filename patterns -------------------------------------------------
 
-    val filenamePatterns: Flow<List<String>> = context.dataStore.data.map { prefs ->
-        prefs[KEY_FILENAME_PATTERNS]?.split("\n")?.filter { it.isNotBlank() }
-            ?: emptyList()
-    }
-
-    suspend fun getFilenamePatterns(): List<String> = filenamePatterns.first()
-
-    suspend fun setFilenamePatterns(patterns: List<String>) {
-        context.dataStore.edit { prefs ->
-            prefs[KEY_FILENAME_PATTERNS] = patterns.joinToString("\n")
-        }
-    }
 
     // ---- Clustering thresholds --------------------------------------------
 
