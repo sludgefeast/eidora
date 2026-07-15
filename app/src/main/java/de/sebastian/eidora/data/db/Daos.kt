@@ -189,6 +189,9 @@ interface FaceRegionDao {
     @Query("UPDATE face_regions SET name = NULL WHERE id = :id")
     suspend fun clearName(id: String)
 
+    @Query("UPDATE face_regions SET regionJson = :regionJson WHERE id = :id")
+    suspend fun updateRegionJson(id: String, regionJson: String)
+
     @Query("SELECT * FROM face_regions")
     suspend fun getAll(): List<FaceRegionEntity>
 

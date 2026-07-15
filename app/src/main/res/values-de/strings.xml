@@ -137,4 +137,6 @@
     <string name="clustering_option_reject_suggestions">Alle bestehenden Vorschläge vorher löschen</string>
     <string name="clustering_option_remove_unconfirmed">Unbestätigte Gesichter von Personen vorher entfernen</string>
     <string name="notif_waiting_for_sync">Warte auf Synchronisierung…</string>
+    <string name="action_rotate_left">Links drehen</string>
+    <string name="action_rotate_right">Rechts drehen</string>
 </resources>
