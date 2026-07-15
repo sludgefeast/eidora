@@ -12,7 +12,8 @@ data class PhotoEntity(
     val path: String,
     val modifiedAt: Long,
     val takenAt: Long?,
-    val analyzed: Boolean = false
+    val analyzed: Boolean = false,
+    @ColumnInfo(name = "pending_xmp_write") val pendingXmpWrite: Boolean = false
 )
 
 @Entity(
