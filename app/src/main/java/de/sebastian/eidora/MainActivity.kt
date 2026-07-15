@@ -283,7 +283,7 @@ fun EidoraApp() {
                     )
                 }
                 "persons" -> {
-                    // Persons screen: Settings + Clustering + destructive ops
+                    // Persons screen: Clustering + destructive ops + Settings (last)
                     TopAppBar(
                         title = { Text(stringResource(R.string.app_name)) },
                         actions = {
@@ -294,13 +294,6 @@ fun EidoraApp() {
                                 expanded = menuExpanded,
                                 onDismissRequest = { menuExpanded = false }
                             ) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.settings_title)) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        navController.navigate("settings")
-                                    }
-                                )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.action_start_clustering)) },
                                     onClick = {
@@ -332,6 +325,14 @@ fun EidoraApp() {
                                     onClick = {
                                         menuExpanded = false
                                         showReanalyseAllConfirm = true
+                                    }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.settings_title)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        navController.navigate("settings")
                                     }
                                 )
                             }
