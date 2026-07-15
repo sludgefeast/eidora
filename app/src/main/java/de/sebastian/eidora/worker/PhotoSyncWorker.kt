@@ -142,26 +142,40 @@ class PhotoSyncWorker(
 
         // -----------------------------------------------------------------------
         // Step 2: Deletion check – only run periodically (every ~24h) or on force.
-        // Compares full DB against full MediaStore to find deleted files.
+        // Uses only _ID + DATA columns (no full scan) for efficiency.
         // -----------------------------------------------------------------------
         val lastDeletionCheck = prefs.getLong("last_deletion_check_sec", 0L)
         val deletionCheckIntervalSec = 24 * 3600L
-        // Periodic WorkManager runs have no input data – always do deletion check
         val isPeriodic = inputData.keyValueMap.isEmpty()
         if (isForce || isPeriodic || nowSec - lastDeletionCheck > deletionCheckIntervalSec) {
+            if (isStopped) return Result.success()
             Log.i(TAG, "Running deletion check")
             try {
-                val allMediaPaths = collectJpegsFromMediaStore(
-                    patterns, folderWhitelist, sinceModifiedSec = 0L
-                ) { }.map { it.file.absolutePath }.toSet()
+                // Lightweight query: only path column, no modifiedAt needed
+                val allMediaPaths = mutableSetOf<String>()
+                val uri = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                val proj = arrayOf(android.provider.MediaStore.Images.Media.DATA)
+                val sel = "${android.provider.MediaStore.Images.Media.MIME_TYPE} = ?"
+                applicationContext.contentResolver.query(uri, proj, sel, arrayOf("image/jpeg"), null)
+                    ?.use { cursor ->
+                        val col = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DATA)
+                        while (cursor.moveToNext()) {
+                            if (isStopped) break
+                            cursor.getString(col)?.let { allMediaPaths.add(it) }
+                        }
+                    }
 
-                val dbPaths = photoDao.getAllPathsWithModified().map { it.path }.toSet()
-                (dbPaths - allMediaPaths).forEach { path ->
-                    try { deletePhoto(path) }
-                    catch (t: Throwable) { Log.e(TAG, "Failed to delete photo $path", t) }
+                if (!isStopped) {
+                    val dbPaths = photoDao.getAllPathsWithModified().map { it.path }.toSet()
+                    (dbPaths - allMediaPaths).forEach { path ->
+                        if (isStopped) return@forEach
+                        try { deletePhoto(path) }
+                        catch (t: Throwable) { Log.e(TAG, "Failed to delete photo $path", t) }
+                    }
+                    prefs.edit().putLong("last_deletion_check_sec", nowSec).apply()
                 }
-                prefs.edit().putLong("last_deletion_check_sec", nowSec).apply()
             } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
                 Log.e(TAG, "Deletion check failed", t)
             }
         }
