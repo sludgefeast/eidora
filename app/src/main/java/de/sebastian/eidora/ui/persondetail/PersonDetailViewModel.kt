@@ -217,13 +217,14 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun confirmMergeConflict(onMerged: (String) -> Unit = {}) {
         val conflict = _uiState.value.mergeConflict ?: return
+        // Dismiss dialog and navigate immediately – merge continues in background
+        _uiState.update { it.copy(mergeConflict = null) }
+        onMerged(conflict.targetPersonId)
         viewModelScope.launch {
             repo.mergePersons(
                 listOf(conflict.sourcePersonId, conflict.targetPersonId),
                 conflict.targetPersonId
             )
-            _uiState.update { it.copy(mergeConflict = null) }
-            onMerged(conflict.targetPersonId)
         }
     }
 
