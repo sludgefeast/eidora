@@ -131,4 +131,10 @@
     <string name="action_remove_unconfirmed">Remove unconfirmed faces</string>
     <string name="action_remove_unconfirmed_short">Remove</string>
     <string name="remove_unconfirmed_confirm">All faces that have not been explicitly confirmed will be removed from this person and moved back to Unknown. Confirmed faces remain.</string>
+    <string name="action_start_clustering">Start clustering</string>
+    <string name="action_start">Start</string>
+    <string name="clustering_dialog_hint">Optionally clean up before clustering:</string>
+    <string name="clustering_option_reject_suggestions">Delete all existing suggestions first</string>
+    <string name="clustering_option_remove_unconfirmed">Remove unconfirmed faces from persons first</string>
+    <string name="notif_waiting_for_sync">Waiting for sync to finish…</string>
 </resources>

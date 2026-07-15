@@ -37,8 +37,19 @@ object NotificationHelper {
         return makeForegroundInfo(NOTIFICATION_ID_EMBEDDING, notification)
     }
 
-    fun clusteringForegroundInfo(context: Context, progress: Int = -1, message: String? = null): ForegroundInfo {
-        val notification = buildNotification(context, context.getString(R.string.notif_clustering_title), message ?: context.getString(R.string.notif_running), progress)
+    fun clusteringForegroundInfo(
+        context: Context,
+        progress: Int = -1,
+        message: String? = null,
+        cancelIntent: android.app.PendingIntent? = null
+    ): ForegroundInfo {
+        val notification = buildNotification(
+            context,
+            context.getString(R.string.notif_clustering_title),
+            message ?: context.getString(R.string.notif_running),
+            progress,
+            cancelIntent = cancelIntent
+        )
         return makeForegroundInfo(NOTIFICATION_ID_CLUSTERING, notification)
     }
 
@@ -80,7 +91,8 @@ object NotificationHelper {
     }
 
     private fun buildNotification(
-        context: Context, title: String, text: String, progress: Int
+        context: Context, title: String, text: String, progress: Int,
+        cancelIntent: android.app.PendingIntent? = null
     ): Notification {
         val builder = NotificationCompat.Builder(context, CHANNEL_SYNC)
             .setSmallIcon(R.drawable.ic_notification)
@@ -90,6 +102,14 @@ object NotificationHelper {
             .setContentIntent(contentIntent(context))
             .setOngoing(true)
             .setSilent(true)
+
+        if (cancelIntent != null) {
+            builder.addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                context.getString(R.string.action_cancel),
+                cancelIntent
+            )
+        }
 
         if (progress >= 0) {
             builder.setProgress(100, progress, false)

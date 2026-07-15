@@ -1,51 +1,51 @@
 package de.sebastian.eidora.worker
 
 import android.content.Context
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import android.util.Log
 import androidx.work.workDataOf
 
 object SyncPipeline {
 
-    private const val UNIQUE_WORK_NAME = "eidora-sync-pipeline"
+    const val UNIQUE_SYNC_NAME = "eidora-sync-pipeline"
+    const val UNIQUE_CLUSTERING_NAME = "eidora-clustering"
+    const val PERIODIC_SYNC_NAME = "eidora-periodic-sync"
+
+    // -----------------------------------------------------------------------
+    // Sync (Photo → ModelDownload → Embedding)
+    // Clustering is no longer chained here – it runs independently on demand.
+    // -----------------------------------------------------------------------
 
     fun enqueue(context: Context) {
+        if (isClusteringRunning(context)) {
+            android.util.Log.i("SyncPipeline", "Clustering active, sync will wait")
+        }
         WorkManager.getInstance(context)
             .beginUniqueWork(
-                UNIQUE_WORK_NAME,
+                UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.KEEP,
                 PhotoSyncWorker.buildRequest()
             )
             .then(ModelDownloadWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())
-            .then(ClusteringWorker.buildRequest())
             .enqueue()
     }
 
     fun enqueueForce(context: Context) {
-        // Reset persisted generation so the worker ignores the fast-path check
         context.getSharedPreferences("sync_state", android.content.Context.MODE_PRIVATE)
-            .edit().remove("media_generation").apply()
+            .edit().remove("last_sync_timestamp_sec").apply()
         WorkManager.getInstance(context)
             .beginUniqueWork(
-                UNIQUE_WORK_NAME,
+                UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.REPLACE,
                 PhotoSyncWorker.buildForceRequest()
             )
             .then(ModelDownloadWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())
-            .then(ClusteringWorker.buildRequest())
-            .enqueue()
-    }
-
-    fun enqueueClustering(context: Context) {
-        WorkManager.getInstance(context)
-            .beginUniqueWork(
-                UNIQUE_WORK_NAME,
-                ExistingWorkPolicy.APPEND_OR_REPLACE,
-                ClusteringWorker.buildRequest()
-            )
             .enqueue()
     }
 
@@ -55,13 +55,54 @@ object SyncPipeline {
             .build()
         WorkManager.getInstance(context)
             .beginUniqueWork(
-                UNIQUE_WORK_NAME,
+                UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
                 syncRequest
             )
             .then(ModelDownloadWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())
-            .then(ClusteringWorker.buildRequest())
             .enqueue()
     }
+
+    // -----------------------------------------------------------------------
+    // Clustering – manual only, runs as a separate unique work chain
+    // -----------------------------------------------------------------------
+
+    /**
+     * Enqueues a manual clustering run.
+     * @param rejectSuggestions delete all existing unnamed suggestions first
+     * @param removeUnconfirmed remove unconfirmed faces from named persons first
+     */
+    fun enqueueClustering(
+        context: Context,
+        rejectSuggestions: Boolean = false,
+        removeUnconfirmed: Boolean = false
+    ) {
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(
+                UNIQUE_CLUSTERING_NAME,
+                ExistingWorkPolicy.KEEP,
+                ClusteringWorker.buildRequest(rejectSuggestions, removeUnconfirmed)
+            )
+    }
+
+    fun cancelClustering(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_CLUSTERING_NAME)
+    }
+
+    // -----------------------------------------------------------------------
+    // State queries for mutual exclusion
+    // -----------------------------------------------------------------------
+
+    fun isSyncRunning(context: Context): Boolean =
+        WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork(UNIQUE_SYNC_NAME).get()
+            ?.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
+            ?: false
+
+    fun isClusteringRunning(context: Context): Boolean =
+        WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork(UNIQUE_CLUSTERING_NAME).get()
+            ?.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
+            ?: false
 }

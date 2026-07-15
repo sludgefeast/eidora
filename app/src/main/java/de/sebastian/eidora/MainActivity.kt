@@ -41,8 +41,13 @@ import de.sebastian.eidora.ui.persons.PersonsViewModel
 import de.sebastian.eidora.ui.photos.PhotosScreen
 import de.sebastian.eidora.ui.photos.PhotosViewModel
 import de.sebastian.eidora.ui.theme.EidoraTheme
+import android.util.Log
 import de.sebastian.eidora.data.db.DatabaseProvider
 import de.sebastian.eidora.data.repository.FaceRepository
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Checkbox
 import de.sebastian.eidora.worker.SyncPipeline
 import kotlinx.coroutines.launch
 
@@ -198,54 +203,141 @@ fun EidoraApp() {
         )
     }
 
+    var showClusteringDialog by remember { mutableStateOf(false) }
+    var clusteringRejectSuggestions by remember { mutableStateOf(false) }
+    var clusteringRemoveUnconfirmed by remember { mutableStateOf(false) }
+
+    if (showClusteringDialog) {
+        AlertDialog(
+            onDismissRequest = { showClusteringDialog = false },
+            title = { Text(stringResource(R.string.action_start_clustering)) },
+            text = {
+                Column {
+                    Text(
+                        stringResource(R.string.clustering_dialog_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = clusteringRejectSuggestions,
+                            onCheckedChange = { clusteringRejectSuggestions = it }
+                        )
+                        Text(stringResource(R.string.clustering_option_reject_suggestions),
+                            modifier = Modifier.padding(start = 4.dp))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = clusteringRemoveUnconfirmed,
+                            onCheckedChange = { clusteringRemoveUnconfirmed = it }
+                        )
+                        Text(stringResource(R.string.clustering_option_remove_unconfirmed),
+                            modifier = Modifier.padding(start = 4.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showClusteringDialog = false
+                    SyncPipeline.enqueueClustering(
+                        context,
+                        rejectSuggestions = clusteringRejectSuggestions,
+                        removeUnconfirmed = clusteringRemoveUnconfirmed
+                    )
+                }) { Text(stringResource(R.string.action_start)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClusteringDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
-            if (currentRoute == "persons" || currentRoute == "photos") {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.app_name)) },
-                    actions = {
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = null)
+            when (currentRoute) {
+                "photos" -> {
+                    // Photos screen: only Settings
+                    var menuExpanded2 by remember { mutableStateOf(false) }
+                    TopAppBar(
+                        title = { Text(stringResource(R.string.app_name)) },
+                        actions = {
+                            IconButton(onClick = { menuExpanded2 = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = null)
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded2,
+                                onDismissRequest = { menuExpanded2 = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.settings_title)) },
+                                    onClick = {
+                                        menuExpanded2 = false
+                                        navController.navigate("settings")
+                                    }
+                                )
+                            }
                         }
-                        DropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.settings_title)) },
-                                onClick = {
-                                    menuExpanded = false
-                                    navController.navigate("settings")
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        stringResource(R.string.action_reject_all_suggestions),
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    showRejectAllConfirm = true
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        stringResource(R.string.action_reanalyse_all),
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    showReanalyseAllConfirm = true
-                                }
-                            )
+                    )
+                }
+                "persons" -> {
+                    // Persons screen: Settings + Clustering + destructive ops
+                    TopAppBar(
+                        title = { Text(stringResource(R.string.app_name)) },
+                        actions = {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = null)
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.settings_title)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        navController.navigate("settings")
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.action_start_clustering)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        clusteringRejectSuggestions = false
+                                        clusteringRemoveUnconfirmed = false
+                                        showClusteringDialog = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.action_reject_all_suggestions),
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        showRejectAllConfirm = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.action_reanalyse_all),
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        showReanalyseAllConfirm = true
+                                    }
+                                )
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         },
         bottomBar = {

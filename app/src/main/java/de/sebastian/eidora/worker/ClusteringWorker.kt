@@ -3,6 +3,7 @@ package de.sebastian.eidora.worker
 import android.content.Context
 import android.util.Log
 import androidx.work.*
+import androidx.work.WorkInfo
 import de.sebastian.eidora.data.db.DatabaseProvider
 import de.sebastian.eidora.data.db.EidoraDatabase
 import de.sebastian.eidora.data.db.PersonEntity
@@ -23,7 +24,47 @@ class ClusteringWorker(
         val personDao = db.personDao()
 
         try {
+            // ----- Mutual exclusion: wait for active sync to finish -----
+            val wm = WorkManager.getInstance(applicationContext)
+            val syncStates = setOf(WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED)
+            var waited = false
+            while (true) {
+                val syncRunning = wm.getWorkInfosForUniqueWork(SyncPipeline.UNIQUE_SYNC_NAME).get()
+                    ?.any { it.state in syncStates } == true
+                if (!syncRunning) break
+                if (!waited) {
+                    waited = true
+                    Log.i(TAG, "Sync is active – clustering waiting")
+                    try {
+                        setForeground(NotificationHelper.clusteringForegroundInfo(
+                            applicationContext, 0,
+                            applicationContext.getString(de.sebastian.eidora.R.string.notif_waiting_for_sync),
+                            cancelIntent = cancelPendingIntent(applicationContext)
+                        ))
+                    } catch (t: Throwable) { /* ignore */ }
+                }
+                if (isStopped) return Result.success()
+                kotlinx.coroutines.delay(5_000)
+            }
+
             reportProgress(0, applicationContext.getString(de.sebastian.eidora.R.string.notif_preparing))
+
+            // ----- Pre-cleaning (from input data) -----
+            val rejectSuggestions = inputData.getBoolean(KEY_REJECT_SUGGESTIONS, false)
+            val removeUnconfirmed = inputData.getBoolean(KEY_REMOVE_UNCONFIRMED, false)
+            if (rejectSuggestions || removeUnconfirmed) {
+                val repo = de.sebastian.eidora.data.repository.FaceRepository(applicationContext, db)
+                if (rejectSuggestions) {
+                    Log.i(TAG, "Pre-clustering: rejecting all suggestions")
+                    repo.rejectAllSuggestions()
+                }
+                if (removeUnconfirmed) {
+                    Log.i(TAG, "Pre-clustering: removing unconfirmed faces from persons")
+                    personDao.getAll().forEach { person ->
+                        repo.removeUnconfirmedFaces(person.id)
+                    }
+                }
+            }
 
             val config = try {
                 de.sebastian.eidora.data.settings.SettingsProvider.get(applicationContext)
@@ -50,7 +91,10 @@ class ClusteringWorker(
             }
             powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius) { reason ->
                 try {
-                    setForeground(NotificationHelper.clusteringForegroundInfo(applicationContext, 0, reason))
+                    setForeground(NotificationHelper.clusteringForegroundInfo(
+                        applicationContext, 0, reason,
+                        cancelIntent = cancelPendingIntent(applicationContext)
+                    ))
                 } catch (t: Throwable) { /* ignore */ }
             }
 
@@ -157,6 +201,31 @@ class ClusteringWorker(
             reportProgress(40, applicationContext.getString(de.sebastian.eidora.R.string.notif_grouping_done))
 
             // ----- Phase 3: Cluster assignment (40-80%) -----
+            // Pre-load existing suggestions (unnamed persons) with their centroids
+            // so new clusters can be merged into them instead of creating duplicates.
+            data class SuggestionData(val person: PersonEntity, val centroid: FloatArray, val medianTakenAt: Long?)
+            val existingSuggestions: List<SuggestionData> = try {
+                personDao.getSuggestions().mapNotNull { suggestion ->
+                    val faces = faceDao.findByPersonIdWithDate(suggestion.id)
+                        .filter { !it.faceRegion.ignored && it.faceRegion.embedding != null }
+                    if (faces.isEmpty()) null
+                    else {
+                        val centroid = EmbeddingModel.weightedCentroid(
+                            faces.map {
+                                EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!) to (it.faceRegion.qualityScore ?: 0.5f)
+                            }
+                        )
+                        val dates = faces.mapNotNull { it.photoTakenAt }.sorted()
+                        val median = if (dates.isEmpty()) null else dates[dates.size / 2]
+                        SuggestionData(suggestion, centroid, median)
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "Failed to load existing suggestions", t)
+                emptyList()
+            }
+            Log.i(TAG, "Loaded ${existingSuggestions.size} existing suggestions for merge check")
+
             val clusterGroups = clusterResults.groupBy { it.clusterId }
             val totalClusters = clusterGroups.size
             clusterGroups.entries.forEachIndexed { index, (_, members) ->
@@ -200,9 +269,30 @@ class ClusteringWorker(
                     }
 
                     val targetPerson: PersonEntity = bestPerson ?: run {
-                        val newPerson = PersonEntity(id = UUID.randomUUID().toString(), name = null)
-                        personDao.insertWithNullableName(newPerson)
-                        newPerson
+                        // No named person matched – check existing suggestions before
+                        // creating a new one. This avoids duplicate suggestion clusters.
+                        var bestSuggestion: PersonEntity? = null
+                        var bestSuggestionDist = config.clusterMatchThreshold
+                        existingSuggestions.forEach { sd ->
+                            try {
+                                val cosD = EmbeddingModel.cosineDistance(clusterCentroid, sd.centroid)
+                                val penalty = de.sebastian.eidora.ml.TemporalDistance.penalty(
+                                    clusterMedian, sd.medianTakenAt, timeWeight, config.clusterMatchThreshold
+                                )
+                                val d = cosD + penalty
+                                if (d < bestSuggestionDist) {
+                                    bestSuggestionDist = d
+                                    bestSuggestion = sd.person
+                                }
+                            } catch (t: Throwable) {
+                                Log.w(TAG, "Error comparing suggestion ${sd.person.id}", t)
+                            }
+                        }
+                        bestSuggestion ?: run {
+                            val newPerson = PersonEntity(id = UUID.randomUUID().toString(), name = null)
+                            personDao.insertWithNullableName(newPerson)
+                            newPerson
+                        }
                     }
 
                     members.forEach { result ->
@@ -246,7 +336,10 @@ class ClusteringWorker(
                 PhotoSyncWorker.KEY_PROGRESS to percent,
                 PhotoSyncWorker.KEY_STATUS to message
             ))
-            setForeground(NotificationHelper.clusteringForegroundInfo(applicationContext, percent, message))
+            setForeground(NotificationHelper.clusteringForegroundInfo(
+                applicationContext, percent, message,
+                cancelIntent = cancelPendingIntent(applicationContext)
+            ))
         } catch (t: Throwable) { /* ignore */ }
     }
 
@@ -286,9 +379,28 @@ class ClusteringWorker(
     }
 
     companion object {
-        fun buildRequest(): OneTimeWorkRequest =
+        const val KEY_REJECT_SUGGESTIONS = "reject_suggestions"
+        const val KEY_REMOVE_UNCONFIRMED = "remove_unconfirmed"
+
+        fun buildRequest(
+            rejectSuggestions: Boolean = false,
+            removeUnconfirmed: Boolean = false
+        ): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<ClusteringWorker>()
+                .setInputData(workDataOf(
+                    KEY_REJECT_SUGGESTIONS to rejectSuggestions,
+                    KEY_REMOVE_UNCONFIRMED to removeUnconfirmed
+                ))
                 .setBackoffCriteria(BackoffPolicy.LINEAR, 30_000L, java.util.concurrent.TimeUnit.MILLISECONDS)
                 .build()
+
+        /** PendingIntent that cancels the clustering work – used in notification. */
+        fun cancelPendingIntent(context: Context): android.app.PendingIntent {
+            val intent = android.content.Intent(context, CancelClusteringReceiver::class.java)
+            return android.app.PendingIntent.getBroadcast(
+                context, 0, intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+        }
     }
 }

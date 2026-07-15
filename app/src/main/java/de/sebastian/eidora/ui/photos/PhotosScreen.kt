@@ -21,6 +21,7 @@ import coil.compose.AsyncImage
 import de.sebastian.eidora.R
 import java.io.File
 import kotlinx.coroutines.launch
+import androidx.compose.animation.core.animateFloatAsState
 import de.sebastian.eidora.ui.common.LazyGridScrollbar
 
 @OptIn(ExperimentalFoundationApi::class)

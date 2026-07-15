@@ -131,4 +131,10 @@
     <string name="action_remove_unconfirmed">Unbestätigte Gesichter entfernen</string>
     <string name="action_remove_unconfirmed_short">Entfernen</string>
     <string name="remove_unconfirmed_confirm">Alle Gesichter die nicht explizit bestätigt wurden werden von dieser Person entfernt und nach Unbekannt verschoben. Bestätigte Gesichter bleiben erhalten.</string>
+    <string name="action_start_clustering">Clustering starten</string>
+    <string name="action_start">Starten</string>
+    <string name="clustering_dialog_hint">Optional vor dem Clustering aufräumen:</string>
+    <string name="clustering_option_reject_suggestions">Alle bestehenden Vorschläge vorher löschen</string>
+    <string name="clustering_option_remove_unconfirmed">Unbestätigte Gesichter von Personen vorher entfernen</string>
+    <string name="notif_waiting_for_sync">Warte auf Synchronisierung…</string>
 </resources>
