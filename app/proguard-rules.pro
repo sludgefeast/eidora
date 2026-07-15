@@ -24,16 +24,16 @@
 -keep @androidx.room.Dao interface *
 
 # Application classes (referenced from AndroidManifest.xml)
--keep class de.sebastian.eidora.EidoraApplication { *; }
--keep class de.sebastian.eidora.MainActivity { *; }
+-keep class org.eidora.EidoraApplication { *; }
+-keep class org.eidora.MainActivity { *; }
 
 # Kotlin serialization
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.AnnotationsKt
--keep,includedescriptorclasses class de.sebastian.eidora.**$$serializer { *; }
--keepclassmembers class de.sebastian.eidora.** {
+-keep,includedescriptorclasses class org.eidora.**$$serializer { *; }
+-keepclassmembers class org.eidora.** {
     *** Companion;
 }
--keepclasseswithmembers class de.sebastian.eidora.** {
+-keepclasseswithmembers class org.eidora.** {
     kotlinx.serialization.KSerializer serializer(...);
 }

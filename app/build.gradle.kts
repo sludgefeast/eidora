@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "de.sebastian.eidora"
+    namespace = "org.eidora"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "de.sebastian.eidora"
+        applicationId = "org.eidora"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
