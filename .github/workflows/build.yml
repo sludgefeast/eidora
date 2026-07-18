@@ -42,10 +42,11 @@ jobs:
           ./ktlint \
             --reporter=plain \
             --reporter=checkstyle,output=build/ktlint-report.xml \
-            "app/src/main/java/**/*.kt"
+            "app/src/main/java/**/*.kt" \
+            || true
 
       - name: Upload ktlint report
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ktlint-report

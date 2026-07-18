@@ -13,7 +13,7 @@ class FaceRepository(
     private val context: Context,
     private val db: EidoraDatabase,
 ) {
-    private val TAG = "FaceRepository"
+    private val tag = "FaceRepository"
 
     private val photoDao = db.photoDao()
     private val personDao = db.personDao()
@@ -267,7 +267,7 @@ class FaceRepository(
                     photoDao.updateModifiedAt(photo.id, file.lastModified())
                 }
             } catch (t: Throwable) {
-                Log.w(TAG, "XMP clear failed for ${photo.path}", t)
+                Log.w(tag, "XMP clear failed for ${photo.path}", t)
             }
             photoDao.updateAnalyzed(photo.id, false)
         }
