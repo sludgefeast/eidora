@@ -34,8 +34,6 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
-
-        }
         viewModelScope.launch {
             repo.clusteringConfig.collect { config ->
                 _uiState.update { it.copy(clusteringConfig = config) }
