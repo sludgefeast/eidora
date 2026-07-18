@@ -1,0 +1,42 @@
+name: Lint (ktlint)
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'eidora_icon.svg'
+      - 'eidora_notification_icon.svg'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  ktlint:
+    name: ktlint
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download ktlint
+        run: |
+          curl -sSLO https://github.com/pinterest/ktlint/releases/download/1.3.1/ktlint
+          chmod +x ktlint
+
+      - name: Run ktlint
+        # --relative makes paths relative to repo root
+        # Continue on error so we always see the full report
+        run: |
+          ./ktlint \
+            --reporter=plain \
+            --reporter=checkstyle,output=build/ktlint-report.xml \
+            "app/src/main/java/**/*.kt" \
+            || true
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ktlint-report
+          path: build/ktlint-report.xml
+          retention-days: 7
