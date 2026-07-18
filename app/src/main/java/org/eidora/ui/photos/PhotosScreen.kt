@@ -74,8 +74,10 @@ fun PhotosScreen(
                                 onTap = {
                                     if (state.isMultiSelectActive)
                                         viewModel.toggleSelection(item.entity.id)
-                                    else
-                                        onPhotoClick(item.entity.id)
+                                    else {
+                                        val faceId = state.confirmedFaceByPhoto[item.entity.id]
+                                        onPhotoClick(item.entity.id, faceId)
+                                    }
                                 },
                                 onLongPress = {
                                     if (state.isMultiSelectActive)

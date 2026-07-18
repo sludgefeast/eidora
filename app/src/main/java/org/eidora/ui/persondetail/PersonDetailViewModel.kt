@@ -50,7 +50,7 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow(PersonDetailUiState())
     val uiState: StateFlow<PersonDetailUiState> = _uiState.asStateFlow()
 
-    private var currentPersonId: String? = null
+    internal var currentPersonId: String? = null
 
     init {
         // Observe all named persons independently of load mode,
