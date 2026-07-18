@@ -103,19 +103,20 @@ class ClusteringWorker(
                         maxBatteryTempCelsius = 40.0f,
                     )
                 }
-            powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius, isStopped = {
-                isStopped
-            }) { reason ->
-                try {
-                    setForeground(
-                        NotificationHelper.clusteringForegroundInfo(
-                            applicationContext,
-                            0,
-                            reason,
-                            cancelIntent = cancelPendingIntent(applicationContext),
-                        ),
-                    )
-                } catch (t: Throwable) {
+            powerGate.awaitOk(
+                minBatteryPercent = powerConfig.minBatteryPercent,
+                maxBatteryTempCelsius = powerConfig.maxBatteryTempCelsius,
+                onWait = { reason ->
+                    try {
+                        setForeground(
+                            NotificationHelper.clusteringForegroundInfo(
+                                applicationContext,
+                                0,
+                                reason,
+                                cancelIntent = cancelPendingIntent(applicationContext),
+                            ),
+                        )
+                    } catch (t: Throwable) {
                     // ignore
                 }
             }

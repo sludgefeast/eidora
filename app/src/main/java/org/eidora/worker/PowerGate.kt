@@ -85,8 +85,8 @@ class PowerGate(
     suspend fun awaitOk(
         minBatteryPercent: Int,
         maxBatteryTempCelsius: Float,
-        onWait: suspend (String) -> Unit,
         isStopped: () -> Boolean = { false },
+        onWait: suspend (String) -> Unit,
     ) {
         while (true) {
             if (isStopped()) return
