@@ -112,10 +112,12 @@ class EmbeddingWorker(
                         powerGate.awaitOk(
                             powerConfig.minBatteryPercent,
                             powerConfig.maxBatteryTempCelsius,
+                            isStopped = { isStopped },
                         ) { reason ->
                             // Only update the shared status – the notifier handles display
                             currentStatus.set(reason)
                         }
+                        if (isStopped) return@flow
                         currentStatus.set("") // clear pause reason when gate opens
                         val bitmap =
                             try {

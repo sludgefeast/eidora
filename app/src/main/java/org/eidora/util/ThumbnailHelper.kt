@@ -25,9 +25,36 @@ object ThumbnailHelper {
     /**
      * Loads a bitmap with EXIF rotation applied so pixel coordinates
      * match the visually correct orientation.
+     * Uses inSampleSize to avoid decoding the full multi-megapixel image.
+     * Target: we need the face crop at 160×160 px, so we only need
+     * the image at ~2× the crop size for reasonable quality.
      */
-    private fun loadRotatedBitmap(file: File): Bitmap? {
-        val raw = BitmapFactory.decodeFile(file.absolutePath) ?: return null
+    private fun loadRotatedBitmap(
+        file: File,
+        targetWidth: Int = 1024,
+        targetHeight: Int = 1024,
+    ): Bitmap? {
+        // First pass: read dimensions only
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, opts)
+        if (opts.outWidth <= 0 || opts.outHeight <= 0) return null
+
+        // Compute sample size: largest power of 2 that keeps us above target
+        var sampleSize = 1
+        var w = opts.outWidth
+        var h = opts.outHeight
+        while (w / 2 >= targetWidth && h / 2 >= targetHeight) {
+            sampleSize *= 2
+            w /= 2
+            h /= 2
+        }
+
+        // Second pass: decode at reduced resolution
+        val decodeOpts = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = android.graphics.Bitmap.Config.RGB_565 // 2 bytes/px vs 4
+        }
+        val raw = BitmapFactory.decodeFile(file.absolutePath, decodeOpts) ?: return null
         val orientation =
             try {
                 ExifInterface(file.absolutePath).getAttributeInt(

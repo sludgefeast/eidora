@@ -103,7 +103,7 @@ class ClusteringWorker(
                         maxBatteryTempCelsius = 40.0f,
                     )
                 }
-            powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius) { reason ->
+            powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius, isStopped = { isStopped }) { reason ->
                 try {
                     setForeground(
                         NotificationHelper.clusteringForegroundInfo(
@@ -178,7 +178,7 @@ class ClusteringWorker(
                         return Result.failure()
                     }
                     if (index % 50 == 0 && index > 0) {
-                        powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius) { reason ->
+                        powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius, isStopped = { isStopped }) { reason ->
                             try {
                                 setForeground(
                                     NotificationHelper.clusteringForegroundInfo(

@@ -86,8 +86,10 @@ class PowerGate(
         minBatteryPercent: Int,
         maxBatteryTempCelsius: Float,
         onWait: suspend (String) -> Unit,
+        isStopped: () -> Boolean = { false },
     ) {
         while (true) {
+            if (isStopped()) return
             val status = currentStatus()
             val result = evaluate(status, minBatteryPercent, maxBatteryTempCelsius)
             if (result is PowerGateResult.Ok) return
