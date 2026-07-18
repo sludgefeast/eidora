@@ -387,6 +387,7 @@ fun EidoraApp() {
                             popUpTo("persons")
                         }
                     },
+                    onShowPhotos = { pid -> navController.navigate("person_photos/$pid") },
                     onFaceClick = { faceId, photoId ->
                         navController.navigate("fullscreen/$photoId?faceId=$faceId")
                     }
@@ -412,7 +413,7 @@ fun EidoraApp() {
                 val vm: PhotosViewModel = viewModel()
                 PhotosScreen(
                     viewModel = vm,
-                    onPhotoClick = { photoId ->
+                    onPhotoClick = { photoId, _ ->
                         navController.navigate("fullscreen/$photoId")
                     }
                 )
@@ -422,6 +423,24 @@ fun EidoraApp() {
                 org.eidora.ui.settings.SettingsScreen(
                     viewModel = vm,
                     onBack = { navController.popBackStack() }
+                )
+            }
+            composable(
+                "person_photos/{personId}",
+                listOf(navArgument("personId") { type = NavType.StringType })
+            ) { back ->
+                val personId = back.arguments?.getString("personId") ?: return@composable
+                val vm: PhotosViewModel = viewModel()
+                LaunchedEffect(personId) { vm.loadForPerson(personId) }
+                PhotosScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onPhotoClick = { photoId, faceId ->
+                        if (faceId != null)
+                            navController.navigate("fullscreen/$photoId?faceId=$faceId")
+                        else
+                            navController.navigate("fullscreen/$photoId")
+                    }
                 )
             }
         }

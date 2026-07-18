@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -49,6 +50,7 @@ fun PersonDetailScreen(
     viewModel: PersonDetailViewModel,
     onBack: () -> Unit,
     onNavigateToPerson: (personId: String) -> Unit,
+    onShowPhotos: (personId: String) -> Unit,
     onFaceClick: (faceRegionId: String, photoId: String) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -193,6 +195,14 @@ fun PersonDetailScreen(
                                 }
                             } else {
                                 var overflowExpanded by remember { mutableStateOf(false) }
+                                IconButton(onClick = {
+                                    viewModel.currentPersonId?.let { onShowPhotos(it) }
+                                }) {
+                                    Icon(
+                                        Icons.Default.PhotoLibrary,
+                                        contentDescription = stringResource(R.string.action_show_person_photos)
+                                    )
+                                }
                                 IconButton(onClick = { showDeletePersonConfirm = true }) {
                                     Icon(
                                         Icons.Default.Delete,

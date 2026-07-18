@@ -25,10 +25,15 @@ sealed class PhotosListItem {
 data class PhotosUiState(
     val items: List<PhotosListItem> = emptyList(),
     val multiSelect: MultiSelectState<String> = MultiSelectState(),
-    val currentYear: String = ""
+    val currentYear: String = "",
+    /** Non-null when showing photos for a specific person. */
+    val personName: String? = null,
+    /** Maps photoId → faceRegionId for the person's confirmed face (person mode only). */
+    val confirmedFaceByPhoto: Map<String, String> = emptyMap()
 ) {
     val selectedPhotoIds get() = multiSelect.selectedIds
     val isMultiSelectActive get() = multiSelect.isActive
+    val isPersonMode get() = personName != null
 }
 
 class PhotosViewModel(app: Application) : AndroidViewModel(app) {
@@ -47,6 +52,24 @@ class PhotosViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             db.photoDao().observeAllSortedByDate().collect { photos ->
                 _uiState.update { it.copy(items = buildListItems(photos)) }
+            }
+        }
+    }
+
+    /** Switch to person-filtered mode. Call after creation when showing a person's photos. */
+    fun loadForPerson(personId: String) {
+        viewModelScope.launch {
+            val person = db.personDao().findById(personId)
+            _uiState.update { it.copy(personName = person?.name ?: "") }
+            db.faceRegionDao().observeConfirmedPhotosForPerson(personId).collect { photos ->
+                val faceMap = db.faceRegionDao()
+                    .findByPersonId(personId)
+                    .filter { it.name != null && !it.ignored }
+                    .associate { it.photoId to it.id }
+                _uiState.update { it.copy(
+                    items = buildListItems(photos),
+                    confirmedFaceByPhoto = faceMap
+                ) }
             }
         }
     }

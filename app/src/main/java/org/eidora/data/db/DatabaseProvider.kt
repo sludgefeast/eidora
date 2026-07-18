@@ -14,7 +14,7 @@ object DatabaseProvider {
                 EidoraDatabase::class.java,
                 "faces.db"
             )
-                .fallbackToDestructiveMigration()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
                 .also { instance = it }
         }

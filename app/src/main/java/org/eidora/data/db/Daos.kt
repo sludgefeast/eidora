@@ -175,6 +175,16 @@ interface FaceRegionDao {
     suspend fun findUnclusteredWithDate(): List<FaceRegionWithPhoto>
 
     @Query("SELECT * FROM face_regions WHERE personId = :personId")
+    @Query("""
+        SELECT DISTINCT ph.* FROM photos ph
+        JOIN face_regions f ON f.photoId = ph.id
+        WHERE f.personId = :personId
+          AND f.name IS NOT NULL
+          AND f.ignored = 0
+        ORDER BY CASE WHEN ph.takenAt IS NULL THEN 1 ELSE 0 END, ph.takenAt DESC
+    """)
+    fun observeConfirmedPhotosForPerson(personId: String): Flow<List<PhotoEntity>>
+
     suspend fun findByPersonId(personId: String): List<FaceRegionEntity>
 
     @Query("SELECT * FROM face_regions WHERE embedding IS NULL AND ignored = 0")

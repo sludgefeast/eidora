@@ -139,4 +139,6 @@
     <string name="notif_waiting_for_sync">Warte auf Synchronisierung…</string>
     <string name="action_rotate_left">Links drehen</string>
     <string name="action_rotate_right">Rechts drehen</string>
+    <string name="action_show_person_photos">Alle Fotos anzeigen</string>
+    <string name="person_photos_empty">Noch keine bestätigten Fotos für diese Person.</string>
 </resources>

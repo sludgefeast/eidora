@@ -28,7 +28,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 @Composable
 fun PhotosScreen(
     viewModel: PhotosViewModel,
-    onPhotoClick: (photoId: String) -> Unit
+    onPhotoClick: (photoId: String, faceId: String?) -> Unit,
+    onBack: (() -> Unit)? = null
 ) {
     val state by viewModel.uiState.collectAsState()
     val gridState = rememberLazyGridState()
