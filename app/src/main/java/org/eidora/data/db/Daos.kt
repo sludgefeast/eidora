@@ -174,9 +174,9 @@ interface FaceRegionDao {
     @Query("SELECT f.*, ph.takenAt as photoTakenAt FROM face_regions f JOIN photos ph ON f.photoId = ph.id WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding IS NOT NULL")
     suspend fun findUnclusteredWithDate(): List<FaceRegionWithPhoto>
 
-    @Query("SELECT * FROM face_regions WHERE personId = :personId")
     @Query("""
-        SELECT DISTINCT ph.* FROM photos ph
+        SELECT DISTINCT ph.id, ph.path, ph.modifiedAt, ph.takenAt, ph.analyzed, ph.pending_xmp_write
+        FROM photos ph
         JOIN face_regions f ON f.photoId = ph.id
         WHERE f.personId = :personId
           AND f.name IS NOT NULL
@@ -185,6 +185,7 @@ interface FaceRegionDao {
     """)
     fun observeConfirmedPhotosForPerson(personId: String): Flow<List<PhotoEntity>>
 
+    @Query("SELECT * FROM face_regions WHERE personId = :personId")
     suspend fun findByPersonId(personId: String): List<FaceRegionEntity>
 
     @Query("SELECT * FROM face_regions WHERE embedding IS NULL AND ignored = 0")
