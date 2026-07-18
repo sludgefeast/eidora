@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -20,7 +19,10 @@ private val KEY_MIN_CLUSTER_SIZE = intPreferencesKey("min_cluster_size")
 private val KEY_TIME_WEIGHT = floatPreferencesKey("clustering_time_weight")
 private val KEY_MIN_BATTERY_PERCENT = intPreferencesKey("min_battery_percent")
 private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius")
-private val KEY_ALLOW_MOBILE_MODEL_DOWNLOAD = androidx.datastore.preferences.core.booleanPreferencesKey("allow_mobile_model_download")
+private val KEY_ALLOW_MOBILE_MODEL_DOWNLOAD =
+    androidx.datastore.preferences.core.booleanPreferencesKey(
+        "allow_mobile_model_download",
+    )
 private val KEY_FOLDER_WHITELIST = stringPreferencesKey("folder_whitelist")
 
 data class ClusteringConfig(
@@ -28,32 +30,33 @@ data class ClusteringConfig(
     val clusterMatchThreshold: Float,
     val individualMatchThreshold: Float,
     val minClusterSize: Int,
-    val timeWeight: Float
+    val timeWeight: Float,
 )
 
 data class PowerConfig(
     val minBatteryPercent: Int,
-    val maxBatteryTempCelsius: Float
+    val maxBatteryTempCelsius: Float,
 )
 
 enum class FolderCategory { CAMERA, COMMON, APPS, OTHER }
 
-class SettingsRepository(private val context: Context) {
-
+class SettingsRepository(
+    private val context: Context,
+) {
     // ---- Filename patterns -------------------------------------------------
-
 
     // ---- Clustering thresholds --------------------------------------------
 
-    val clusteringConfig: Flow<ClusteringConfig> = context.dataStore.data.map { prefs ->
-        ClusteringConfig(
-            edgeThreshold = prefs[KEY_CLUSTER_EDGE_THRESHOLD] ?: DEFAULT_EDGE_THRESHOLD,
-            clusterMatchThreshold = prefs[KEY_CLUSTER_MATCH_THRESHOLD] ?: DEFAULT_CLUSTER_MATCH_THRESHOLD,
-            individualMatchThreshold = prefs[KEY_INDIVIDUAL_MATCH_THRESHOLD] ?: DEFAULT_INDIVIDUAL_MATCH_THRESHOLD,
-            minClusterSize = prefs[KEY_MIN_CLUSTER_SIZE] ?: DEFAULT_MIN_CLUSTER_SIZE,
-            timeWeight = prefs[KEY_TIME_WEIGHT] ?: DEFAULT_TIME_WEIGHT
-        )
-    }
+    val clusteringConfig: Flow<ClusteringConfig> =
+        context.dataStore.data.map { prefs ->
+            ClusteringConfig(
+                edgeThreshold = prefs[KEY_CLUSTER_EDGE_THRESHOLD] ?: DEFAULT_EDGE_THRESHOLD,
+                clusterMatchThreshold = prefs[KEY_CLUSTER_MATCH_THRESHOLD] ?: DEFAULT_CLUSTER_MATCH_THRESHOLD,
+                individualMatchThreshold = prefs[KEY_INDIVIDUAL_MATCH_THRESHOLD] ?: DEFAULT_INDIVIDUAL_MATCH_THRESHOLD,
+                minClusterSize = prefs[KEY_MIN_CLUSTER_SIZE] ?: DEFAULT_MIN_CLUSTER_SIZE,
+                timeWeight = prefs[KEY_TIME_WEIGHT] ?: DEFAULT_TIME_WEIGHT,
+            )
+        }
 
     suspend fun getClusteringConfig(): ClusteringConfig = clusteringConfig.first()
 
@@ -69,12 +72,13 @@ class SettingsRepository(private val context: Context) {
 
     // ---- Power gate --------------------------------------------------------
 
-    val powerConfig: Flow<PowerConfig> = context.dataStore.data.map { prefs ->
-        PowerConfig(
-            minBatteryPercent = prefs[KEY_MIN_BATTERY_PERCENT] ?: DEFAULT_MIN_BATTERY_PERCENT,
-            maxBatteryTempCelsius = prefs[KEY_MAX_BATTERY_TEMP] ?: DEFAULT_MAX_BATTERY_TEMP
-        )
-    }
+    val powerConfig: Flow<PowerConfig> =
+        context.dataStore.data.map { prefs ->
+            PowerConfig(
+                minBatteryPercent = prefs[KEY_MIN_BATTERY_PERCENT] ?: DEFAULT_MIN_BATTERY_PERCENT,
+                maxBatteryTempCelsius = prefs[KEY_MAX_BATTERY_TEMP] ?: DEFAULT_MAX_BATTERY_TEMP,
+            )
+        }
 
     suspend fun getPowerConfig(): PowerConfig = powerConfig.first()
 
@@ -92,10 +96,11 @@ class SettingsRepository(private val context: Context) {
      * Stored as newline-separated list.
      * null / empty = only DEFAULT_FOLDER_WHITELIST (first-run default).
      */
-    val folderWhitelist: Flow<Set<String>> = context.dataStore.data.map { prefs ->
-        prefs[KEY_FOLDER_WHITELIST]?.split("\n")?.filter { it.isNotBlank() }?.toSet()
-            ?: DEFAULT_FOLDER_WHITELIST
-    }
+    val folderWhitelist: Flow<Set<String>> =
+        context.dataStore.data.map { prefs ->
+            prefs[KEY_FOLDER_WHITELIST]?.split("\n")?.filter { it.isNotBlank() }?.toSet()
+                ?: DEFAULT_FOLDER_WHITELIST
+        }
 
     suspend fun getFolderWhitelist(): Set<String> = folderWhitelist.first()
 
@@ -107,9 +112,10 @@ class SettingsRepository(private val context: Context) {
 
     // ---- Model download over mobile network ---------------------------------
 
-    val allowMobileModelDownload: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[KEY_ALLOW_MOBILE_MODEL_DOWNLOAD] ?: false
-    }
+    val allowMobileModelDownload: Flow<Boolean> =
+        context.dataStore.data.map { prefs ->
+            prefs[KEY_ALLOW_MOBILE_MODEL_DOWNLOAD] ?: false
+        }
 
     suspend fun getAllowMobileModelDownload(): Boolean = allowMobileModelDownload.first()
 
@@ -134,12 +140,14 @@ class SettingsRepository(private val context: Context) {
         val APPS_PATTERNS = listOf("Android/media/", "Android/data/")
         val COMMON_PATTERNS = listOf("Pictures/", "Download/", "Downloads/")
 
-        fun categorize(relativePath: String): FolderCategory = when {
-            APPS_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.APPS
-            CAMERA_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.CAMERA
-            COMMON_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.COMMON
-            else -> FolderCategory.OTHER
-        }
+        fun categorize(relativePath: String): FolderCategory =
+            when {
+                APPS_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.APPS
+                CAMERA_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.CAMERA
+                COMMON_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.COMMON
+                else -> FolderCategory.OTHER
+            }
+
         const val DEFAULT_MIN_BATTERY_PERCENT = 20
         const val DEFAULT_MAX_BATTERY_TEMP = 40.0f
 
@@ -148,7 +156,10 @@ class SettingsRepository(private val context: Context) {
             return Regex("^$escaped$", RegexOption.IGNORE_CASE)
         }
 
-        fun matchesAnyPattern(filename: String, patterns: List<String>): Boolean {
+        fun matchesAnyPattern(
+            filename: String,
+            patterns: List<String>,
+        ): Boolean {
             if (patterns.isEmpty()) return true
             return patterns.any { patternToRegex(it).matches(filename) }
         }

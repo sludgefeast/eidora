@@ -3,19 +3,19 @@ package org.eidora.ui.persons
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.db.PersonEntity
 import org.eidora.data.db.PersonWithCount
 import org.eidora.data.repository.FaceRepository
 import org.eidora.ui.common.MultiSelectState
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 
 data class PersonSuggestionUi(
     val personId: String,
     val representativeFaceId: String?,
     val firstFaceId: String?,
-    val faceCount: Int
+    val faceCount: Int,
 )
 
 data class PersonsUiState(
@@ -25,14 +25,15 @@ data class PersonsUiState(
     val ignoredCount: Int = 0,
     val multiSelect: MultiSelectState<String> = MultiSelectState(),
     val renamingPersonId: String? = null,
-    val showMergeSheet: Boolean = false
+    val showMergeSheet: Boolean = false,
 ) {
     val selectedPersonIds get() = multiSelect.selectedIds
     val isMultiSelectActive get() = multiSelect.isActive
 }
 
-class PersonsViewModel(app: Application) : AndroidViewModel(app) {
-
+class PersonsViewModel(
+    app: Application,
+) : AndroidViewModel(app) {
     private val db = DatabaseProvider.getInstance(app)
     private val repo = FaceRepository(app, db)
     private val faceDao = db.faceRegionDao()
@@ -47,21 +48,24 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
                 repo.observePersonsWithCount(),
                 personDao.observeSuggestions(),
                 faceDao.observeUnknownCount(),
-                faceDao.observeIgnoredCount()
-            ) { confirmed: List<PersonWithCount>,
-                suggestions: List<PersonEntity>,
-                unknownCount: Int,
-                ignoredCount: Int ->
+                faceDao.observeIgnoredCount(),
+            ) {
+                    confirmed: List<PersonWithCount>,
+                    suggestions: List<PersonEntity>,
+                    unknownCount: Int,
+                    ignoredCount: Int,
+                ->
 
-                val suggestionUis = suggestions.map { person ->
-                    val faces = faceDao.findByPersonId(person.id)
-                    PersonSuggestionUi(
-                        personId = person.id,
-                        representativeFaceId = person.representativeFaceId,
-                        firstFaceId = faces.firstOrNull()?.id,
-                        faceCount = faces.size
-                    )
-                }
+                val suggestionUis =
+                    suggestions.map { person ->
+                        val faces = faceDao.findByPersonId(person.id)
+                        PersonSuggestionUi(
+                            personId = person.id,
+                            representativeFaceId = person.representativeFaceId,
+                            firstFaceId = faces.firstOrNull()?.id,
+                            faceCount = faces.size,
+                        )
+                    }
 
                 PersonsUiState(
                     confirmedPersons = confirmed,
@@ -70,7 +74,7 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
                     ignoredCount = ignoredCount,
                     multiSelect = _uiState.value.multiSelect,
                     renamingPersonId = _uiState.value.renamingPersonId,
-                    showMergeSheet = _uiState.value.showMergeSheet
+                    showMergeSheet = _uiState.value.showMergeSheet,
                 )
             }.collect { newState -> _uiState.value = newState }
         }
@@ -95,7 +99,10 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
         _uiState.update { it.copy(renamingPersonId = null) }
     }
 
-    fun renamePerson(personId: String, newName: String) {
+    fun renamePerson(
+        personId: String,
+        newName: String,
+    ) {
         viewModelScope.launch {
             repo.renamePerson(personId, newName)
             _uiState.update { it.copy(renamingPersonId = null) }
@@ -117,13 +124,16 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
             _uiState.update {
                 it.copy(
                     multiSelect = it.multiSelect.clear(),
-                    showMergeSheet = false
+                    showMergeSheet = false,
                 )
             }
         }
     }
 
-    fun confirmSuggestion(personId: String, name: String) {
+    fun confirmSuggestion(
+        personId: String,
+        name: String,
+    ) {
         viewModelScope.launch {
             val existing = personDao.findByName(name)
             if (existing != null && existing.id != personId) {
@@ -143,7 +153,8 @@ class PersonsViewModel(app: Application) : AndroidViewModel(app) {
     fun rejectAllSuggestions() {
         viewModelScope.launch {
             repo.rejectAllSuggestions()
-            org.eidora.worker.SyncPipeline.enqueueClustering(getApplication())
+            org.eidora.worker.SyncPipeline
+                .enqueueClustering(getApplication())
         }
     }
 }

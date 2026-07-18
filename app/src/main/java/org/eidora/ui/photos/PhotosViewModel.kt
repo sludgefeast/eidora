@@ -1,25 +1,31 @@
 package org.eidora.ui.photos
 
-import android.content.Context
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import org.eidora.R
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.db.PhotoEntity
 import org.eidora.data.repository.FaceRepository
 import org.eidora.ui.common.MultiSelectState
 import org.eidora.worker.SyncPipeline
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 sealed class PhotosListItem {
-    data class MonthHeader(val label: String, val key: String) : PhotosListItem()
-    data class Photo(val entity: PhotoEntity) : PhotosListItem()
+    data class MonthHeader(
+        val label: String,
+        val key: String,
+    ) : PhotosListItem()
+
+    data class Photo(
+        val entity: PhotoEntity,
+    ) : PhotosListItem()
 }
 
 data class PhotosUiState(
@@ -29,15 +35,16 @@ data class PhotosUiState(
     /** Non-null when showing photos for a specific person. */
     val personName: String? = null,
     /** Maps photoId → faceRegionId for the person's confirmed face (person mode only). */
-    val confirmedFaceByPhoto: Map<String, String> = emptyMap()
+    val confirmedFaceByPhoto: Map<String, String> = emptyMap(),
 ) {
     val selectedPhotoIds get() = multiSelect.selectedIds
     val isMultiSelectActive get() = multiSelect.isActive
     val isPersonMode get() = personName != null
 }
 
-class PhotosViewModel(app: Application) : AndroidViewModel(app) {
-
+class PhotosViewModel(
+    app: Application,
+) : AndroidViewModel(app) {
     private val db = DatabaseProvider.getInstance(app)
     private val repo = FaceRepository(app, db)
     private val context: Context get() = getApplication()
@@ -62,14 +69,18 @@ class PhotosViewModel(app: Application) : AndroidViewModel(app) {
             val person = db.personDao().findById(personId)
             _uiState.update { it.copy(personName = person?.name ?: "") }
             db.faceRegionDao().observeConfirmedPhotosForPerson(personId).collect { photos ->
-                val faceMap = db.faceRegionDao()
-                    .findByPersonId(personId)
-                    .filter { it.name != null && !it.ignored }
-                    .associate { it.photoId to it.id }
-                _uiState.update { it.copy(
-                    items = buildListItems(photos),
-                    confirmedFaceByPhoto = faceMap
-                ) }
+                val faceMap =
+                    db
+                        .faceRegionDao()
+                        .findByPersonId(personId)
+                        .filter { it.name != null && !it.ignored }
+                        .associate { it.photoId to it.id }
+                _uiState.update {
+                    it.copy(
+                        items = buildListItems(photos),
+                        confirmedFaceByPhoto = faceMap,
+                    )
+                }
             }
         }
     }
@@ -79,16 +90,18 @@ class PhotosViewModel(app: Application) : AndroidViewModel(app) {
         var lastMonthKey: String? = null
 
         photos.forEach { photo ->
-            val monthKey = photo.takenAt?.let {
-                val date = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
-                "${date.year}-${date.monthValue}"
-            } ?: "no-date"
+            val monthKey =
+                photo.takenAt?.let {
+                    val date = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
+                    "${date.year}-${date.monthValue}"
+                } ?: "no-date"
 
             if (monthKey != lastMonthKey) {
-                val label = photo.takenAt?.let {
-                    val date = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
-                    monthFormatter.format(date)
-                } ?: context.getString(R.string.label_no_date)
+                val label =
+                    photo.takenAt?.let {
+                        val date = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
+                        monthFormatter.format(date)
+                    } ?: context.getString(R.string.label_no_date)
                 result.add(PhotosListItem.MonthHeader(label = label, key = monthKey))
                 lastMonthKey = monthKey
             }
@@ -100,12 +113,15 @@ class PhotosViewModel(app: Application) : AndroidViewModel(app) {
     fun updateCurrentYear(firstVisiblePhotoId: String?) {
         val photo = firstVisiblePhotoId ?: return
         val items = _uiState.value.items
-        val photoItem = items.filterIsInstance<PhotosListItem.Photo>()
-            .find { it.entity.id == photo } ?: return
-        val year = photoItem.entity.takenAt?.let {
-            val date = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
-            yearFormatter.format(date)
-        } ?: ""
+        val photoItem =
+            items
+                .filterIsInstance<PhotosListItem.Photo>()
+                .find { it.entity.id == photo } ?: return
+        val year =
+            photoItem.entity.takenAt?.let {
+                val date = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
+                yearFormatter.format(date)
+            } ?: ""
         _uiState.update { it.copy(currentYear = year) }
     }
 
@@ -115,9 +131,10 @@ class PhotosViewModel(app: Application) : AndroidViewModel(app) {
 
     fun rangeSelect(photoId: String) {
         _uiState.update { state ->
-            val orderedIds = state.items
-                .filterIsInstance<PhotosListItem.Photo>()
-                .map { it.entity.id }
+            val orderedIds =
+                state.items
+                    .filterIsInstance<PhotosListItem.Photo>()
+                    .map { it.entity.id }
             state.copy(multiSelect = state.multiSelect.rangeSelect(photoId, orderedIds))
         }
     }

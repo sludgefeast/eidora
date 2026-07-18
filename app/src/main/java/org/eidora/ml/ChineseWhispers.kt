@@ -1,7 +1,6 @@
 package org.eidora.ml
 
 import kotlin.random.Random
-import org.eidora.ml.TemporalDistance
 
 /**
  * Chinese Whispers graph clustering for face embeddings.
@@ -13,7 +12,6 @@ import org.eidora.ml.TemporalDistance
  *   only candidate pairs from LSH buckets are compared.
  */
 object ChineseWhispers {
-
     private const val MAX_ITERATIONS = 100
 
     // Enable LSH-based candidate generation above this node count.
@@ -21,21 +19,21 @@ object ChineseWhispers {
 
     // LSH parameters. K bits per signature → 2^K possible buckets per table.
     // L independent hash tables increase recall.
-    private const val LSH_K = 10       // ~1024 buckets per table
-    private const val LSH_L = 8        // 8 tables → good recall
-    private const val LSH_SEED = 42L   // deterministic between runs
+    private const val LSH_K = 10 // ~1024 buckets per table
+    private const val LSH_L = 8 // 8 tables → good recall
+    private const val LSH_SEED = 42L // deterministic between runs
     private const val EMBEDDING_DIM = 512
 
     data class ClusterResult(
         val faceRegionId: String,
-        val clusterId: Int
+        val clusterId: Int,
     )
 
     fun cluster(
         nodes: List<Pair<String, FloatArray>>,
         edgeThreshold: Float = 0.30f,
         takenAt: Map<String, Long?> = emptyMap(),
-        timeWeight: Float = 0f
+        timeWeight: Float = 0f,
     ): List<ClusterResult> {
         if (nodes.isEmpty()) return emptyList()
         if (nodes.size == 1) return listOf(ClusterResult(nodes[0].first, 0))
@@ -51,9 +49,27 @@ object ChineseWhispers {
 
         // Choose candidate-pair strategy based on size.
         if (n < LSH_THRESHOLD) {
-            buildEdgesExhaustive(embeddings, nodeIds, edgeThreshold, takenAt, timeWeight, neighborsIdx, neighborsWeight, neighborCount)
+            buildEdgesExhaustive(
+                embeddings,
+                nodeIds,
+                edgeThreshold,
+                takenAt,
+                timeWeight,
+                neighborsIdx,
+                neighborsWeight,
+                neighborCount,
+            )
         } else {
-            buildEdgesLsh(embeddings, nodeIds, edgeThreshold, takenAt, timeWeight, neighborsIdx, neighborsWeight, neighborCount)
+            buildEdgesLsh(
+                embeddings,
+                nodeIds,
+                edgeThreshold,
+                takenAt,
+                timeWeight,
+                neighborsIdx,
+                neighborsWeight,
+                neighborCount,
+            )
         }
 
         // Iterative label propagation
@@ -105,16 +121,20 @@ object ChineseWhispers {
         timeWeight: Float,
         neighborsIdx: Array<IntArray?>,
         neighborsWeight: Array<FloatArray?>,
-        neighborCount: IntArray
+        neighborCount: IntArray,
     ) {
         val n = embeddings.size
         for (i in 0 until n) {
             val embI = embeddings[i]
             for (j in i + 1 until n) {
                 val cosD = EmbeddingModel.cosineDistance(embI, embeddings[j])
-                val penalty = TemporalDistance.penalty(
-                    takenAt[nodeIds[i]], takenAt[nodeIds[j]], timeWeight, edgeThreshold
-                )
+                val penalty =
+                    TemporalDistance.penalty(
+                        takenAt[nodeIds[i]],
+                        takenAt[nodeIds[j]],
+                        timeWeight,
+                        edgeThreshold,
+                    )
                 val dist = cosD + penalty
                 if (dist < edgeThreshold) {
                     val weight = 1f - dist
@@ -143,17 +163,18 @@ object ChineseWhispers {
         timeWeight: Float,
         neighborsIdx: Array<IntArray?>,
         neighborsWeight: Array<FloatArray?>,
-        neighborCount: IntArray
+        neighborCount: IntArray,
     ) {
         val n = embeddings.size
         val random = Random(LSH_SEED)
 
         // Generate L * K random hyperplanes (unit vectors).
-        val hyperplanes = Array(LSH_L) {
-            Array(LSH_K) {
-                FloatArray(EMBEDDING_DIM) { random.nextFloat() * 2f - 1f }
+        val hyperplanes =
+            Array(LSH_L) {
+                Array(LSH_K) {
+                    FloatArray(EMBEDDING_DIM) { random.nextFloat() * 2f - 1f }
+                }
             }
-        }
 
         // For each table, bucket = signature → list of node indices.
         // Signatures fit in an Int since K = 10.
@@ -191,9 +212,13 @@ object ChineseWhispers {
                         if (seen[u] == v) continue
                         seen[u] = v
                         val cosD = EmbeddingModel.cosineDistance(embeddings[u], embeddings[v])
-                        val penalty = TemporalDistance.penalty(
-                            takenAt[nodeIds[u]], takenAt[nodeIds[v]], timeWeight, edgeThreshold
-                        )
+                        val penalty =
+                            TemporalDistance.penalty(
+                                takenAt[nodeIds[u]],
+                                takenAt[nodeIds[v]],
+                                timeWeight,
+                                edgeThreshold,
+                            )
                         val dist = cosD + penalty
                         if (dist < edgeThreshold) {
                             val weight = 1f - dist
@@ -206,7 +231,10 @@ object ChineseWhispers {
         }
     }
 
-    private fun dot(a: FloatArray, b: FloatArray): Float {
+    private fun dot(
+        a: FloatArray,
+        b: FloatArray,
+    ): Float {
         var sum = 0f
         for (i in a.indices) sum += a[i] * b[i]
         return sum
@@ -222,7 +250,7 @@ object ChineseWhispers {
         counts: IntArray,
         from: Int,
         to: Int,
-        weight: Float
+        weight: Float,
     ) {
         var curIdx = idx[from]
         var curWeights = weights[from]

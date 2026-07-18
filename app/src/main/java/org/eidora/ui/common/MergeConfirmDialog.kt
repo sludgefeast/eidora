@@ -19,7 +19,7 @@ fun MergeConfirmDialog(
     existingPersonName: String,
     existingRepresentativeThumbnail: File?,
     onConfirmMerge: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onCancel,
@@ -27,21 +27,21 @@ fun MergeConfirmDialog(
         text = {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
                     stringResource(R.string.merge_conflict_message, existingPersonName),
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 16.dp),
                 )
                 CircleThumbnail(
                     file = existingRepresentativeThumbnail,
                     contentDescription = existingPersonName,
-                    modifier = Modifier.size(96.dp)
+                    modifier = Modifier.size(96.dp),
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = existingPersonName,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
                 )
             }
         },
@@ -54,6 +54,6 @@ fun MergeConfirmDialog(
             TextButton(onClick = onCancel) {
                 Text(stringResource(R.string.action_cancel))
             }
-        }
+        },
     )
 }

@@ -4,14 +4,16 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
-import org.eidora.data.settings.SettingsProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.eidora.data.settings.SettingsProvider
 
 class AllowMobileDownloadReceiver : BroadcastReceiver() {
-
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         if (intent.action != ACTION_ALLOW) return
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
@@ -19,7 +21,9 @@ class AllowMobileDownloadReceiver : BroadcastReceiver() {
                 SettingsProvider.get(context).setAllowMobileModelDownload(true)
                 try {
                     NotificationManagerCompat.from(context).cancel(1005)
-                } catch (t: Throwable) { /* ignore */ }
+                } catch (t: Throwable) {
+                    // ignore
+                }
                 SyncPipeline.enqueueForce(context)
             } finally {
                 pending.finish()

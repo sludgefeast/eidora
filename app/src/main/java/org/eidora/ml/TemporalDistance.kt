@@ -22,7 +22,6 @@ import kotlin.math.exp
  * must be roughly twice as similar in embedding space to be linked".
  */
 object TemporalDistance {
-
     /** Half-life in years: after this interval the penalty equals the reference. */
     private const val HALF_LIFE_YEARS = 3.0f
 
@@ -39,7 +38,7 @@ object TemporalDistance {
         takenAtA: Long?,
         takenAtB: Long?,
         weight: Float,
-        reference: Float
+        reference: Float,
     ): Float {
         if (weight <= 0f || takenAtA == null || takenAtB == null) return 0f
         if (takenAtA <= 0L || takenAtB <= 0L) return 0f

@@ -2,16 +2,16 @@ package org.eidora.data.repository
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.flow.Flow
 import org.eidora.data.db.*
 import org.eidora.ml.EmbeddingModel
 import org.eidora.util.*
 import java.io.File
 import java.util.UUID
-import kotlinx.coroutines.flow.Flow
 
 class FaceRepository(
     private val context: Context,
-    private val db: EidoraDatabase
+    private val db: EidoraDatabase,
 ) {
     private val TAG = "FaceRepository"
 
@@ -23,7 +23,10 @@ class FaceRepository(
     // Confirm face → person
     // -----------------------------------------------------------------------
 
-    suspend fun confirmFace(faceRegionId: String, personId: String) {
+    suspend fun confirmFace(
+        faceRegionId: String,
+        personId: String,
+    ) {
         val face = faceDao.findById(faceRegionId) ?: return
         val person = personDao.findById(personId) ?: return
         val personName = person.name ?: return // can't confirm to unnamed suggestion person
@@ -42,7 +45,7 @@ class FaceRepository(
      */
     suspend fun rejectSuggestion(personId: String) {
         val person = personDao.findById(personId) ?: return
-        if (person.name != null) return  // Safety: only reject unnamed suggestions
+        if (person.name != null) return // Safety: only reject unnamed suggestions
         val faces = faceDao.findByPersonId(personId)
         faces.forEach { face -> faceDao.updatePersonId(face.id, null) }
         personDao.deleteById(personId)
@@ -78,8 +81,10 @@ class FaceRepository(
      * They move back to Unknown and will be re-clustered on the next run.
      */
     suspend fun removeUnconfirmedFaces(personId: String) {
-        val unconfirmed = faceDao.findByPersonId(personId)
-            .filter { it.name == null }
+        val unconfirmed =
+            faceDao
+                .findByPersonId(personId)
+                .filter { it.name == null }
         unconfirmed.forEach { face ->
             faceDao.updatePersonId(face.id, null)
         }
@@ -156,7 +161,10 @@ class FaceRepository(
     // Assign face to person (or new person)
     // -----------------------------------------------------------------------
 
-    suspend fun assignFaceToPerson(faceRegionId: String, personId: String) {
+    suspend fun assignFaceToPerson(
+        faceRegionId: String,
+        personId: String,
+    ) {
         val face = faceDao.findById(faceRegionId) ?: return
         val previousPersonId = face.personId
         val person = personDao.findById(personId) ?: return
@@ -170,11 +178,15 @@ class FaceRepository(
         recomputeCentroid(personId)
     }
 
-    suspend fun assignFaceToNewPerson(faceRegionId: String, name: String): PersonEntity {
+    suspend fun assignFaceToNewPerson(
+        faceRegionId: String,
+        name: String,
+    ): PersonEntity {
         val existing = personDao.findByName(name)
-        val person = existing ?: PersonEntity(UUID.randomUUID().toString(), name).also {
-            personDao.insert(it)
-        }
+        val person =
+            existing ?: PersonEntity(UUID.randomUUID().toString(), name).also {
+                personDao.insert(it)
+            }
         assignFaceToPerson(faceRegionId, person.id)
         return person
     }
@@ -183,7 +195,10 @@ class FaceRepository(
     // Rename person
     // -----------------------------------------------------------------------
 
-    suspend fun renamePerson(personId: String, newName: String) {
+    suspend fun renamePerson(
+        personId: String,
+        newName: String,
+    ) {
         personDao.updateName(personId, newName)
         faceDao.updateConfirmedNamesForPerson(personId, newName)
         val faces = faceDao.findByPersonId(personId).filter { it.name != null }
@@ -195,7 +210,10 @@ class FaceRepository(
     // Merge persons
     // -----------------------------------------------------------------------
 
-    suspend fun mergePersons(sourceIds: List<String>, winnerId: String) {
+    suspend fun mergePersons(
+        sourceIds: List<String>,
+        winnerId: String,
+    ) {
         val winner = personDao.findById(winnerId) ?: return
         val winnerName = winner.name ?: return
         sourceIds.filter { it != winnerId }.forEach { sourceId ->
@@ -259,17 +277,13 @@ class FaceRepository(
     // Observe
     // -----------------------------------------------------------------------
 
-    fun observePersonsWithCount(): Flow<List<PersonWithCount>> =
-        personDao.observeAllWithConfirmedCount()
+    fun observePersonsWithCount(): Flow<List<PersonWithCount>> = personDao.observeAllWithConfirmedCount()
 
-    fun observeFacesByPerson(personId: String): Flow<List<FaceRegionWithPhoto>> =
-        faceDao.observeByPersonId(personId)
+    fun observeFacesByPerson(personId: String): Flow<List<FaceRegionWithPhoto>> = faceDao.observeByPersonId(personId)
 
-    fun observeUnknownFaces(): Flow<List<FaceRegionWithPhoto>> =
-        faceDao.observeUnknown()
+    fun observeUnknownFaces(): Flow<List<FaceRegionWithPhoto>> = faceDao.observeUnknown()
 
-    fun observeIgnoredFaces(): Flow<List<FaceRegionWithPhoto>> =
-        faceDao.observeIgnored()
+    fun observeIgnoredFaces(): Flow<List<FaceRegionWithPhoto>> = faceDao.observeIgnored()
 
     // -----------------------------------------------------------------------
     // Private helpers
@@ -282,12 +296,15 @@ class FaceRepository(
      */
     private suspend fun markPendingXmpWrite(photoId: String) {
         photoDao.markPendingXmpWrite(photoId)
-        org.eidora.worker.XmpWriteWorker.enqueue(context)
+        org.eidora.worker.XmpWriteWorker
+            .enqueue(context)
     }
 
     suspend fun recomputeCentroid(personId: String) {
-        val allFaces = faceDao.findByPersonId(personId)
-            .filter { !it.ignored && it.embedding != null }
+        val allFaces =
+            faceDao
+                .findByPersonId(personId)
+                .filter { !it.ignored && it.embedding != null }
         if (allFaces.isEmpty()) {
             personDao.updateRepresentativeFace(personId, null)
             return
@@ -296,12 +313,13 @@ class FaceRepository(
         val basisFaces = confirmedFaces.ifEmpty { allFaces }
         val embeddings = basisFaces.map { EmbeddingModel.bytesToFloatArray(it.embedding!!) }
         val centroid = EmbeddingModel.centroid(embeddings)
-        val representative = basisFaces.minByOrNull { face ->
-            EmbeddingModel.cosineDistance(
-                EmbeddingModel.bytesToFloatArray(face.embedding!!),
-                centroid
-            )
-        }
+        val representative =
+            basisFaces.minByOrNull { face ->
+                EmbeddingModel.cosineDistance(
+                    EmbeddingModel.bytesToFloatArray(face.embedding!!),
+                    centroid,
+                )
+            }
         personDao.updateRepresentativeFace(personId, representative?.id)
     }
 

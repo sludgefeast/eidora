@@ -6,7 +6,6 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 object FileUtil {
-
     private val JPEG_MAGIC = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())
 
     fun isJpeg(file: File): Boolean {
@@ -33,5 +32,4 @@ object FileUtil {
             null
         }
     }
-
 }

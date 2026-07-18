@@ -15,9 +15,8 @@ private const val TAG = "ClusteringWorker"
 
 class ClusteringWorker(
     context: Context,
-    params: WorkerParameters
+    params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
-
     override suspend fun doWork(): Result {
         val db = DatabaseProvider.getInstance(applicationContext)
         val faceDao = db.faceRegionDao()
@@ -29,19 +28,27 @@ class ClusteringWorker(
             val syncStates = setOf(WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED)
             var waited = false
             while (true) {
-                val syncRunning = wm.getWorkInfosForUniqueWork(SyncPipeline.UNIQUE_SYNC_NAME).get()
-                    ?.any { it.state in syncStates } == true
+                val syncRunning =
+                    wm
+                        .getWorkInfosForUniqueWork(SyncPipeline.UNIQUE_SYNC_NAME)
+                        .get()
+                        ?.any { it.state in syncStates } == true
                 if (!syncRunning) break
                 if (!waited) {
                     waited = true
                     Log.i(TAG, "Sync is active – clustering waiting")
                     try {
-                        setForeground(NotificationHelper.clusteringForegroundInfo(
-                            applicationContext, 0,
-                            applicationContext.getString(org.eidora.R.string.notif_waiting_for_sync),
-                            cancelIntent = cancelPendingIntent(applicationContext)
-                        ))
-                    } catch (t: Throwable) { /* ignore */ }
+                        setForeground(
+                            NotificationHelper.clusteringForegroundInfo(
+                                applicationContext,
+                                0,
+                                applicationContext.getString(org.eidora.R.string.notif_waiting_for_sync),
+                                cancelIntent = cancelPendingIntent(applicationContext),
+                            ),
+                        )
+                    } catch (t: Throwable) {
+                        // ignore
+                    }
                 }
                 if (isStopped) return Result.success()
                 kotlinx.coroutines.delay(5_000)
@@ -53,7 +60,9 @@ class ClusteringWorker(
             val rejectSuggestions = inputData.getBoolean(KEY_REJECT_SUGGESTIONS, false)
             val removeUnconfirmed = inputData.getBoolean(KEY_REMOVE_UNCONFIRMED, false)
             if (rejectSuggestions || removeUnconfirmed) {
-                val repo = org.eidora.data.repository.FaceRepository(applicationContext, db)
+                val repo =
+                    org.eidora.data.repository
+                        .FaceRepository(applicationContext, db)
                 if (rejectSuggestions) {
                     Log.i(TAG, "Pre-clustering: rejecting all suggestions")
                     repo.rejectAllSuggestions()
@@ -66,36 +75,47 @@ class ClusteringWorker(
                 }
             }
 
-            val config = try {
-                org.eidora.data.settings.SettingsProvider.get(applicationContext)
-                    .getClusteringConfig()
-            } catch (t: Throwable) {
-                Log.w(TAG, "Failed to load clustering config, using defaults", t)
-                org.eidora.data.settings.ClusteringConfig(
-                    edgeThreshold = 0.30f,
-                    clusterMatchThreshold = 0.30f,
-                    individualMatchThreshold = 0.25f,
-                    minClusterSize = 2,
-                    timeWeight = 1.0f
-                )
-            }
+            val config =
+                try {
+                    org.eidora.data.settings.SettingsProvider
+                        .get(applicationContext)
+                        .getClusteringConfig()
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Failed to load clustering config, using defaults", t)
+                    org.eidora.data.settings.ClusteringConfig(
+                        edgeThreshold = 0.30f,
+                        clusterMatchThreshold = 0.30f,
+                        individualMatchThreshold = 0.25f,
+                        minClusterSize = 2,
+                        timeWeight = 1.0f,
+                    )
+                }
 
             val powerGate = PowerGate(applicationContext)
-            val powerConfig = try {
-                org.eidora.data.settings.SettingsProvider.get(applicationContext).getPowerConfig()
-            } catch (t: Throwable) {
-                org.eidora.data.settings.PowerConfig(
-                    minBatteryPercent = 20,
-                    maxBatteryTempCelsius = 40.0f
-                )
-            }
+            val powerConfig =
+                try {
+                    org.eidora.data.settings.SettingsProvider
+                        .get(applicationContext)
+                        .getPowerConfig()
+                } catch (t: Throwable) {
+                    org.eidora.data.settings.PowerConfig(
+                        minBatteryPercent = 20,
+                        maxBatteryTempCelsius = 40.0f,
+                    )
+                }
             powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius) { reason ->
                 try {
-                    setForeground(NotificationHelper.clusteringForegroundInfo(
-                        applicationContext, 0, reason,
-                        cancelIntent = cancelPendingIntent(applicationContext)
-                    ))
-                } catch (t: Throwable) { /* ignore */ }
+                    setForeground(
+                        NotificationHelper.clusteringForegroundInfo(
+                            applicationContext,
+                            0,
+                            reason,
+                            cancelIntent = cancelPendingIntent(applicationContext),
+                        ),
+                    )
+                } catch (t: Throwable) {
+                    // ignore
+                }
             }
 
             val pendingEmbeddings = faceDao.findWithoutEmbedding()
@@ -105,8 +125,10 @@ class ClusteringWorker(
             }
 
             val timeWeight = config.timeWeight
-            val unknownFacesAll = faceDao.findUnclusteredWithDate()
-                .filter { it.faceRegion.embedding != null }
+            val unknownFacesAll =
+                faceDao
+                    .findUnclusteredWithDate()
+                    .filter { it.faceRegion.embedding != null }
 
             // PersonData: all embeddings with metadata for weighted nearest-neighbour matching.
             // Keeping individual embeddings instead of a centroid preserves age-related variation.
@@ -114,27 +136,38 @@ class ClusteringWorker(
                 val embedding: FloatArray,
                 val takenAt: Long?,
                 val quality: Float,
-                val isConfirmed: Boolean
+                val isConfirmed: Boolean,
             )
-            data class PersonData(val faces: List<PersonEmbedding>)
 
-            val personData: Map<String, PersonData> = personDao.getAll()
-                .filter { it.name != null }
-                .mapNotNull { person ->
-                    val allFaces = faceDao.findByPersonIdWithDate(person.id)
-                        .filter { !it.faceRegion.ignored && it.faceRegion.embedding != null }
-                    if (allFaces.isEmpty()) null
-                    else person.id to PersonData(
-                        allFaces.map {
-                            PersonEmbedding(
-                                embedding = EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!),
-                                takenAt = it.photoTakenAt,
-                                quality = it.faceRegion.qualityScore ?: 0.5f,
-                                isConfirmed = it.faceRegion.name != null
-                            )
+            data class PersonData(
+                val faces: List<PersonEmbedding>,
+            )
+
+            val personData: Map<String, PersonData> =
+                personDao
+                    .getAll()
+                    .filter { it.name != null }
+                    .mapNotNull { person ->
+                        val allFaces =
+                            faceDao
+                                .findByPersonIdWithDate(person.id)
+                                .filter { !it.faceRegion.ignored && it.faceRegion.embedding != null }
+                        if (allFaces.isEmpty()) {
+                            null
+                        } else {
+                            person.id to
+                                PersonData(
+                                    allFaces.map {
+                                        PersonEmbedding(
+                                            embedding = EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!),
+                                            takenAt = it.photoTakenAt,
+                                            quality = it.faceRegion.qualityScore ?: 0.5f,
+                                            isConfirmed = it.faceRegion.name != null,
+                                        )
+                                    },
+                                )
                         }
-                    )
-                }.toMap()
+                    }.toMap()
 
             // ----- Phase 1: Individual matching (0-30%) -----
             val individuallyAssigned = mutableSetOf<String>()
@@ -147,8 +180,16 @@ class ClusteringWorker(
                     if (index % 50 == 0 && index > 0) {
                         powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius) { reason ->
                             try {
-                                setForeground(NotificationHelper.clusteringForegroundInfo(applicationContext, (index * 30) / unknownFacesAll.size, reason))
-                            } catch (t: Throwable) { /* ignore */ }
+                                setForeground(
+                                    NotificationHelper.clusteringForegroundInfo(
+                                        applicationContext,
+                                        (index * 30) / unknownFacesAll.size,
+                                        reason,
+                                    ),
+                                )
+                            } catch (t: Throwable) {
+                                // ignore
+                            }
                         }
                     }
                     try {
@@ -158,18 +199,26 @@ class ClusteringWorker(
                         personData.forEach { (personId, pd) ->
                             // Weighted nearest-neighbour: find the best matching face
                             // in this person's history, boosted by temporal proximity.
-                            val bestFaceDist = pd.faces.minOfOrNull { pf ->
-                                val cosD = EmbeddingModel.cosineDistance(embedding, pf.embedding)
-                                // Temporal bonus: reduce distance for temporally close faces
-                                val temporalBonus = temporalBonus(
-                                    face.photoTakenAt, pf.takenAt, timeWeight
-                                )
-                                // Quality and confirm boost as weight on the bonus
-                                val boost = (pf.quality * if (pf.isConfirmed) 1.5f else 1.0f)
-                                    .coerceAtMost(1.0f)
-                                cosD - temporalBonus * boost
-                            } ?: return@forEach
-                            if (bestFaceDist < bestDist) { bestDist = bestFaceDist; bestId = personId }
+                            val bestFaceDist =
+                                pd.faces.minOfOrNull { pf ->
+                                    val cosD = EmbeddingModel.cosineDistance(embedding, pf.embedding)
+                                    // Temporal bonus: reduce distance for temporally close faces
+                                    val temporalBonus =
+                                        temporalBonus(
+                                            face.photoTakenAt,
+                                            pf.takenAt,
+                                            timeWeight,
+                                        )
+                                    // Quality and confirm boost as weight on the bonus
+                                    val boost =
+                                        (pf.quality * if (pf.isConfirmed) 1.5f else 1.0f)
+                                            .coerceAtMost(1.0f)
+                                    cosD - temporalBonus * boost
+                                } ?: return@forEach
+                            if (bestFaceDist < bestDist) {
+                                bestDist = bestFaceDist
+                                bestId = personId
+                            }
                         }
                         bestId?.let { personId ->
                             faceDao.updatePersonId(face.faceRegion.id, personId)
@@ -180,63 +229,97 @@ class ClusteringWorker(
                     }
                     if (index % 10 == 0) {
                         val phaseProgress = (index * 30) / unknownFacesAll.size
-                        reportProgress(phaseProgress, applicationContext.getString(org.eidora.R.string.notif_matching_persons, index + 1, unknownFacesAll.size))
+                        reportProgress(
+                            phaseProgress,
+                            applicationContext.getString(
+                                org.eidora.R.string.notif_matching_persons,
+                                index + 1,
+                                unknownFacesAll.size,
+                            ),
+                        )
                     }
                 }
                 Log.i(TAG, "Individually assigned ${individuallyAssigned.size} faces to existing persons")
             }
             reportProgress(30, applicationContext.getString(org.eidora.R.string.notif_matching_persons_done))
 
-            val candidates: List<Pair<String, FloatArray>> = unknownFacesAll
-                .filter { it.faceRegion.id !in individuallyAssigned }
-                .map { face -> Pair(face.faceRegion.id, EmbeddingModel.bytesToFloatArray(face.faceRegion.embedding!!)) }
+            val candidates: List<Pair<String, FloatArray>> =
+                unknownFacesAll
+                    .filter { it.faceRegion.id !in individuallyAssigned }
+                    .map { face ->
+                        Pair(face.faceRegion.id, EmbeddingModel.bytesToFloatArray(face.faceRegion.embedding!!))
+                    }
             // takenAt lookup for ChineseWhispers temporal penalty
-            val candidateTakenAt: Map<String, Long?> = unknownFacesAll
-                .filter { it.faceRegion.id !in individuallyAssigned }
-                .associate { it.faceRegion.id to it.photoTakenAt }
+            val candidateTakenAt: Map<String, Long?> =
+                unknownFacesAll
+                    .filter { it.faceRegion.id !in individuallyAssigned }
+                    .associate { it.faceRegion.id to it.photoTakenAt }
 
             if (candidates.isEmpty()) {
                 reportProgress(80, applicationContext.getString(org.eidora.R.string.notif_updating_centroids))
-                try { recomputeAllCentroids(db) { p -> reportProgress(80 + p * 20 / 100, applicationContext.getString(org.eidora.R.string.notif_updating_centroids)) } }
-                catch (t: Throwable) { Log.e(TAG, "Failed to recompute centroids", t) }
+                try {
+                    recomputeAllCentroids(
+                        db,
+                    ) { p ->
+                        reportProgress(
+                            80 + p * 20 / 100,
+                            applicationContext.getString(org.eidora.R.string.notif_updating_centroids),
+                        )
+                    }
+                } catch (
+                    t: Throwable,
+                ) {
+                    Log.e(TAG, "Failed to recompute centroids", t)
+                }
                 reportProgress(100, applicationContext.getString(org.eidora.R.string.notif_done))
                 return Result.success()
             }
 
             // ----- Phase 2: Chinese Whispers (30-40%) -----
             reportProgress(30, applicationContext.getString(org.eidora.R.string.notif_grouping, candidates.size))
-            val clusterResults = try {
-                ChineseWhispers.cluster(candidates, config.edgeThreshold, candidateTakenAt, timeWeight)
-            } catch (t: Throwable) {
-                Log.e(TAG, "Clustering algorithm failed", t)
-                return Result.failure()
-            }
+            val clusterResults =
+                try {
+                    ChineseWhispers.cluster(candidates, config.edgeThreshold, candidateTakenAt, timeWeight)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Clustering algorithm failed", t)
+                    return Result.failure()
+                }
             reportProgress(40, applicationContext.getString(org.eidora.R.string.notif_grouping_done))
 
             // ----- Phase 3: Cluster assignment (40-80%) -----
             // Pre-load existing suggestions (unnamed persons) with their centroids
             // so new clusters can be merged into them instead of creating duplicates.
-            data class SuggestionData(val person: PersonEntity, val centroid: FloatArray, val medianTakenAt: Long?)
-            val existingSuggestions: List<SuggestionData> = try {
-                personDao.getSuggestions().mapNotNull { suggestion ->
-                    val faces = faceDao.findByPersonIdWithDate(suggestion.id)
-                        .filter { !it.faceRegion.ignored && it.faceRegion.embedding != null }
-                    if (faces.isEmpty()) null
-                    else {
-                        val centroid = EmbeddingModel.weightedCentroid(
-                            faces.map {
-                                EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!) to (it.faceRegion.qualityScore ?: 0.5f)
-                            }
-                        )
-                        val dates = faces.mapNotNull { it.photoTakenAt }.sorted()
-                        val median = if (dates.isEmpty()) null else dates[dates.size / 2]
-                        SuggestionData(suggestion, centroid, median)
+            data class SuggestionData(
+                val person: PersonEntity,
+                val centroid: FloatArray,
+                val medianTakenAt: Long?,
+            )
+            val existingSuggestions: List<SuggestionData> =
+                try {
+                    personDao.getSuggestions().mapNotNull { suggestion ->
+                        val faces =
+                            faceDao
+                                .findByPersonIdWithDate(suggestion.id)
+                                .filter { !it.faceRegion.ignored && it.faceRegion.embedding != null }
+                        if (faces.isEmpty()) {
+                            null
+                        } else {
+                            val centroid =
+                                EmbeddingModel.weightedCentroid(
+                                    faces.map {
+                                        EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!) to
+                                            (it.faceRegion.qualityScore ?: 0.5f)
+                                    },
+                                )
+                            val dates = faces.mapNotNull { it.photoTakenAt }.sorted()
+                            val median = if (dates.isEmpty()) null else dates[dates.size / 2]
+                            SuggestionData(suggestion, centroid, median)
+                        }
                     }
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Failed to load existing suggestions", t)
+                    emptyList()
                 }
-            } catch (t: Throwable) {
-                Log.w(TAG, "Failed to load existing suggestions", t)
-                emptyList()
-            }
             Log.i(TAG, "Loaded ${existingSuggestions.size} existing suggestions for merge check")
 
             val clusterGroups = clusterResults.groupBy { it.clusterId }
@@ -250,33 +333,43 @@ class ClusteringWorker(
                 }
 
                 try {
-                    val memberPairs: List<Pair<FloatArray, Float>> = members.mapNotNull { result ->
-                        candidates.find { it.first == result.faceRegionId }
-                            ?.let { (_, emb) ->
-                                // quality is stored in faceDao but not in the candidates list;
-                                // fall back to equal weight for clustering pass
-                                emb to 0.5f
-                            }
-                    }
+                    val memberPairs: List<Pair<FloatArray, Float>> =
+                        members.mapNotNull { result ->
+                            candidates
+                                .find { it.first == result.faceRegionId }
+                                ?.let { (_, emb) ->
+                                    // quality is stored in faceDao but not in the candidates list;
+                                    // fall back to equal weight for clustering pass
+                                    emb to 0.5f
+                                }
+                        }
                     val clusterCentroid = EmbeddingModel.weightedCentroid(memberPairs)
 
                     var bestPerson: PersonEntity? = null
                     var bestDistance = config.clusterMatchThreshold
-                    val clusterMedian = members.mapNotNull { candidateTakenAt[it.faceRegionId] }
-                        .sorted().let { if (it.isEmpty()) null else it[it.size / 2] }
+                    val clusterMedian =
+                        members
+                            .mapNotNull { candidateTakenAt[it.faceRegionId] }
+                            .sorted()
+                            .let { if (it.isEmpty()) null else it[it.size / 2] }
 
                     personData.forEach { (personId, pd) ->
                         try {
                             // Compare cluster centroid against each person embedding (NN)
-                            val bestFaceDist = pd.faces.minOfOrNull { pf ->
-                                val cosD = EmbeddingModel.cosineDistance(clusterCentroid, pf.embedding)
-                                val temporalBonus = temporalBonus(
-                                    clusterMedian, pf.takenAt, timeWeight
-                                )
-                                val boost = (pf.quality * if (pf.isConfirmed) 1.5f else 1.0f)
-                                    .coerceAtMost(1.0f)
-                                cosD - temporalBonus * boost
-                            } ?: return@forEach
+                            val bestFaceDist =
+                                pd.faces.minOfOrNull { pf ->
+                                    val cosD = EmbeddingModel.cosineDistance(clusterCentroid, pf.embedding)
+                                    val temporalBonus =
+                                        temporalBonus(
+                                            clusterMedian,
+                                            pf.takenAt,
+                                            timeWeight,
+                                        )
+                                    val boost =
+                                        (pf.quality * if (pf.isConfirmed) 1.5f else 1.0f)
+                                            .coerceAtMost(1.0f)
+                                    cosD - temporalBonus * boost
+                                } ?: return@forEach
                             if (bestFaceDist < bestDistance) {
                                 bestDistance = bestFaceDist
                                 bestPerson = personDao.findById(personId)
@@ -286,50 +379,70 @@ class ClusteringWorker(
                         }
                     }
 
-                    val targetPerson: PersonEntity = bestPerson ?: run {
-                        // No named person matched – check existing suggestions before
-                        // creating a new one. This avoids duplicate suggestion clusters.
-                        var bestSuggestion: PersonEntity? = null
-                        var bestSuggestionDist = config.clusterMatchThreshold
-                        existingSuggestions.forEach { sd ->
-                            try {
-                                val cosD = EmbeddingModel.cosineDistance(clusterCentroid, sd.centroid)
-                                val penalty = org.eidora.ml.TemporalDistance.penalty(
-                                    clusterMedian, sd.medianTakenAt, timeWeight, config.clusterMatchThreshold
-                                )
-                                val d = cosD + penalty
-                                if (d < bestSuggestionDist) {
-                                    bestSuggestionDist = d
-                                    bestSuggestion = sd.person
+                    val targetPerson: PersonEntity =
+                        bestPerson ?: run {
+                            // No named person matched – check existing suggestions before
+                            // creating a new one. This avoids duplicate suggestion clusters.
+                            var bestSuggestion: PersonEntity? = null
+                            var bestSuggestionDist = config.clusterMatchThreshold
+                            existingSuggestions.forEach { sd ->
+                                try {
+                                    val cosD = EmbeddingModel.cosineDistance(clusterCentroid, sd.centroid)
+                                    val penalty =
+                                        org.eidora.ml.TemporalDistance.penalty(
+                                            clusterMedian,
+                                            sd.medianTakenAt,
+                                            timeWeight,
+                                            config.clusterMatchThreshold,
+                                        )
+                                    val d = cosD + penalty
+                                    if (d < bestSuggestionDist) {
+                                        bestSuggestionDist = d
+                                        bestSuggestion = sd.person
+                                    }
+                                } catch (t: Throwable) {
+                                    Log.w(TAG, "Error comparing suggestion ${sd.person.id}", t)
                                 }
-                            } catch (t: Throwable) {
-                                Log.w(TAG, "Error comparing suggestion ${sd.person.id}", t)
+                            }
+                            bestSuggestion ?: run {
+                                val newPerson = PersonEntity(id = UUID.randomUUID().toString(), name = null)
+                                personDao.insertWithNullableName(newPerson)
+                                newPerson
                             }
                         }
-                        bestSuggestion ?: run {
-                            val newPerson = PersonEntity(id = UUID.randomUUID().toString(), name = null)
-                            personDao.insertWithNullableName(newPerson)
-                            newPerson
-                        }
-                    }
 
                     members.forEach { result ->
-                        try { faceDao.updatePersonId(result.faceRegionId, targetPerson.id) }
-                        catch (t: Throwable) { Log.w(TAG, "Failed to assign face ${result.faceRegionId}", t) }
+                        try {
+                            faceDao.updatePersonId(result.faceRegionId, targetPerson.id)
+                        } catch (
+                            t: Throwable,
+                        ) {
+                            Log.w(TAG, "Failed to assign face ${result.faceRegionId}", t)
+                        }
                     }
                 } catch (t: Throwable) {
                     Log.e(TAG, "Failed to process cluster, skipping", t)
                 }
 
                 val phaseProgress = 40 + ((index + 1) * 40) / totalClusters.coerceAtLeast(1)
-                reportProgress(phaseProgress, applicationContext.getString(org.eidora.R.string.notif_assigning, index + 1, totalClusters))
+                reportProgress(
+                    phaseProgress,
+                    applicationContext.getString(
+                        org.eidora.R.string.notif_assigning,
+                        index + 1,
+                        totalClusters,
+                    ),
+                )
             }
 
             // ----- Phase 4: Centroid recompute (80-100%) -----
             reportProgress(80, applicationContext.getString(org.eidora.R.string.notif_updating_centroids))
             try {
                 recomputeAllCentroids(db) { p ->
-                    reportProgress(80 + p * 20 / 100, applicationContext.getString(org.eidora.R.string.notif_updating_centroids))
+                    reportProgress(
+                        80 + p * 20 / 100,
+                        applicationContext.getString(org.eidora.R.string.notif_updating_centroids),
+                    )
                 }
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to recompute centroids", t)
@@ -342,28 +455,42 @@ class ClusteringWorker(
             return Result.failure()
         } finally {
             try {
-                androidx.core.app.NotificationManagerCompat.from(applicationContext)
+                androidx.core.app.NotificationManagerCompat
+                    .from(applicationContext)
                     .cancel(NotificationHelper.NOTIFICATION_ID_CLUSTERING)
-            } catch (t: Throwable) { /* ignore */ }
+            } catch (t: Throwable) {
+                // ignore
+            }
         }
     }
 
-    private suspend fun reportProgress(percent: Int, message: String) {
+    private suspend fun reportProgress(
+        percent: Int,
+        message: String,
+    ) {
         try {
-            setProgress(workDataOf(
-                PhotoSyncWorker.KEY_PROGRESS to percent,
-                PhotoSyncWorker.KEY_STATUS to message
-            ))
-            setForeground(NotificationHelper.clusteringForegroundInfo(
-                applicationContext, percent, message,
-                cancelIntent = cancelPendingIntent(applicationContext)
-            ))
-        } catch (t: Throwable) { /* ignore */ }
+            setProgress(
+                workDataOf(
+                    PhotoSyncWorker.KEY_PROGRESS to percent,
+                    PhotoSyncWorker.KEY_STATUS to message,
+                ),
+            )
+            setForeground(
+                NotificationHelper.clusteringForegroundInfo(
+                    applicationContext,
+                    percent,
+                    message,
+                    cancelIntent = cancelPendingIntent(applicationContext),
+                ),
+            )
+        } catch (t: Throwable) {
+            // ignore
+        }
     }
 
     private suspend fun recomputeAllCentroids(
         db: EidoraDatabase,
-        onProgress: suspend (Int) -> Unit = {}
+        onProgress: suspend (Int) -> Unit = {},
     ) {
         val personDao = db.personDao()
         val faceDao = db.faceRegionDao()
@@ -371,22 +498,26 @@ class ClusteringWorker(
         val persons = personDao.getAll()
         persons.forEachIndexed { index, person ->
             try {
-                val allFaces = faceDao.findByPersonId(person.id)
-                    .filter { !it.ignored && it.embedding != null }
+                val allFaces =
+                    faceDao
+                        .findByPersonId(person.id)
+                        .filter { !it.ignored && it.embedding != null }
                 if (allFaces.isNotEmpty()) {
                     val basisFaces = allFaces.filter { it.name != null }.ifEmpty { allFaces }
-                    val centroid = EmbeddingModel.weightedCentroid(
-                        basisFaces.map {
-                            EmbeddingModel.bytesToFloatArray(it.embedding!!) to (it.qualityScore ?: 0.5f)
-                        }
-                    )
-
-                    val representative = basisFaces.minByOrNull { face ->
-                        EmbeddingModel.cosineDistance(
-                            EmbeddingModel.bytesToFloatArray(face.embedding!!),
-                            centroid
+                    val centroid =
+                        EmbeddingModel.weightedCentroid(
+                            basisFaces.map {
+                                EmbeddingModel.bytesToFloatArray(it.embedding!!) to (it.qualityScore ?: 0.5f)
+                            },
                         )
-                    }
+
+                    val representative =
+                        basisFaces.minByOrNull { face ->
+                            EmbeddingModel.cosineDistance(
+                                EmbeddingModel.bytesToFloatArray(face.embedding!!),
+                                centroid,
+                            )
+                        }
                     personDao.updateRepresentativeFace(person.id, representative?.id)
                 }
             } catch (t: Throwable) {
@@ -406,13 +537,13 @@ class ClusteringWorker(
         takenAtA: Long?,
         takenAtB: Long?,
         weight: Float,
-        maxBonus: Float = 0.15f
+        maxBonus: Float = 0.15f,
     ): Float {
         if (weight <= 0f || takenAtA == null || takenAtB == null) return 0f
         if (takenAtA <= 0L || takenAtB <= 0L) return 0f
         val deltaMs = kotlin.math.abs(takenAtA - takenAtB).toFloat()
         val deltaYears = deltaMs / (365.25f * 24 * 3600 * 1000)
-        val sigma = 3.0f  // Gaussian half-width in years
+        val sigma = 3.0f // Gaussian half-width in years
         val gaussian = kotlin.math.exp(-(deltaYears * deltaYears) / (2f * sigma * sigma))
         return maxBonus * weight * gaussian
     }
@@ -423,22 +554,25 @@ class ClusteringWorker(
 
         fun buildRequest(
             rejectSuggestions: Boolean = false,
-            removeUnconfirmed: Boolean = false
+            removeUnconfirmed: Boolean = false,
         ): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<ClusteringWorker>()
-                .setInputData(workDataOf(
-                    KEY_REJECT_SUGGESTIONS to rejectSuggestions,
-                    KEY_REMOVE_UNCONFIRMED to removeUnconfirmed
-                ))
-                .setBackoffCriteria(BackoffPolicy.LINEAR, 30_000L, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .setInputData(
+                    workDataOf(
+                        KEY_REJECT_SUGGESTIONS to rejectSuggestions,
+                        KEY_REMOVE_UNCONFIRMED to removeUnconfirmed,
+                    ),
+                ).setBackoffCriteria(BackoffPolicy.LINEAR, 30_000L, java.util.concurrent.TimeUnit.MILLISECONDS)
                 .build()
 
         /** PendingIntent that cancels the clustering work – used in notification. */
         fun cancelPendingIntent(context: Context): android.app.PendingIntent {
             val intent = android.content.Intent(context, CancelClusteringReceiver::class.java)
             return android.app.PendingIntent.getBroadcast(
-                context, 0, intent,
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                context,
+                0,
+                intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
             )
         }
     }

@@ -5,12 +5,12 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 
 object NetworkHelper {
-
     enum class NetworkStatus { WIFI, MOBILE, NONE }
 
     fun currentStatus(context: Context): NetworkStatus {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return NetworkStatus.NONE
+        val cm =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return NetworkStatus.NONE
         val network = cm.activeNetwork ?: return NetworkStatus.NONE
         val caps = cm.getNetworkCapabilities(network) ?: return NetworkStatus.NONE
         return when {

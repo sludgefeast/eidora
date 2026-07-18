@@ -1,16 +1,14 @@
 package org.eidora.worker
 
 import android.content.Context
-import androidx.work.ExistingPeriodicWorkPolicy
+import android.util.Log
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import android.util.Log
 import androidx.work.workDataOf
 
 object SyncPipeline {
-
     const val UNIQUE_SYNC_NAME = "eidora-sync-pipeline"
     const val UNIQUE_CLUSTERING_NAME = "eidora-clustering"
     const val PERIODIC_SYNC_NAME = "eidora-periodic-sync"
@@ -24,42 +22,49 @@ object SyncPipeline {
         if (isClusteringRunning(context)) {
             android.util.Log.i("SyncPipeline", "Clustering active, sync will wait")
         }
-        WorkManager.getInstance(context)
+        WorkManager
+            .getInstance(context)
             .beginUniqueWork(
                 UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.KEEP,
-                PhotoSyncWorker.buildRequest()
-            )
-            .then(ModelDownloadWorker.buildRequest())
+                PhotoSyncWorker.buildRequest(),
+            ).then(ModelDownloadWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())
             .enqueue()
     }
 
     fun enqueueForce(context: Context) {
-        context.getSharedPreferences("sync_state", android.content.Context.MODE_PRIVATE)
-            .edit().remove("last_sync_timestamp_sec").apply()
-        WorkManager.getInstance(context)
+        context
+            .getSharedPreferences("sync_state", android.content.Context.MODE_PRIVATE)
+            .edit()
+            .remove("last_sync_timestamp_sec")
+            .apply()
+        WorkManager
+            .getInstance(context)
             .beginUniqueWork(
                 UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.REPLACE,
-                PhotoSyncWorker.buildForceRequest()
-            )
-            .then(ModelDownloadWorker.buildRequest())
+                PhotoSyncWorker.buildForceRequest(),
+            ).then(ModelDownloadWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())
             .enqueue()
     }
 
-    fun enqueueReSyncPhoto(context: Context, photoId: String) {
-        val syncRequest = OneTimeWorkRequestBuilder<PhotoSyncWorker>()
-            .setInputData(workDataOf(PhotoSyncWorker.KEY_PHOTO_ID to photoId))
-            .build()
-        WorkManager.getInstance(context)
+    fun enqueueReSyncPhoto(
+        context: Context,
+        photoId: String,
+    ) {
+        val syncRequest =
+            OneTimeWorkRequestBuilder<PhotoSyncWorker>()
+                .setInputData(workDataOf(PhotoSyncWorker.KEY_PHOTO_ID to photoId))
+                .build()
+        WorkManager
+            .getInstance(context)
             .beginUniqueWork(
                 UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
-                syncRequest
-            )
-            .then(ModelDownloadWorker.buildRequest())
+                syncRequest,
+            ).then(ModelDownloadWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())
             .enqueue()
     }
@@ -76,13 +81,14 @@ object SyncPipeline {
     fun enqueueClustering(
         context: Context,
         rejectSuggestions: Boolean = false,
-        removeUnconfirmed: Boolean = false
+        removeUnconfirmed: Boolean = false,
     ) {
-        WorkManager.getInstance(context)
+        WorkManager
+            .getInstance(context)
             .enqueueUniqueWork(
                 UNIQUE_CLUSTERING_NAME,
                 ExistingWorkPolicy.KEEP,
-                ClusteringWorker.buildRequest(rejectSuggestions, removeUnconfirmed)
+                ClusteringWorker.buildRequest(rejectSuggestions, removeUnconfirmed),
             )
     }
 
@@ -95,14 +101,18 @@ object SyncPipeline {
     // -----------------------------------------------------------------------
 
     fun isSyncRunning(context: Context): Boolean =
-        WorkManager.getInstance(context)
-            .getWorkInfosForUniqueWork(UNIQUE_SYNC_NAME).get()
+        WorkManager
+            .getInstance(context)
+            .getWorkInfosForUniqueWork(UNIQUE_SYNC_NAME)
+            .get()
             ?.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
             ?: false
 
     fun isClusteringRunning(context: Context): Boolean =
-        WorkManager.getInstance(context)
-            .getWorkInfosForUniqueWork(UNIQUE_CLUSTERING_NAME).get()
+        WorkManager
+            .getInstance(context)
+            .getWorkInfosForUniqueWork(UNIQUE_CLUSTERING_NAME)
+            .get()
             ?.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
             ?: false
 }

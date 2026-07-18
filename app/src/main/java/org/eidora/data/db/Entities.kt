@@ -13,17 +13,17 @@ data class PhotoEntity(
     val modifiedAt: Long,
     val takenAt: Long?,
     val analyzed: Boolean = false,
-    @ColumnInfo(name = "pending_xmp_write") val pendingXmpWrite: Boolean = false
+    @ColumnInfo(name = "pending_xmp_write") val pendingXmpWrite: Boolean = false,
 )
 
 @Entity(
     tableName = "persons",
-    indices = [Index(value = ["name"], unique = true)]
+    indices = [Index(value = ["name"], unique = true)],
 )
 data class PersonEntity(
     @PrimaryKey val id: String,
-    val name: String?,  // null = clustering suggestion, not yet named by user
-    val representativeFaceId: String? = null
+    val name: String?, // null = clustering suggestion, not yet named by user
+    val representativeFaceId: String? = null,
 )
 
 @Entity(
@@ -33,19 +33,19 @@ data class PersonEntity(
             entity = PhotoEntity::class,
             parentColumns = ["id"],
             childColumns = ["photoId"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.CASCADE,
         ),
         ForeignKey(
             entity = PersonEntity::class,
             parentColumns = ["id"],
             childColumns = ["personId"],
-            onDelete = ForeignKey.SET_NULL
-        )
+            onDelete = ForeignKey.SET_NULL,
+        ),
     ],
     indices = [
         Index("photoId"),
-        Index("personId")
-    ]
+        Index("personId"),
+    ],
 )
 data class FaceRegionEntity(
     @PrimaryKey val id: String,
@@ -55,7 +55,7 @@ data class FaceRegionEntity(
     val regionJson: String,
     val embedding: ByteArray? = null,
     val ignored: Boolean = false,
-    @ColumnInfo(name = "quality_score") val qualityScore: Float? = null
+    @ColumnInfo(name = "quality_score") val qualityScore: Float? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

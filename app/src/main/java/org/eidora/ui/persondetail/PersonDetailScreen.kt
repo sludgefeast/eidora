@@ -2,18 +2,12 @@ package org.eidora.ui.persondetail
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.draw.alpha
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -25,24 +19,22 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import org.eidora.R
 import org.eidora.data.db.FaceRegionWithPhoto
 import org.eidora.ui.common.CircleThumbnail
+import org.eidora.ui.common.LazyGridScrollbar
 import org.eidora.ui.common.MergeConfirmDialog
 import org.eidora.util.ThumbnailHelper
-import org.eidora.ui.common.LazyGridScrollbar
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +43,7 @@ fun PersonDetailScreen(
     onBack: () -> Unit,
     onNavigateToPerson: (personId: String) -> Unit,
     onShowPhotos: (personId: String) -> Unit,
-    onFaceClick: (faceRegionId: String, photoId: String) -> Unit
+    onFaceClick: (faceRegionId: String, photoId: String) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -75,7 +67,7 @@ fun PersonDetailScreen(
                 TextButton(onClick = { showRemoveUnconfirmedConfirm = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
-            }
+            },
         )
     }
 
@@ -94,7 +86,7 @@ fun PersonDetailScreen(
                 TextButton(onClick = { showDeletePersonConfirm = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
-            }
+            },
         )
     }
 
@@ -112,8 +104,9 @@ fun PersonDetailScreen(
         }
     }
 
-    val canEdit = state.viewMode == PersonDetailViewMode.NORMAL ||
-                  state.viewMode == PersonDetailViewMode.SUGGESTION
+    val canEdit =
+        state.viewMode == PersonDetailViewMode.NORMAL ||
+            state.viewMode == PersonDetailViewMode.SUGGESTION
 
     Scaffold(
         topBar = {
@@ -131,26 +124,30 @@ fun PersonDetailScreen(
                                 }
                             },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = {
-                                if (editedName.isNotBlank() && editedName != state.personName) {
-                                    viewModel.renameCurrentPerson(editedName.trim())
-                                }
-                                if (state.viewMode != PersonDetailViewMode.SUGGESTION) {
-                                    isEditingName = false
-                                }
-                            }),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusRequester(focusRequester)
+                            keyboardActions =
+                                KeyboardActions(onDone = {
+                                    if (editedName.isNotBlank() && editedName != state.personName) {
+                                        viewModel.renameCurrentPerson(editedName.trim())
+                                    }
+                                    if (state.viewMode != PersonDetailViewMode.SUGGESTION) {
+                                        isEditingName = false
+                                    }
+                                }),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(focusRequester),
                         )
                         LaunchedEffect(Unit) { focusRequester.requestFocus() }
                     } else {
                         Text(
                             text = state.personName,
-                            fontStyle = if (state.viewMode != PersonDetailViewMode.NORMAL)
-                                androidx.compose.ui.text.font.FontStyle.Italic
-                            else
-                                androidx.compose.ui.text.font.FontStyle.Normal
+                            fontStyle =
+                                if (state.viewMode != PersonDetailViewMode.NORMAL) {
+                                    androidx.compose.ui.text.font.FontStyle.Italic
+                                } else {
+                                    androidx.compose.ui.text.font.FontStyle.Normal
+                                },
                         )
                     }
                 },
@@ -163,7 +160,7 @@ fun PersonDetailScreen(
                             }) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
-                                    contentDescription = stringResource(R.string.action_reject_suggestion)
+                                    contentDescription = stringResource(R.string.action_reject_suggestion),
                                 )
                             }
                             IconButton(onClick = {
@@ -173,7 +170,7 @@ fun PersonDetailScreen(
                             }) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
-                                    contentDescription = stringResource(R.string.action_confirm)
+                                    contentDescription = stringResource(R.string.action_confirm),
                                 )
                             }
                         }
@@ -183,7 +180,10 @@ fun PersonDetailScreen(
                                     isEditingName = false
                                     editedName = state.personName
                                 }) {
-                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_cancel))
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.action_cancel),
+                                    )
                                 }
                                 IconButton(onClick = {
                                     if (editedName.isNotBlank() && editedName != state.personName) {
@@ -191,7 +191,10 @@ fun PersonDetailScreen(
                                     }
                                     isEditingName = false
                                 }) {
-                                    Icon(Icons.Default.Check, contentDescription = stringResource(R.string.action_edit_name))
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = stringResource(R.string.action_edit_name),
+                                    )
                                 }
                             } else {
                                 var overflowExpanded by remember { mutableStateOf(false) }
@@ -200,43 +203,49 @@ fun PersonDetailScreen(
                                 }) {
                                     Icon(
                                         Icons.Default.PhotoLibrary,
-                                        contentDescription = stringResource(R.string.action_show_person_photos)
+                                        contentDescription = stringResource(R.string.action_show_person_photos),
                                     )
                                 }
                                 IconButton(onClick = { showDeletePersonConfirm = true }) {
                                     Icon(
                                         Icons.Default.Delete,
                                         contentDescription = stringResource(R.string.action_delete_person),
-                                        tint = MaterialTheme.colorScheme.error
+                                        tint = MaterialTheme.colorScheme.error,
                                     )
                                 }
-                                IconButton(onClick = { editedName = state.personName; isEditingName = true }) {
-                                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.action_edit_name))
+                                IconButton(onClick = {
+                                    editedName = state.personName
+                                    isEditingName = true
+                                }) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = stringResource(R.string.action_edit_name),
+                                    )
                                 }
                                 IconButton(onClick = { overflowExpanded = true }) {
                                     Icon(Icons.Default.MoreVert, contentDescription = null)
                                 }
                                 DropdownMenu(
                                     expanded = overflowExpanded,
-                                    onDismissRequest = { overflowExpanded = false }
+                                    onDismissRequest = { overflowExpanded = false },
                                 ) {
                                     DropdownMenuItem(
                                         text = {
                                             Text(
                                                 stringResource(R.string.action_remove_unconfirmed),
-                                                color = MaterialTheme.colorScheme.error
+                                                color = MaterialTheme.colorScheme.error,
                                             )
                                         },
                                         onClick = {
                                             overflowExpanded = false
                                             showRemoveUnconfirmedConfirm = true
-                                        }
+                                        },
                                     )
                                 }
                             }
                         }
                     }
-                }
+                },
             )
         },
         bottomBar = {
@@ -246,26 +255,28 @@ fun PersonDetailScreen(
                     onIgnore = { viewModel.ignoreSelected() },
                     onRemove = { viewModel.removeSelected() },
                     onRedetect = { viewModel.redetectSelected() },
-                    onAssign = { viewModel.showAssignSheet() }
+                    onAssign = { viewModel.showAssignSheet() },
                 )
             } else if (state.viewMode == PersonDetailViewMode.UNKNOWN &&
-                       state.unconfirmedFaces.isNotEmpty()) {
+                state.unconfirmedFaces.isNotEmpty()
+            ) {
                 Surface(shadowElevation = 8.dp) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
                     ) {
                         Button(
                             onClick = { viewModel.reassignUnknownFaces() },
-                            enabled = !state.isReassigning
+                            enabled = !state.isReassigning,
                         ) {
                             if (state.isReassigning) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(16.dp),
                                     strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary
+                                    color = MaterialTheme.colorScheme.onPrimary,
                                 )
                                 Spacer(Modifier.width(8.dp))
                             }
@@ -274,90 +285,112 @@ fun PersonDetailScreen(
                     }
                 }
             }
-        }
+        },
     ) { padding ->
         val gridState = rememberLazyGridState()
         val scope = rememberCoroutineScope()
 
         Box(modifier = Modifier.padding(padding)) {
-        LazyVerticalGrid(
-            state = gridState,
-            columns = GridCells.Fixed(3),
-            contentPadding = PaddingValues(
-                top = 8.dp,
-                bottom = 8.dp,
-                start = 8.dp,
-                end = 34.dp   // room for scrollbar
-            ),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (state.viewMode == PersonDetailViewMode.SUGGESTION) {
-                item(span = { GridItemSpan(3) }) {
-                    Text(
-                        text = stringResource(R.string.suggestion_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp)
-                    )
-                }
-            }
-            if (state.unconfirmedFaces.isNotEmpty()) {
-                faceItemsWithMonthHeaders(
-                    faces = state.unconfirmedFaces,
-                    isSelected = { state.selectedFaceIds.contains(it) },
-                    borderColorFor = { if (state.viewMode == PersonDetailViewMode.NORMAL) Color(0xFF4CAF50) else null },
-                    onTap = { id ->
-                        if (state.isMultiSelectActive) viewModel.toggleFaceSelection(id)
-                        else viewModel.showFaceActions(id)
-                    },
-                    onLongPress = { id ->
-                        if (state.isMultiSelectActive) viewModel.rangeSelectFace(id)
-                        else viewModel.toggleFaceSelection(id)
-                    },
-                    onImageTap = { faceId, photoId -> onFaceClick(faceId, photoId) }
-                )
-            }
-
-            if (state.confirmedFaces.isNotEmpty()) {
-                item(span = { GridItemSpan(3) }) {
-                    Column {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            LazyVerticalGrid(
+                state = gridState,
+                columns = GridCells.Fixed(3),
+                contentPadding =
+                    PaddingValues(
+                        top = 8.dp,
+                        bottom = 8.dp,
+                        start = 8.dp,
+                        end = 34.dp, // room for scrollbar
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (state.viewMode == PersonDetailViewMode.SUGGESTION) {
+                    item(span = { GridItemSpan(3) }) {
                         Text(
-                            text = stringResource(R.string.section_confirmed),
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                            text = stringResource(R.string.suggestion_hint),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
                         )
                     }
                 }
-                faceItemsWithMonthHeaders(
-                    faces = state.confirmedFaces,
-                    isSelected = { state.selectedFaceIds.contains(it) },
-                    borderColorFor = { null },
-                    onTap = { id ->
-                        if (state.isMultiSelectActive) viewModel.toggleFaceSelection(id)
-                        else viewModel.showFaceActions(id)
-                    },
-                    onLongPress = { id ->
-                        if (state.isMultiSelectActive) viewModel.rangeSelectFace(id)
-                        else viewModel.toggleFaceSelection(id)
-                    },
-                    onImageTap = { faceId, photoId -> onFaceClick(faceId, photoId) }
-                )
+                if (state.unconfirmedFaces.isNotEmpty()) {
+                    faceItemsWithMonthHeaders(
+                        faces = state.unconfirmedFaces,
+                        isSelected = { state.selectedFaceIds.contains(it) },
+                        borderColorFor = {
+                            if (state.viewMode ==
+                                PersonDetailViewMode.NORMAL
+                            ) {
+                                Color(0xFF4CAF50)
+                            } else {
+                                null
+                            }
+                        },
+                        onTap = { id ->
+                            if (state.isMultiSelectActive) {
+                                viewModel.toggleFaceSelection(id)
+                            } else {
+                                viewModel.showFaceActions(id)
+                            }
+                        },
+                        onLongPress = { id ->
+                            if (state.isMultiSelectActive) {
+                                viewModel.rangeSelectFace(id)
+                            } else {
+                                viewModel.toggleFaceSelection(id)
+                            }
+                        },
+                        onImageTap = { faceId, photoId -> onFaceClick(faceId, photoId) },
+                    )
+                }
+
+                if (state.confirmedFaces.isNotEmpty()) {
+                    item(span = { GridItemSpan(3) }) {
+                        Column {
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                            Text(
+                                text = stringResource(R.string.section_confirmed),
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                    faceItemsWithMonthHeaders(
+                        faces = state.confirmedFaces,
+                        isSelected = { state.selectedFaceIds.contains(it) },
+                        borderColorFor = { null },
+                        onTap = { id ->
+                            if (state.isMultiSelectActive) {
+                                viewModel.toggleFaceSelection(id)
+                            } else {
+                                viewModel.showFaceActions(id)
+                            }
+                        },
+                        onLongPress = { id ->
+                            if (state.isMultiSelectActive) {
+                                viewModel.rangeSelectFace(id)
+                            } else {
+                                viewModel.toggleFaceSelection(id)
+                            }
+                        },
+                        onImageTap = { faceId, photoId -> onFaceClick(faceId, photoId) },
+                    )
+                }
             }
-        }
-        // Drag scrollbar
-        LazyGridScrollbar(
-            state = gridState,
-            scope = scope,
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
-        )
+            // Drag scrollbar
+            LazyGridScrollbar(
+                state = gridState,
+                scope = scope,
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+            )
         } // Box
     }
 
     state.actionFaceId?.let { faceId ->
-        val face = state.unconfirmedFaces.find { it.faceRegion.id == faceId }
-            ?: state.confirmedFaces.find { it.faceRegion.id == faceId }
+        val face =
+            state.unconfirmedFaces.find { it.faceRegion.id == faceId }
+                ?: state.confirmedFaces.find { it.faceRegion.id == faceId }
         FaceActionsSheet(
             viewMode = state.viewMode,
             onOpenPhoto = {
@@ -366,29 +399,31 @@ fun PersonDetailScreen(
             onConfirm = { viewModel.confirmFace(faceId) },
             onIgnore = { viewModel.ignoreFace(faceId) },
             onRemove = {
-                if (state.viewMode == PersonDetailViewMode.IGNORED)
+                if (state.viewMode == PersonDetailViewMode.IGNORED) {
                     viewModel.unignoreFace(faceId)
-                else
+                } else {
                     viewModel.removeFace(faceId)
+                }
             },
             onPermanentlyDelete = { viewModel.permanentlyDeleteFace(faceId) },
             onRedetect = { viewModel.redetectFace(faceId) },
             onAssign = { viewModel.showAssignSheet(faceId) },
-            onDismiss = { viewModel.dismissActions() }
+            onDismiss = { viewModel.dismissActions() },
         )
     }
 
     if (state.showAssignSheet) {
         AssignToPersonSheet(
             viewModel = viewModel,
-            onDismiss = { viewModel.dismissAssignSheet() }
+            onDismiss = { viewModel.dismissAssignSheet() },
         )
     }
     state.mergeConflict?.let { conflict ->
         val context = LocalContext.current
-        val thumbnail = conflict.targetRepresentativeFaceId?.let {
-            ThumbnailHelper.thumbnailFile(context, it)
-        }
+        val thumbnail =
+            conflict.targetRepresentativeFaceId?.let {
+                ThumbnailHelper.thumbnailFile(context, it)
+            }
         MergeConfirmDialog(
             existingPersonName = conflict.targetPersonName,
             existingRepresentativeThumbnail = thumbnail,
@@ -398,7 +433,7 @@ fun PersonDetailScreen(
                     onNavigateToPerson(targetId)
                 }
             },
-            onCancel = { viewModel.cancelMergeConflict() }
+            onCancel = { viewModel.cancelMergeConflict() },
         )
     }
 }
@@ -411,31 +446,33 @@ private fun FaceGridItem(
     borderColor: Color?,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
-    onImageTap: () -> Unit
+    onImageTap: () -> Unit,
 ) {
     val context = LocalContext.current
     val thumbnailFile = ThumbnailHelper.thumbnailFile(context, face.faceRegion.id)
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .combinedClickable(
-                onClick = onTap,
-                onLongClick = onLongPress
-            )
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .combinedClickable(
+                    onClick = onTap,
+                    onLongClick = onLongPress,
+                ),
     ) {
         CircleThumbnail(
             file = thumbnailFile,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            borderColor = borderColor
+            borderColor = borderColor,
         ) {
             if (isSelected) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0x660D47A1))
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color(0x660D47A1)),
                 )
             }
         }
@@ -453,7 +490,7 @@ private fun FaceActionsSheet(
     onPermanentlyDelete: () -> Unit,
     onRedetect: () -> Unit,
     onAssign: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -473,40 +510,42 @@ private fun FaceActionsSheet(
                 TextButton(onClick = { showDeleteConfirm = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
-            }
+            },
         )
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(bottom = 32.dp)) {
-            val actions = buildList<Pair<String, () -> Unit>> {
-                add(stringResource(R.string.action_open_photo) to onOpenPhoto)
+            val actions =
+                buildList<Pair<String, () -> Unit>> {
+                    add(stringResource(R.string.action_open_photo) to onOpenPhoto)
 
-                // Confirm: only in NORMAL mode (Unknown/Ignored have no person to confirm to)
-                if (viewMode == PersonDetailViewMode.NORMAL) {
-                    add(stringResource(R.string.action_confirm) to onConfirm)
+                    // Confirm: only in NORMAL mode (Unknown/Ignored have no person to confirm to)
+                    if (viewMode == PersonDetailViewMode.NORMAL) {
+                        add(stringResource(R.string.action_confirm) to onConfirm)
+                    }
+
+                    // Ignore: not in IGNORED mode (already ignored)
+                    if (viewMode != PersonDetailViewMode.IGNORED) {
+                        add(stringResource(R.string.action_ignore) to onIgnore)
+                    }
+
+                    // Remove or Unignore depending on mode
+                    when (viewMode) {
+                        PersonDetailViewMode.NORMAL,
+                        PersonDetailViewMode.SUGGESTION,
+                        ->
+                            add(stringResource(R.string.action_remove_from_person) to onRemove)
+                        PersonDetailViewMode.IGNORED ->
+                            add(stringResource(R.string.action_unignore) to onRemove)
+                        PersonDetailViewMode.UNKNOWN -> { /* no remove/unignore */ }
+                    }
+
+                    add(stringResource(R.string.action_redetect) to onRedetect)
+                    add(stringResource(R.string.action_assign_to_person) to onAssign)
+                    // Permanently delete – always available, shown last with destructive colour
+                    add(stringResource(R.string.action_delete_face) to { showDeleteConfirm = true })
                 }
-
-                // Ignore: not in IGNORED mode (already ignored)
-                if (viewMode != PersonDetailViewMode.IGNORED) {
-                    add(stringResource(R.string.action_ignore) to onIgnore)
-                }
-
-                // Remove or Unignore depending on mode
-                when (viewMode) {
-                    PersonDetailViewMode.NORMAL,
-                    PersonDetailViewMode.SUGGESTION ->
-                        add(stringResource(R.string.action_remove_from_person) to onRemove)
-                    PersonDetailViewMode.IGNORED ->
-                        add(stringResource(R.string.action_unignore) to onRemove)
-                    PersonDetailViewMode.UNKNOWN -> { /* no remove/unignore */ }
-                }
-
-                add(stringResource(R.string.action_redetect) to onRedetect)
-                add(stringResource(R.string.action_assign_to_person) to onAssign)
-                // Permanently delete – always available, shown last with destructive colour
-                add(stringResource(R.string.action_delete_face) to { showDeleteConfirm = true })
-            }
 
             actions.forEachIndexed { index, (label, action) ->
                 val isDestructive = index == actions.lastIndex
@@ -514,13 +553,19 @@ private fun FaceActionsSheet(
                     headlineContent = {
                         Text(
                             text = label,
-                            color = if (isDestructive)
-                                MaterialTheme.colorScheme.error
-                            else
-                                MaterialTheme.colorScheme.onSurface
+                            color =
+                                if (isDestructive) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
                         )
                     },
-                    modifier = Modifier.combinedClickable(onClick = { action() ; if (!isDestructive) onDismiss() })
+                    modifier =
+                        Modifier.combinedClickable(onClick = {
+                            action()
+                            if (!isDestructive) onDismiss()
+                        }),
                 )
             }
         }
@@ -533,15 +578,16 @@ private fun MultiSelectActionBar(
     onIgnore: () -> Unit,
     onRemove: () -> Unit,
     onRedetect: () -> Unit,
-    onAssign: () -> Unit
+    onAssign: () -> Unit,
 ) {
     Surface(shadowElevation = 8.dp) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_confirm)) }
             TextButton(onClick = onIgnore) { Text(stringResource(R.string.action_ignore)) }
@@ -552,44 +598,59 @@ private fun MultiSelectActionBar(
     }
 }
 
-
 private fun LazyGridScope.faceItemsWithMonthHeaders(
     faces: List<org.eidora.data.db.FaceRegionWithPhoto>,
     isSelected: (String) -> Boolean,
     borderColorFor: (String) -> androidx.compose.ui.graphics.Color?,
     onTap: (String) -> Unit,
     onLongPress: (String) -> Unit,
-    onImageTap: (faceId: String, photoId: String) -> Unit
+    onImageTap: (faceId: String, photoId: String) -> Unit,
 ) {
-    val formatter = java.time.format.DateTimeFormatter.ofPattern(
-        "MMMM yyyy", java.util.Locale.getDefault()
-    )
+    val formatter =
+        java.time.format.DateTimeFormatter.ofPattern(
+            "MMMM yyyy",
+            java.util.Locale.getDefault(),
+        )
     var lastMonthKey = ""
 
     faces.forEach { faceWithPhoto ->
         val takenAt = faceWithPhoto.photoTakenAt
-        val monthKey = if (takenAt != null && takenAt > 0L) {
-            val date = java.time.Instant.ofEpochMilli(takenAt)
-                .atZone(java.time.ZoneId.systemDefault())
-                .toLocalDate()
-            "${date.year}-${date.monthValue}"
-        } else "unknown"
+        val monthKey =
+            if (takenAt != null && takenAt > 0L) {
+                val date =
+                    java.time.Instant
+                        .ofEpochMilli(takenAt)
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toLocalDate()
+                "${date.year}-${date.monthValue}"
+            } else {
+                "unknown"
+            }
 
         if (monthKey != lastMonthKey) {
             lastMonthKey = monthKey
-            val label = if (takenAt != null && takenAt > 0L) {
-                val date = java.time.Instant.ofEpochMilli(takenAt)
-                    .atZone(java.time.ZoneId.systemDefault())
-                formatter.format(date)
-            } else "–"
+            val label =
+                if (takenAt != null && takenAt > 0L) {
+                    val date =
+                        java.time.Instant
+                            .ofEpochMilli(takenAt)
+                            .atZone(java.time.ZoneId.systemDefault())
+                    formatter.format(date)
+                } else {
+                    "–"
+                }
             item(key = "month_${monthKey}_${faceWithPhoto.faceRegion.id}", span = { GridItemSpan(3) }) {
                 androidx.compose.material3.Text(
                     text = label,
                     style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
                     color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = androidx.compose.ui.Modifier.padding(
-                        start = 4.dp, end = 4.dp, top = 12.dp, bottom = 4.dp
-                    )
+                    modifier =
+                        androidx.compose.ui.Modifier.padding(
+                            start = 4.dp,
+                            end = 4.dp,
+                            top = 12.dp,
+                            bottom = 4.dp,
+                        ),
                 )
             }
         }
@@ -601,7 +662,7 @@ private fun LazyGridScope.faceItemsWithMonthHeaders(
                 borderColor = borderColorFor(faceWithPhoto.faceRegion.id),
                 onTap = { onTap(faceWithPhoto.faceRegion.id) },
                 onLongPress = { onLongPress(faceWithPhoto.faceRegion.id) },
-                onImageTap = { onImageTap(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId) }
+                onImageTap = { onImageTap(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId) },
             )
         }
     }

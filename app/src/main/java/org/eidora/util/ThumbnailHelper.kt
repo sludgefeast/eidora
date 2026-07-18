@@ -10,11 +10,13 @@ import org.eidora.domain.model.FaceRegionCoords
 import java.io.File
 
 object ThumbnailHelper {
-
     private const val THUMBNAIL_SIZE = 128
     private const val PADDING_FACTOR = 0.10f
 
-    fun thumbnailFile(context: Context, faceRegionId: String): File {
+    fun thumbnailFile(
+        context: Context,
+        faceRegionId: String,
+    ): File {
         val dir = File(context.filesDir, "thumbnails")
         dir.mkdirs()
         return File(dir, "$faceRegionId.webp")
@@ -26,22 +28,30 @@ object ThumbnailHelper {
      */
     private fun loadRotatedBitmap(file: File): Bitmap? {
         val raw = BitmapFactory.decodeFile(file.absolutePath) ?: return null
-        val orientation = try {
-            ExifInterface(file.absolutePath).getAttributeInt(
-                ExifInterface.TAG_ORIENTATION,
+        val orientation =
+            try {
+                ExifInterface(file.absolutePath).getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL,
+                )
+            } catch (e: Exception) {
                 ExifInterface.ORIENTATION_NORMAL
-            )
-        } catch (e: Exception) {
-            ExifInterface.ORIENTATION_NORMAL
-        }
-        val degrees = when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-            ExifInterface.ORIENTATION_TRANSPOSE -> { /* flip + 90 handled below */ 90f }
-            ExifInterface.ORIENTATION_TRANSVERSE -> { /* flip + 270 handled below */ 270f }
-            else -> 0f
-        }
+            }
+        val degrees =
+            when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                ExifInterface.ORIENTATION_TRANSPOSE -> {
+                    // flip + 90 handled below
+                    90f
+                }
+                ExifInterface.ORIENTATION_TRANSVERSE -> {
+                    // flip + 270 handled below
+                    270f
+                }
+                else -> 0f
+            }
         if (degrees == 0f) return raw
         val matrix = Matrix().apply { postRotate(degrees) }
         val rotated = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
@@ -53,7 +63,12 @@ object ThumbnailHelper {
      * Creates a 128x128 WebP thumbnail for the face region with 10% padding.
      * Coords are in the rotated (visually correct) image space.
      */
-    fun createThumbnail(context: Context, photoFile: File, coords: FaceRegionCoords, faceRegionId: String): Boolean {
+    fun createThumbnail(
+        context: Context,
+        photoFile: File,
+        coords: FaceRegionCoords,
+        faceRegionId: String,
+    ): Boolean {
         return try {
             val original = loadRotatedBitmap(photoFile) ?: return false
             val imgW = original.width.toFloat()
@@ -66,12 +81,13 @@ object ThumbnailHelper {
             val padX = halfW * PADDING_FACTOR
             val padY = halfH * PADDING_FACTOR
 
-            val rect = RectF(
-                (cx - halfW - padX).coerceAtLeast(0f),
-                (cy - halfH - padY).coerceAtLeast(0f),
-                (cx + halfW + padX).coerceAtMost(imgW),
-                (cy + halfH + padY).coerceAtMost(imgH)
-            )
+            val rect =
+                RectF(
+                    (cx - halfW - padX).coerceAtLeast(0f),
+                    (cy - halfH - padY).coerceAtLeast(0f),
+                    (cx + halfW + padX).coerceAtMost(imgW),
+                    (cy + halfH + padY).coerceAtMost(imgH),
+                )
 
             // Make crop square to avoid distortion
             val cropSize = maxOf(rect.width(), rect.height())
@@ -80,11 +96,14 @@ object ThumbnailHelper {
             val squareRight = (squareLeft + cropSize).coerceAtMost(imgW)
             val squareBottom = (squareTop + cropSize).coerceAtMost(imgH)
 
-            val cropped = Bitmap.createBitmap(
-                original,
-                squareLeft.toInt(), squareTop.toInt(),
-                (squareRight - squareLeft).toInt(), (squareBottom - squareTop).toInt()
-            )
+            val cropped =
+                Bitmap.createBitmap(
+                    original,
+                    squareLeft.toInt(),
+                    squareTop.toInt(),
+                    (squareRight - squareLeft).toInt(),
+                    (squareBottom - squareTop).toInt(),
+                )
             val scaled = Bitmap.createScaledBitmap(cropped, THUMBNAIL_SIZE, THUMBNAIL_SIZE, true)
 
             val outFile = thumbnailFile(context, faceRegionId)
@@ -101,7 +120,10 @@ object ThumbnailHelper {
         }
     }
 
-    fun deleteThumbnail(context: Context, faceRegionId: String) {
+    fun deleteThumbnail(
+        context: Context,
+        faceRegionId: String,
+    ) {
         thumbnailFile(context, faceRegionId).delete()
     }
 
@@ -109,7 +131,10 @@ object ThumbnailHelper {
      * Crops the face region WITHOUT padding, scaled square crop for the embedding model input.
      * Coords are in the rotated (visually correct) image space.
      */
-    fun cropForEmbedding(photoFile: File, coords: FaceRegionCoords): Bitmap? {
+    fun cropForEmbedding(
+        photoFile: File,
+        coords: FaceRegionCoords,
+    ): Bitmap? {
         return try {
             val original = loadRotatedBitmap(photoFile) ?: return null
             val imgW = original.width.toFloat()

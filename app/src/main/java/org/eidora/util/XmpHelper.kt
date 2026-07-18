@@ -6,9 +6,9 @@ import com.ashampoo.xmp.XMPMeta
 import com.ashampoo.xmp.XMPMetaFactory
 import com.ashampoo.xmp.options.PropertyOptions
 import com.ashampoo.xmp.options.SerializeOptions
-import org.eidora.domain.model.FaceRegionCoords
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.eidora.domain.model.FaceRegionCoords
 import java.io.File
 
 private const val TAG = "XmpHelper"
@@ -22,11 +22,10 @@ private const val NS_MWG_KW = "http://www.metadataworkinggroup.com/schemas/keywo
 
 data class XmpFaceRegion(
     val name: String?,
-    val coords: FaceRegionCoords
+    val coords: FaceRegionCoords,
 )
 
 object XmpHelper {
-
     init {
         try {
             XMPMetaFactory.schemaRegistry.registerNamespace(NS_MWG_RS, "mwg-rs")
@@ -52,10 +51,16 @@ object XmpHelper {
             val bytes: ByteArray? = exif.getAttributeBytes(ExifInterface.TAG_XMP)
             if (bytes != null && bytes.isNotEmpty()) {
                 // Strip UTF-8 BOM (EF BB BF) if present – some writers add it
-                val start = if (bytes.size >= 3 &&
-                    bytes[0] == 0xEF.toByte() &&
-                    bytes[1] == 0xBB.toByte() &&
-                    bytes[2] == 0xBF.toByte()) 3 else 0
+                val start =
+                    if (bytes.size >= 3 &&
+                        bytes[0] == 0xEF.toByte() &&
+                        bytes[1] == 0xBB.toByte() &&
+                        bytes[2] == 0xBF.toByte()
+                    ) {
+                        3
+                    } else {
+                        0
+                    }
                 String(bytes, start, bytes.size - start, Charsets.UTF_8)
             } else {
                 // Fallback: getAttribute() returns a String already decoded by
@@ -74,10 +79,15 @@ object XmpHelper {
      * We set the attribute as a UTF-8 string; ExifInterface.saveAttributes()
      * writes the JPEG APP1 segment as-is.
      */
-    private fun writeXmpString(exif: ExifInterface, xmp: XMPMeta) {
-        val serialized = XMPMetaFactory.serializeToString(
-            xmp, SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true)
-        )
+    private fun writeXmpString(
+        exif: ExifInterface,
+        xmp: XMPMeta,
+    ) {
+        val serialized =
+            XMPMetaFactory.serializeToString(
+                xmp,
+                SerializeOptions().setOmitXmpMetaElement(false).setUseCompactFormat(true),
+            )
         // Verify round-trip: ensure the string contains no characters that
         // would be lost if encoded as UTF-8.
         val utf8Bytes = serialized.toByteArray(Charsets.UTF_8)
@@ -106,10 +116,12 @@ object XmpHelper {
                     val w = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Area/stArea:w")?.toFloatOrNull() ?: continue
                     val h = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Area/stArea:h")?.toFloatOrNull() ?: continue
                     val name = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Name")
-                    regions.add(XmpFaceRegion(
-                        name = name?.takeIf { n -> n.isNotBlank() },
-                        coords = FaceRegionCoords(x, y, w, h)
-                    ))
+                    regions.add(
+                        XmpFaceRegion(
+                            name = name?.takeIf { n -> n.isNotBlank() },
+                            coords = FaceRegionCoords(x, y, w, h),
+                        ),
+                    )
                 } catch (t: Throwable) {
                     Log.w(TAG, "Failed to parse region $i in ${file.name}, skipping", t)
                 }
@@ -121,14 +133,19 @@ object XmpHelper {
         }
     }
 
-    fun writeFaceRegions(file: File, regions: List<XmpFaceRegion>) {
+    fun writeFaceRegions(
+        file: File,
+        regions: List<XmpFaceRegion>,
+    ) {
         try {
             val exif = ExifInterface(file.absolutePath)
             val xmpString = readXmpString(exif)
-            val xmp: XMPMeta = if (xmpString != null)
-                XMPMetaFactory.parseFromString(xmpString)
-            else
-                XMPMetaFactory.create()
+            val xmp: XMPMeta =
+                if (xmpString != null) {
+                    XMPMetaFactory.parseFromString(xmpString)
+                } else {
+                    XMPMetaFactory.create()
+                }
 
             xmp.deleteProperty(NS_MWG_RS, "mwg-rs:Regions")
 
@@ -160,7 +177,9 @@ object XmpHelper {
             }
 
             val confirmedNames = regions.mapNotNull { it.name }.distinct()
-            try { writePersonTags(xmp, confirmedNames) } catch (t: Throwable) {
+            try {
+                writePersonTags(xmp, confirmedNames)
+            } catch (t: Throwable) {
                 Log.e(TAG, "Failed to write person tags", t)
             }
 
@@ -180,7 +199,11 @@ object XmpHelper {
             xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
             xmp.deleteProperty(NS_DIGIKAM, "digiKam:TagsList")
             xmp.deleteProperty(NS_LR, "lr:hierarchicalSubject")
-            try { clearPeopleSubjects(xmp) } catch (t: Throwable) { Log.w(TAG, "clearPeopleSubjects failed", t) }
+            try {
+                clearPeopleSubjects(xmp)
+            } catch (t: Throwable) {
+                Log.w(TAG, "clearPeopleSubjects failed", t)
+            }
             writeXmpString(exif, xmp)
             exif.saveAttributes()
         } catch (t: Throwable) {
@@ -188,7 +211,10 @@ object XmpHelper {
         }
     }
 
-    private fun writePersonTags(xmp: XMPMeta, names: List<String>) {
+    private fun writePersonTags(
+        xmp: XMPMeta,
+        names: List<String>,
+    ) {
         val bagOpts = PropertyOptions().setArray(true)
         val seqOpts = PropertyOptions().setArray(true).setArrayOrdered(true)
         val emptyOpts = PropertyOptions()
@@ -236,7 +262,9 @@ object XmpHelper {
                     personNames.add(value.removePrefix("People/"))
                 }
             }
-        } catch (t: Throwable) { /* TagsList may not exist yet */ }
+        } catch (t: Throwable) {
+            // TagsList may not exist yet
+        }
 
         if (personNames.isEmpty()) return
 
@@ -251,4 +279,5 @@ object XmpHelper {
 }
 
 fun FaceRegionCoords.toJson(): String = Json.encodeToString(this)
+
 fun String.toFaceRegionCoords(): FaceRegionCoords = Json.decodeFromString(this)

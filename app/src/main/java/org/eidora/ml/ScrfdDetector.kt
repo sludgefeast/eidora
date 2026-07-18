@@ -34,15 +34,16 @@ private const val NMS_IOU_THRESHOLD = 0.4f
  *   - bbox  [1, n, 4]  (distances left/top/right/bottom in stride units)
  *   - kps   [1, n, 10] (5 landmark offsets in stride units)
  */
-class ScrfdDetector(context: Context) : Closeable {
-
+class ScrfdDetector(
+    context: Context,
+) : Closeable {
     data class DetectedFace(
         val xMin: Float,
         val yMin: Float,
         val width: Float,
         val height: Float,
         val rotationRadians: Float,
-        val score: Float
+        val score: Float,
     )
 
     private val interpreter: Interpreter
@@ -51,17 +52,25 @@ class ScrfdDetector(context: Context) : Closeable {
 
     val backend: String
 
-    private data class ScaleOutputs(val score: Int, val bbox: Int, val kps: Int)
+    private data class ScaleOutputs(
+        val score: Int,
+        val bbox: Int,
+        val kps: Int,
+    )
+
     private val scaleOutputs: Map<Int, ScaleOutputs>
 
     init {
         // Bundled as an APK asset at build time (downloaded from the
         // models-v2 release by the build workflow).
-        val buffer = context.assets.openFd("scrfd_2.5g_kps_640_float32.tflite").use { afd ->
-            java.io.FileInputStream(afd.fileDescriptor).channel.map(
-                FileChannel.MapMode.READ_ONLY, afd.startOffset, afd.declaredLength
-            )
-        }
+        val buffer =
+            context.assets.openFd("scrfd_2.5g_kps_640_float32.tflite").use { afd ->
+                java.io.FileInputStream(afd.fileDescriptor).channel.map(
+                    FileChannel.MapMode.READ_ONLY,
+                    afd.startOffset,
+                    afd.declaredLength,
+                )
+            }
 
         val gpu = tryCreateGpu(buffer)
         if (gpu != null) {
@@ -86,14 +95,16 @@ class ScrfdDetector(context: Context) : Closeable {
             val options = Interpreter.Options().addDelegate(delegate)
             Pair(Interpreter(buffer, options), delegate)
         } catch (t: Throwable) {
-            Log.w(TAG, "GPU init failed, using CPU", t); null
+            Log.w(TAG, "GPU init failed, using CPU", t)
+            null
         }
     }
 
     private fun resolveOutputIndices(): Map<Int, ScaleOutputs> {
-        val anchorCounts = STRIDES.associateWith {
-            (INPUT_SIZE / it) * (INPUT_SIZE / it) * NUM_ANCHORS_PER_CELL
-        }
+        val anchorCounts =
+            STRIDES.associateWith {
+                (INPUT_SIZE / it) * (INPUT_SIZE / it) * NUM_ANCHORS_PER_CELL
+            }
         val scoreByStride = mutableMapOf<Int, Int>()
         val bboxByStride = mutableMapOf<Int, Int>()
         val kpsByStride = mutableMapOf<Int, Int>()
@@ -102,11 +113,12 @@ class ScrfdDetector(context: Context) : Closeable {
             val shape = interpreter.getOutputTensor(i).shape()
             Log.i(TAG, "Output tensor $i shape: ${shape.contentToString()}")
             // Accept both [1, n, c] (batched) and [n, c] (non-batched) layouts
-            val (n, c) = when {
-                shape.size == 3 && shape[0] == 1 -> shape[1] to shape[2]
-                shape.size == 2 -> shape[0] to shape[1]
-                else -> continue
-            }
+            val (n, c) =
+                when {
+                    shape.size == 3 && shape[0] == 1 -> shape[1] to shape[2]
+                    shape.size == 2 -> shape[0] to shape[1]
+                    else -> continue
+                }
             val stride = anchorCounts.entries.find { it.value == n }?.key ?: continue
             when (c) {
                 1 -> scoreByStride[stride] = i
@@ -117,12 +129,15 @@ class ScrfdDetector(context: Context) : Closeable {
 
         return STRIDES.associateWith { stride ->
             ScaleOutputs(
-                score = scoreByStride[stride]
-                    ?: throw IllegalStateException("Missing score output for stride $stride"),
-                bbox = bboxByStride[stride]
-                    ?: throw IllegalStateException("Missing bbox output for stride $stride"),
-                kps = kpsByStride[stride]
-                    ?: throw IllegalStateException("Missing kps output for stride $stride")
+                score =
+                    scoreByStride[stride]
+                        ?: throw IllegalStateException("Missing score output for stride $stride"),
+                bbox =
+                    bboxByStride[stride]
+                        ?: throw IllegalStateException("Missing bbox output for stride $stride"),
+                kps =
+                    kpsByStride[stride]
+                        ?: throw IllegalStateException("Missing kps output for stride $stride"),
             )
         }
     }
@@ -139,13 +154,12 @@ class ScrfdDetector(context: Context) : Closeable {
 
     /** Unwraps a 2D or 3D output buffer into rows of FloatArray. */
     @Suppress("UNCHECKED_CAST")
-    private fun rows(buffer: Any): Array<FloatArray> {
-        return when {
+    private fun rows(buffer: Any): Array<FloatArray> =
+        when {
             buffer is Array<*> && buffer.size == 1 && buffer[0] is Array<*> ->
                 buffer[0] as Array<FloatArray>
             else -> buffer as Array<FloatArray>
         }
-    }
 
     suspend fun detect(source: Bitmap): List<DetectedFace> {
         val resized = Bitmap.createScaledBitmap(source, INPUT_SIZE, INPUT_SIZE, true)
@@ -171,7 +185,7 @@ class ScrfdDetector(context: Context) : Closeable {
                 rows(outputs[idx.score]!!),
                 rows(outputs[idx.bbox]!!),
                 rows(outputs[idx.kps]!!),
-                candidates
+                candidates,
             )
         }
         return nms(candidates)
@@ -182,7 +196,7 @@ class ScrfdDetector(context: Context) : Closeable {
         scores: Array<FloatArray>,
         bbox: Array<FloatArray>,
         kps: Array<FloatArray>,
-        out: MutableList<DetectedFace>
+        out: MutableList<DetectedFace>,
     ) {
         val cols = INPUT_SIZE / stride
         val n = cols * cols * NUM_ANCHORS_PER_CELL
@@ -208,10 +222,12 @@ class ScrfdDetector(context: Context) : Closeable {
             val leftEyeX = cx + kps[i][2] * stride
             val leftEyeY = cy + kps[i][3] * stride
 
-            val rotation = kotlin.math.atan2(
-                (rightEyeY - leftEyeY).toDouble(),
-                (rightEyeX - leftEyeX).toDouble()
-            ).toFloat()
+            val rotation =
+                kotlin.math
+                    .atan2(
+                        (rightEyeY - leftEyeY).toDouble(),
+                        (rightEyeX - leftEyeX).toDouble(),
+                    ).toFloat()
 
             out.add(
                 DetectedFace(
@@ -220,8 +236,8 @@ class ScrfdDetector(context: Context) : Closeable {
                     width = ((x2 - x1) / INPUT_SIZE).coerceIn(0f, 1f),
                     height = ((y2 - y1) / INPUT_SIZE).coerceIn(0f, 1f),
                     rotationRadians = rotation,
-                    score = score
-                )
+                    score = score,
+                ),
             )
         }
     }
@@ -235,7 +251,9 @@ class ScrfdDetector(context: Context) : Closeable {
             val r = ((px shr 16 and 0xFF) - 127.5f) / 128f
             val g = ((px shr 8 and 0xFF) - 127.5f) / 128f
             val b = ((px and 0xFF) - 127.5f) / 128f
-            buffer.putFloat(r); buffer.putFloat(g); buffer.putFloat(b)
+            buffer.putFloat(r)
+            buffer.putFloat(g)
+            buffer.putFloat(b)
         }
         buffer.rewind()
         return buffer
@@ -253,7 +271,10 @@ class ScrfdDetector(context: Context) : Closeable {
         return keep
     }
 
-    private fun iou(a: DetectedFace, b: DetectedFace): Float {
+    private fun iou(
+        a: DetectedFace,
+        b: DetectedFace,
+    ): Float {
         val aX2 = a.xMin + a.width
         val aY2 = a.yMin + a.height
         val bX2 = b.xMin + b.width
@@ -269,7 +290,15 @@ class ScrfdDetector(context: Context) : Closeable {
     }
 
     override fun close() {
-        try { interpreter.close() } catch (t: Throwable) { /* ignore */ }
-        try { gpuDelegate?.close() } catch (t: Throwable) { /* ignore */ }
+        try {
+            interpreter.close()
+        } catch (t: Throwable) {
+            // ignore
+        }
+        try {
+            gpuDelegate?.close()
+        } catch (t: Throwable) {
+            // ignore
+        }
     }
 }

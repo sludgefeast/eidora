@@ -3,31 +3,34 @@ package org.eidora.ui.settings
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import org.eidora.data.settings.ClusteringConfig
 import org.eidora.data.settings.PowerConfig
 import org.eidora.data.settings.SettingsProvider
 import org.eidora.data.settings.SettingsRepository
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 
 data class SettingsUiState(
-    val clusteringConfig: ClusteringConfig = ClusteringConfig(
-        edgeThreshold = SettingsRepository.DEFAULT_EDGE_THRESHOLD,
-        clusterMatchThreshold = SettingsRepository.DEFAULT_CLUSTER_MATCH_THRESHOLD,
-        individualMatchThreshold = SettingsRepository.DEFAULT_INDIVIDUAL_MATCH_THRESHOLD,
-        minClusterSize = SettingsRepository.DEFAULT_MIN_CLUSTER_SIZE,
-        timeWeight = SettingsRepository.DEFAULT_TIME_WEIGHT
-    ),
-    val powerConfig: PowerConfig = PowerConfig(
-        minBatteryPercent = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
-        maxBatteryTempCelsius = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP
-    ),
+    val clusteringConfig: ClusteringConfig =
+        ClusteringConfig(
+            edgeThreshold = SettingsRepository.DEFAULT_EDGE_THRESHOLD,
+            clusterMatchThreshold = SettingsRepository.DEFAULT_CLUSTER_MATCH_THRESHOLD,
+            individualMatchThreshold = SettingsRepository.DEFAULT_INDIVIDUAL_MATCH_THRESHOLD,
+            minClusterSize = SettingsRepository.DEFAULT_MIN_CLUSTER_SIZE,
+            timeWeight = SettingsRepository.DEFAULT_TIME_WEIGHT,
+        ),
+    val powerConfig: PowerConfig =
+        PowerConfig(
+            minBatteryPercent = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
+            maxBatteryTempCelsius = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
+        ),
     val availableFolders: List<String> = emptyList(),
-    val folderWhitelist: Set<String> = SettingsRepository.DEFAULT_FOLDER_WHITELIST
+    val folderWhitelist: Set<String> = SettingsRepository.DEFAULT_FOLDER_WHITELIST,
 )
 
-class SettingsViewModel(app: Application) : AndroidViewModel(app) {
-
+class SettingsViewModel(
+    app: Application,
+) : AndroidViewModel(app) {
     private val repo = SettingsProvider.get(app)
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -50,8 +53,6 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
-
-
 
     fun setClusteringConfig(config: ClusteringConfig) {
         viewModelScope.launch { repo.setClusteringConfig(config) }

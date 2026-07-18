@@ -7,29 +7,27 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import org.eidora.R
-import java.io.File
-import kotlinx.coroutines.launch
 import org.eidora.ui.common.LazyGridScrollbar
-import androidx.compose.runtime.rememberCoroutineScope
+import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PhotosScreen(
     viewModel: PhotosViewModel,
     onPhotoClick: (photoId: String, faceId: String?) -> Unit,
-    onBack: (() -> Unit)? = null
+    onBack: (() -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
     val gridState = rememberLazyGridState()
@@ -47,9 +45,10 @@ fun PhotosScreen(
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             state = gridState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(end = 26.dp)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(end = 26.dp),
         ) {
             state.items.forEach { item ->
                 when (item) {
@@ -59,10 +58,11 @@ fun PhotosScreen(
                                 text = item.label,
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(MaterialTheme.colorScheme.background)
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.background)
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
                             )
                         }
                     }
@@ -72,19 +72,20 @@ fun PhotosScreen(
                                 photo = item,
                                 isSelected = state.selectedPhotoIds.contains(item.entity.id),
                                 onTap = {
-                                    if (state.isMultiSelectActive)
+                                    if (state.isMultiSelectActive) {
                                         viewModel.toggleSelection(item.entity.id)
-                                    else {
+                                    } else {
                                         val faceId = state.confirmedFaceByPhoto[item.entity.id]
                                         onPhotoClick(item.entity.id, faceId)
                                     }
                                 },
                                 onLongPress = {
-                                    if (state.isMultiSelectActive)
+                                    if (state.isMultiSelectActive) {
                                         viewModel.rangeSelect(item.entity.id)
-                                    else
+                                    } else {
                                         viewModel.toggleSelection(item.entity.id)
-                                }
+                                    }
+                                },
                             )
                         }
                     }
@@ -95,9 +96,10 @@ fun PhotosScreen(
         LazyGridScrollbar(
             state = gridState,
             scope = scope,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
+            modifier =
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight(),
         )
 
         if (state.currentYear.isNotBlank()) {
@@ -105,28 +107,29 @@ fun PhotosScreen(
                 text = state.currentYear,
                 fontSize = 13.sp,
                 color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 8.dp, end = 12.dp)
-                    .background(
-                        color = Color.Black.copy(alpha = 0.45f),
-                        shape = MaterialTheme.shapes.small
-                    )
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 8.dp, end = 12.dp)
+                        .background(
+                            color = Color.Black.copy(alpha = 0.45f),
+                            shape = MaterialTheme.shapes.small,
+                        ).padding(horizontal = 8.dp, vertical = 2.dp),
             )
         }
 
         if (state.isMultiSelectActive && state.selectedPhotoIds.isNotEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.BottomCenter
+                contentAlignment = Alignment.BottomCenter,
             ) {
                 Surface(shadowElevation = 8.dp) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
                     ) {
                         Button(onClick = { viewModel.redetectSelected() }) {
                             Text(stringResource(R.string.action_redetect))
@@ -148,29 +151,29 @@ private fun PhotoGridItem(
     photo: PhotosListItem.Photo,
     isSelected: Boolean,
     onTap: () -> Unit,
-    onLongPress: () -> Unit
+    onLongPress: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(2.dp)
-            .aspectRatio(1f)
-            .combinedClickable(onClick = onTap, onLongClick = onLongPress)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(2.dp)
+                .aspectRatio(1f)
+                .combinedClickable(onClick = onTap, onLongClick = onLongPress),
     ) {
         AsyncImage(
             model = File(photo.entity.path),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         )
         if (isSelected) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0x660D47A1))
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color(0x660D47A1)),
             )
         }
     }
 }
-
-

@@ -7,13 +7,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object ModelDownloader {
-
     private const val TAG = "ModelDownloader"
 
     data class ModelInfo(
         val filename: String,
         val url: String,
-        val sha256: String
+        val sha256: String,
     )
 
     // All ML models (SCRFD detector, ArcFace embedding) are bundled as APK
@@ -21,10 +20,15 @@ object ModelDownloader {
     // kept empty so the download worker is a no-op.
     private val ALL_MODELS = emptyList<ModelInfo>()
 
-    fun modelFile(context: Context, info: ModelInfo): File =
-        File(context.filesDir, info.filename)
+    fun modelFile(
+        context: Context,
+        info: ModelInfo,
+    ): File = File(context.filesDir, info.filename)
 
-    fun isDownloaded(context: Context, info: ModelInfo): Boolean {
+    fun isDownloaded(
+        context: Context,
+        info: ModelInfo,
+    ): Boolean {
         val file = modelFile(context, info)
         return file.exists() && verify(file, info) == VerifyResult.OK
     }
@@ -32,13 +36,15 @@ object ModelDownloader {
     /**
      * True when all models required for the pipeline are present.
      */
-    fun allModelsReady(context: Context): Boolean =
-        ALL_MODELS.all { isDownloaded(context, it) }
+    fun allModelsReady(context: Context): Boolean = ALL_MODELS.all { isDownloaded(context, it) }
 
     enum class VerifyResult { OK, WRONG_HASH }
 
     /** Verifies the file's SHA-256 matches [info.sha256]. */
-    fun verify(file: File, info: ModelInfo): VerifyResult {
+    fun verify(
+        file: File,
+        info: ModelInfo,
+    ): VerifyResult {
         val actual = sha256(file)
         if (actual == null || !actual.equals(info.sha256, ignoreCase = true)) {
             Log.w(TAG, "${info.filename}: hash mismatch (got $actual)")
@@ -47,8 +53,8 @@ object ModelDownloader {
         return VerifyResult.OK
     }
 
-    private fun sha256(file: File): String? {
-        return try {
+    private fun sha256(file: File): String? =
+        try {
             val md = java.security.MessageDigest.getInstance("SHA-256")
             file.inputStream().use { input ->
                 val buffer = ByteArray(8192)
@@ -60,34 +66,40 @@ object ModelDownloader {
             }
             md.digest().joinToString("") { "%02x".format(it) }
         } catch (t: Throwable) {
-            Log.w(TAG, "SHA-256 computation failed", t); null
+            Log.w(TAG, "SHA-256 computation failed", t)
+            null
         }
-    }
 
     enum class DownloadOutcome {
         /** All missing models were downloaded and verified. */
         SUCCESS,
+
         /** A network error occurred (transient) – caller should retry. */
         NETWORK_ERROR,
+
         /** A model was downloaded but its hash did not match (persistent). */
-        HASH_MISMATCH
+        HASH_MISMATCH,
     }
 
     /**
      * Downloads every missing model. Progress callback aggregates over all
      * pending downloads (0-100 across the entire batch).
      */
-    fun download(context: Context, onProgress: ((Int) -> Unit)? = null): DownloadOutcome {
+    fun download(
+        context: Context,
+        onProgress: ((Int) -> Unit)? = null,
+    ): DownloadOutcome {
         val pending = ALL_MODELS.filter { !isDownloaded(context, it) }
         if (pending.isEmpty()) return DownloadOutcome.SUCCESS
 
         pending.forEachIndexed { index, info ->
-            val outcome = downloadOne(context, info) { p ->
-                if (onProgress != null) {
-                    val overall = ((index * 100 + p) / pending.size)
-                    onProgress(overall)
+            val outcome =
+                downloadOne(context, info) { p ->
+                    if (onProgress != null) {
+                        val overall = ((index * 100 + p) / pending.size)
+                        onProgress(overall)
+                    }
                 }
-            }
             if (outcome != DownloadOutcome.SUCCESS) return outcome
         }
         return DownloadOutcome.SUCCESS
@@ -96,7 +108,7 @@ object ModelDownloader {
     private fun downloadOne(
         context: Context,
         info: ModelInfo,
-        onProgress: ((Int) -> Unit)?
+        onProgress: ((Int) -> Unit)?,
     ): DownloadOutcome {
         val target = File(context.filesDir, info.filename)
         val tempFile = File(context.filesDir, "${info.filename}.part")

@@ -2,8 +2,6 @@ package org.eidora.util
 
 import android.graphics.Bitmap
 import org.eidora.domain.model.FaceRegionCoords
-import org.eidora.ml.ScrfdDetector
-import kotlin.math.abs
 import kotlin.math.exp
 
 /**
@@ -18,7 +16,6 @@ import kotlin.math.exp
  *    images → low variance → low score.
  */
 object FaceQuality {
-
     /**
      * Computes a quality score in [0..1] for a detected face.
      *
@@ -30,7 +27,7 @@ object FaceQuality {
     fun compute(
         coords: FaceRegionCoords,
         rotationRad: Float?,
-        faceBitmap: Bitmap?
+        faceBitmap: Bitmap?,
     ): Float {
         val sizeScore = sizeScore(coords.w, coords.h)
         val frontalScore = if (rotationRad != null) frontalScore(rotationRad) else 0.5f
@@ -45,20 +42,25 @@ object FaceQuality {
      * Quick estimate without a bitmap: useful when we only have bbox + angle.
      * Sharpness defaults to the neutral value 0.5.
      */
-    fun computeFast(coords: FaceRegionCoords, rotationRad: Float?): Float =
-        compute(coords, rotationRad, null)
+    fun computeFast(
+        coords: FaceRegionCoords,
+        rotationRad: Float?,
+    ): Float = compute(coords, rotationRad, null)
 
     // -----------------------------------------------------------------------
 
     /** Logistic curve: 1% area → 0.27, 5% → 0.73, 10% → 0.88, 25% → 0.98 */
-    private fun sizeScore(w: Float, h: Float): Float {
+    private fun sizeScore(
+        w: Float,
+        h: Float,
+    ): Float {
         val area = (w * h).coerceIn(0f, 1f)
         return 1f / (1f + exp(-10f * (area - 0.05f)))
     }
 
     /** Gaussian around 0 rad; FWHM ≈ 40° means ±20° still scores > 0.5. */
     private fun frontalScore(rotationRad: Float): Float {
-        val sigma = 0.35f   // radians ≈ 20°
+        val sigma = 0.35f // radians ≈ 20°
         return exp(-(rotationRad * rotationRad) / (2f * sigma * sigma))
     }
 
@@ -76,20 +78,22 @@ object FaceQuality {
         bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
 
         // Convert to grayscale, then apply 3x3 Laplacian kernel
-        val gray = FloatArray(w * h) { i ->
-            val px = pixels[i]
-            0.299f * (px shr 16 and 0xFF) +
-            0.587f * (px shr 8 and 0xFF) +
-            0.114f * (px and 0xFF)
-        }
+        val gray =
+            FloatArray(w * h) { i ->
+                val px = pixels[i]
+                0.299f * (px shr 16 and 0xFF) +
+                    0.587f * (px shr 8 and 0xFF) +
+                    0.114f * (px and 0xFF)
+            }
 
         var sum = 0.0
         var count = 0
         for (y in 1 until h - 1) {
             for (x in 1 until w - 1) {
-                val lap = -4f * gray[y * w + x] +
-                    gray[(y - 1) * w + x] + gray[(y + 1) * w + x] +
-                    gray[y * w + (x - 1)] + gray[y * w + (x + 1)]
+                val lap =
+                    -4f * gray[y * w + x] +
+                        gray[(y - 1) * w + x] + gray[(y + 1) * w + x] +
+                        gray[y * w + (x - 1)] + gray[y * w + (x + 1)]
                 sum += lap * lap
                 count++
             }

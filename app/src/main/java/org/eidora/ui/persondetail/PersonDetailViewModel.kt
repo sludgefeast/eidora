@@ -3,15 +3,14 @@ package org.eidora.ui.persondetail
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.db.FaceRegionWithPhoto
 import org.eidora.data.db.PersonWithCount
 import org.eidora.data.repository.FaceRepository
-import org.eidora.worker.SyncPipeline
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
-
 import org.eidora.ui.common.MultiSelectState
+import org.eidora.worker.SyncPipeline
 
 enum class PersonDetailViewMode { NORMAL, UNKNOWN, IGNORED, SUGGESTION }
 
@@ -27,7 +26,7 @@ data class PersonDetailUiState(
     val allPersons: List<PersonWithCount> = emptyList(),
     val personSearchQuery: String = "",
     val isReassigning: Boolean = false,
-    val mergeConflict: MergeConflict? = null
+    val mergeConflict: MergeConflict? = null,
 ) {
     val selectedFaceIds get() = multiSelect.selectedIds
     val isMultiSelectActive get() = multiSelect.isActive
@@ -37,11 +36,12 @@ data class MergeConflict(
     val sourcePersonId: String,
     val targetPersonId: String,
     val targetPersonName: String,
-    val targetRepresentativeFaceId: String?
+    val targetRepresentativeFaceId: String?,
 )
 
-class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
-
+class PersonDetailViewModel(
+    app: Application,
+) : AndroidViewModel(app) {
     private val db = DatabaseProvider.getInstance(app)
     private val repo = FaceRepository(app, db)
     private val faceDao = db.faceRegionDao()
@@ -70,20 +70,26 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
             _uiState.update {
                 it.copy(
                     personName = person?.name ?: "",
-                    viewMode = if (isSuggestion) PersonDetailViewMode.SUGGESTION
-                               else PersonDetailViewMode.NORMAL
+                    viewMode =
+                        if (isSuggestion) {
+                            PersonDetailViewMode.SUGGESTION
+                        } else {
+                            PersonDetailViewMode.NORMAL
+                        },
                 )
             }
 
             faceDao.observeByPersonId(personId).collect { faces: List<FaceRegionWithPhoto> ->
                 _uiState.update {
                     it.copy(
-                        unconfirmedFaces = faces.filter { f ->
-                            f.faceRegion.name == null && !f.faceRegion.ignored
-                        },
-                        confirmedFaces = faces.filter { f ->
-                            f.faceRegion.name != null && !f.faceRegion.ignored
-                        }
+                        unconfirmedFaces =
+                            faces.filter { f ->
+                                f.faceRegion.name == null && !f.faceRegion.ignored
+                            },
+                        confirmedFaces =
+                            faces.filter { f ->
+                                f.faceRegion.name != null && !f.faceRegion.ignored
+                            },
                     )
                 }
             }
@@ -95,11 +101,12 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
             repo.observeUnknownFaces().collect { faces: List<FaceRegionWithPhoto> ->
                 _uiState.update {
                     it.copy(
-                        personName = getApplication<Application>()
-                            .getString(org.eidora.R.string.virtual_person_unknown),
+                        personName =
+                            getApplication<Application>()
+                                .getString(org.eidora.R.string.virtual_person_unknown),
                         viewMode = PersonDetailViewMode.UNKNOWN,
                         unconfirmedFaces = faces,
-                        confirmedFaces = emptyList()
+                        confirmedFaces = emptyList(),
                     )
                 }
             }
@@ -111,11 +118,12 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
             repo.observeIgnoredFaces().collect { faces: List<FaceRegionWithPhoto> ->
                 _uiState.update {
                     it.copy(
-                        personName = getApplication<Application>()
-                            .getString(org.eidora.R.string.virtual_person_ignored),
+                        personName =
+                            getApplication<Application>()
+                                .getString(org.eidora.R.string.virtual_person_ignored),
                         viewMode = PersonDetailViewMode.IGNORED,
                         unconfirmedFaces = faces,
-                        confirmedFaces = emptyList()
+                        confirmedFaces = emptyList(),
                     )
                 }
             }
@@ -128,8 +136,9 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun rangeSelectFace(faceId: String) {
         _uiState.update { state ->
-            val orderedIds = (state.unconfirmedFaces + state.confirmedFaces)
-                .map { it.faceRegion.id }
+            val orderedIds =
+                (state.unconfirmedFaces + state.confirmedFaces)
+                    .map { it.faceRegion.id }
             state.copy(multiSelect = state.multiSelect.rangeSelect(faceId, orderedIds))
         }
     }
@@ -137,7 +146,6 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
     fun clearSelection() {
         _uiState.update { it.copy(multiSelect = it.multiSelect.clear()) }
     }
-
 
     fun showFaceActions(faceId: String) {
         _uiState.update { it.copy(actionFaceId = faceId) }
@@ -195,12 +203,13 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
             if (existing != null && existing.id != personId) {
                 _uiState.update {
                     it.copy(
-                        mergeConflict = MergeConflict(
-                            sourcePersonId = personId,
-                            targetPersonId = existing.id,
-                            targetPersonName = trimmed,
-                            targetRepresentativeFaceId = existing.representativeFaceId
-                        )
+                        mergeConflict =
+                            MergeConflict(
+                                sourcePersonId = personId,
+                                targetPersonId = existing.id,
+                                targetPersonName = trimmed,
+                                targetRepresentativeFaceId = existing.representativeFaceId,
+                            ),
                     )
                 }
                 return@launch
@@ -209,7 +218,7 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
             _uiState.update {
                 it.copy(
                     personName = trimmed,
-                    viewMode = PersonDetailViewMode.NORMAL
+                    viewMode = PersonDetailViewMode.NORMAL,
                 )
             }
         }
@@ -223,7 +232,7 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             repo.mergePersons(
                 listOf(conflict.sourcePersonId, conflict.targetPersonId),
-                conflict.targetPersonId
+                conflict.targetPersonId,
             )
         }
     }
@@ -239,7 +248,8 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
     fun reassignUnknownFaces() {
         val app = getApplication<Application>()
         _uiState.update { it.copy(isReassigning = true) }
-        org.eidora.worker.SyncPipeline.enqueueClustering(app)
+        org.eidora.worker.SyncPipeline
+            .enqueueClustering(app)
         // Reset spinner after a short delay - the flow will already have
         // updated the visible faces as they leave "Unknown"
         viewModelScope.launch {
@@ -303,9 +313,19 @@ class PersonDetailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun filteredPersons(): List<PersonWithCount> {
-        val q = _uiState.value.personSearchQuery.trim().lowercase()
-        return if (q.isEmpty()) _uiState.value.allPersons
-        else _uiState.value.allPersons.filter { it.person.name?.lowercase()?.contains(q) == true }
+        val q =
+            _uiState.value.personSearchQuery
+                .trim()
+                .lowercase()
+        return if (q.isEmpty()) {
+            _uiState.value.allPersons
+        } else {
+            _uiState.value.allPersons.filter {
+                it.person.name
+                    ?.lowercase()
+                    ?.contains(q) == true
+            }
+        }
     }
 
     fun assignToExistingPerson(personId: String) {

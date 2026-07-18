@@ -3,11 +3,6 @@ package org.eidora.worker
 import android.content.Context
 import android.util.Log
 import androidx.work.*
-import org.eidora.data.db.DatabaseProvider
-import org.eidora.data.db.FaceRegionEntity
-import org.eidora.ml.EmbeddingModel
-import org.eidora.util.ThumbnailHelper
-import org.eidora.util.toFaceRegionCoords
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -19,6 +14,11 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.eidora.data.db.DatabaseProvider
+import org.eidora.data.db.FaceRegionEntity
+import org.eidora.ml.EmbeddingModel
+import org.eidora.util.ThumbnailHelper
+import org.eidora.util.toFaceRegionCoords
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -27,21 +27,21 @@ private const val PARALLELISM = 3
 
 class EmbeddingWorker(
     context: Context,
-    params: WorkerParameters
+    params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
-
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     override suspend fun doWork(): Result {
         val db = DatabaseProvider.getInstance(applicationContext)
         val faceDao = db.faceRegionDao()
         val photoDao = db.photoDao()
 
-        val model = try {
-            EmbeddingModel(applicationContext)
-        } catch (t: Throwable) {
-            Log.e(TAG, "Failed to initialize embedding model", t)
-            return Result.failure()
-        }
+        val model =
+            try {
+                EmbeddingModel(applicationContext)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to initialize embedding model", t)
+                return Result.failure()
+            }
         Log.i(TAG, "Embedding model initialized on backend: ${model.backend}")
 
         return try {
@@ -50,71 +50,87 @@ class EmbeddingWorker(
             if (total == 0) return Result.success()
 
             val powerGate = PowerGate(applicationContext)
-            val powerConfig = try {
-                org.eidora.data.settings.SettingsProvider.get(applicationContext).getPowerConfig()
-            } catch (t: Throwable) {
-                org.eidora.data.settings.PowerConfig(
-                    minBatteryPercent = 20,
-                    maxBatteryTempCelsius = 40.0f
-                )
-            }
+            val powerConfig =
+                try {
+                    org.eidora.data.settings.SettingsProvider
+                        .get(applicationContext)
+                        .getPowerConfig()
+                } catch (t: Throwable) {
+                    org.eidora.data.settings.PowerConfig(
+                        minBatteryPercent = 20,
+                        maxBatteryTempCelsius = 40.0f,
+                    )
+                }
 
             val done = AtomicInteger(0)
             val startedAt = System.currentTimeMillis()
             // Shared status: either "X%" or a pause reason – the notifier reads this
-            val currentStatus = java.util.concurrent.atomic.AtomicReference<String>("")
+            val currentStatus =
+                java.util.concurrent.atomic
+                    .AtomicReference<String>("")
 
-            val notifierScope = kotlinx.coroutines.CoroutineScope(
-                kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob()
-            )
-            val notifierJob = notifierScope.launch {
-                while (isActive) {
-                    val current = done.get()
-                    val progress = if (total == 0) 0 else (current * 100) / total
-                    val eta = PhotoSyncWorker.formatEta(applicationContext, startedAt, current, total)
-                    // If a pause reason is set, show that; otherwise show progress + ETA
-                    val status = currentStatus.get()
-                    val message = when {
-                        status.isNotEmpty() -> status
-                        eta.isNotEmpty() -> "$progress% – $eta"
-                        else -> "$progress%"
+            val notifierScope =
+                kotlinx.coroutines.CoroutineScope(
+                    kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob(),
+                )
+            val notifierJob =
+                notifierScope.launch {
+                    while (isActive) {
+                        val current = done.get()
+                        val progress = if (total == 0) 0 else (current * 100) / total
+                        val eta = PhotoSyncWorker.formatEta(applicationContext, startedAt, current, total)
+                        // If a pause reason is set, show that; otherwise show progress + ETA
+                        val status = currentStatus.get()
+                        val message =
+                            when {
+                                status.isNotEmpty() -> status
+                                eta.isNotEmpty() -> "$progress% – $eta"
+                                else -> "$progress%"
+                            }
+                        try {
+                            setForeground(
+                                NotificationHelper.embeddingForegroundInfoWithMessage(
+                                    applicationContext,
+                                    progress,
+                                    message,
+                                ),
+                            )
+                        } catch (t: Throwable) {
+                            // ignore
+                        }
+                        kotlinx.coroutines.delay(500)
                     }
-                    try {
-                        setForeground(
-                            NotificationHelper.embeddingForegroundInfoWithMessage(applicationContext, progress, message)
-                        )
-                    } catch (t: Throwable) { /* ignore */ }
-                    kotlinx.coroutines.delay(500)
                 }
-            }
 
             // Producer: crop face bitmaps in parallel on IO dispatcher
             // Consumer (implicit): compute embedding via mutex-guarded interpreter,
             // then write result back to DB
-            pending.asFlow()
+            pending
+                .asFlow()
                 .flatMapMerge(concurrency = PARALLELISM) { face ->
                     flow {
                         powerGate.awaitOk(
                             powerConfig.minBatteryPercent,
-                            powerConfig.maxBatteryTempCelsius
+                            powerConfig.maxBatteryTempCelsius,
                         ) { reason ->
                             // Only update the shared status – the notifier handles display
                             currentStatus.set(reason)
                         }
                         currentStatus.set("") // clear pause reason when gate opens
-                        val bitmap = try {
-                            val photo = photoDao.findById(face.photoId) ?: return@flow
-                            val photoFile = File(photo.path)
-                            if (!photoFile.exists()) return@flow
-                            val coords = face.regionJson.toFaceRegionCoords()
-                            ThumbnailHelper.cropForEmbedding(photoFile, coords)
-                        } catch (t: Throwable) {
-                            Log.e(TAG, "Failed to prepare face ${face.id}, skipping", t); null
-                        }
+                        val bitmap =
+                            try {
+                                val photo = photoDao.findById(face.photoId) ?: return@flow
+                                val photoFile = File(photo.path)
+                                if (!photoFile.exists()) return@flow
+                                val coords = face.regionJson.toFaceRegionCoords()
+                                ThumbnailHelper.cropForEmbedding(photoFile, coords)
+                            } catch (t: Throwable) {
+                                Log.e(TAG, "Failed to prepare face ${face.id}, skipping", t)
+                                null
+                            }
                         if (bitmap != null) emit(face to bitmap)
                     }.flowOn(Dispatchers.IO)
-                }
-                .buffer(capacity = PARALLELISM)
+                }.buffer(capacity = PARALLELISM)
                 .collect { (face, bitmap) ->
                     try {
                         val embedding = model.computeEmbedding(bitmap)
@@ -124,11 +140,12 @@ class EmbeddingWorker(
                         // already computed at detection time.
                         try {
                             val coords = face.regionJson.toFaceRegionCoords()
-                            val refined = org.eidora.util.FaceQuality.compute(
-                                coords = coords,
-                                rotationRad = null, // rotation already baked into initial score
-                                faceBitmap = bitmap
-                            )
+                            val refined =
+                                org.eidora.util.FaceQuality.compute(
+                                    coords = coords,
+                                    rotationRad = null, // rotation already baked into initial score
+                                    faceBitmap = bitmap,
+                                )
                             // Blend detection-time score (2/3) with sharpness (1/3)
                             val prev = face.qualityScore ?: refined
                             val blended = prev * 0.667f + refined * 0.333f
@@ -142,10 +159,13 @@ class EmbeddingWorker(
                         bitmap.recycle()
                     }
                     val current = done.incrementAndGet()
-                    setProgress(workDataOf(
-                        PhotoSyncWorker.KEY_PROGRESS to (current * 100) / total,
-                        PhotoSyncWorker.KEY_STATUS to applicationContext.getString(org.eidora.R.string.notif_embedding_title)
-                    ))
+                    setProgress(
+                        workDataOf(
+                            PhotoSyncWorker.KEY_PROGRESS to (current * 100) / total,
+                            PhotoSyncWorker.KEY_STATUS to
+                                applicationContext.getString(org.eidora.R.string.notif_embedding_title),
+                        ),
+                    )
                 }
 
             notifierJob.cancel()
@@ -155,16 +175,22 @@ class EmbeddingWorker(
             Log.e(TAG, "Unhandled error in EmbeddingWorker", t)
             Result.failure()
         } finally {
-            try { model.close() } catch (t: Throwable) { Log.w(TAG, "Error closing model", t) }
             try {
-                androidx.core.app.NotificationManagerCompat.from(applicationContext)
+                model.close()
+            } catch (t: Throwable) {
+                Log.w(TAG, "Error closing model", t)
+            }
+            try {
+                androidx.core.app.NotificationManagerCompat
+                    .from(applicationContext)
                     .cancel(NotificationHelper.NOTIFICATION_ID_EMBEDDING)
-            } catch (t: Throwable) { /* ignore */ }
+            } catch (t: Throwable) {
+                // ignore
+            }
         }
     }
 
     companion object {
-        fun buildRequest(): OneTimeWorkRequest =
-            OneTimeWorkRequestBuilder<EmbeddingWorker>().build()
+        fun buildRequest(): OneTimeWorkRequest = OneTimeWorkRequestBuilder<EmbeddingWorker>().build()
     }
 }

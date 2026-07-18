@@ -3,19 +3,20 @@ package org.eidora.ui.fullscreen
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.db.FaceRegionEntity
 import org.eidora.data.repository.FaceRepository
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 
 data class FullscreenUiState(
     val photoPath: String? = null,
-    val faceRegions: List<FaceRegionEntity> = emptyList()
+    val faceRegions: List<FaceRegionEntity> = emptyList(),
 )
 
-class FullscreenViewModel(app: Application) : AndroidViewModel(app) {
-
+class FullscreenViewModel(
+    app: Application,
+) : AndroidViewModel(app) {
     private val db = DatabaseProvider.getInstance(app)
     private val repo = FaceRepository(app, db)
     private val faceDao = db.faceRegionDao()

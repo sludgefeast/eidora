@@ -4,6 +4,13 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.RotateLeft
+import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,27 +28,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BrokenImage
-import androidx.compose.material.icons.filled.RotateLeft
-import androidx.compose.material.icons.filled.RotateRight
 import androidx.exifinterface.media.ExifInterface
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.eidora.R
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.domain.model.FaceRegionCoords
 import org.eidora.util.ThumbnailHelper
 import org.eidora.util.toFaceRegionCoords
 import org.eidora.util.toJson
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.min
 
@@ -52,7 +52,7 @@ private const val MAX_ZOOM = 6f
 fun FullscreenPhotoScreen(
     viewModel: FullscreenViewModel,
     currentFaceRegionId: String?,
-    onRedetect: () -> Unit
+    onRedetect: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
     val photoFile = remember(state.photoPath) { state.photoPath?.let { File(it) } }
@@ -65,12 +65,12 @@ fun FullscreenPhotoScreen(
                     imageVector = Icons.Default.BrokenImage,
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(R.string.photo_not_found),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -102,16 +102,20 @@ fun FullscreenPhotoScreen(
                     val file = photoFile ?: return@withContext
                     // 1. Write EXIF orientation
                     val exif = ExifInterface(file.absolutePath)
-                    val currentOrientation = exif.getAttributeInt(
-                        ExifInterface.TAG_ORIENTATION,
-                        ExifInterface.ORIENTATION_NORMAL
-                    )
+                    val currentOrientation =
+                        exif.getAttributeInt(
+                            ExifInterface.TAG_ORIENTATION,
+                            ExifInterface.ORIENTATION_NORMAL,
+                        )
                     val newOrientation = rotateExifOrientation(currentOrientation, delta.toInt())
                     exif.setAttribute(ExifInterface.TAG_ORIENTATION, newOrientation.toString())
                     exif.saveAttributes()
                     // Notify MediaStore so other apps see the new orientation
                     android.media.MediaScannerConnection.scanFile(
-                        context, arrayOf(file.absolutePath), arrayOf("image/jpeg"), null
+                        context,
+                        arrayOf(file.absolutePath),
+                        arrayOf("image/jpeg"),
+                        null,
                     )
 
                     // 2. Transform face region coords + regenerate thumbnails
@@ -130,7 +134,7 @@ fun FullscreenPhotoScreen(
                     // 3. Invalidate Coil cache so next recompose shows rotated image
                     context.imageLoader.diskCache?.remove(file.absolutePath)
                     context.imageLoader.memoryCache?.remove(
-                        coil.memory.MemoryCache.Key(file.absolutePath)
+                        coil.memory.MemoryCache.Key(file.absolutePath),
                     )
                 } catch (t: Throwable) {
                     android.util.Log.e("FullscreenPhoto", "Failed to save rotation", t)
@@ -143,57 +147,61 @@ fun FullscreenPhotoScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { containerSize = it }
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = {
-                            if (scale > 1.01f) {
-                                scale = 1f; offsetX = 0f; offsetY = 0f
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .onSizeChanged { containerSize = it }
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                if (scale > 1.01f) {
+                                    scale = 1f
+                                    offsetX = 0f
+                                    offsetY = 0f
+                                } else {
+                                    scale = 2.5f
+                                }
+                            },
+                        )
+                    }.pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(MIN_ZOOM, MAX_ZOOM)
+                            scale = newScale
+                            if (newScale > 1.01f) {
+                                offsetX += pan.x
+                                offsetY += pan.y
+                                val maxOffsetX = (containerSize.width * (newScale - 1f)) / 2f
+                                val maxOffsetY = (containerSize.height * (newScale - 1f)) / 2f
+                                offsetX = offsetX.coerceIn(-maxOffsetX, maxOffsetX)
+                                offsetY = offsetY.coerceIn(-maxOffsetY, maxOffsetY)
                             } else {
-                                scale = 2.5f
+                                offsetX = 0f
+                                offsetY = 0f
                             }
                         }
-                    )
-                }
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        val newScale = (scale * zoom).coerceIn(MIN_ZOOM, MAX_ZOOM)
-                        scale = newScale
-                        if (newScale > 1.01f) {
-                            offsetX += pan.x
-                            offsetY += pan.y
-                            val maxOffsetX = (containerSize.width * (newScale - 1f)) / 2f
-                            val maxOffsetY = (containerSize.height * (newScale - 1f)) / 2f
-                            offsetX = offsetX.coerceIn(-maxOffsetX, maxOffsetX)
-                            offsetY = offsetY.coerceIn(-maxOffsetY, maxOffsetY)
-                        } else {
-                            offsetX = 0f; offsetY = 0f
-                        }
-                    }
-                }
-                .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offsetX,
-                    translationY = offsetY,
-                    rotationZ = displayRotation
-                )
+                    }.graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offsetX,
+                        translationY = offsetY,
+                        rotationZ = displayRotation,
+                    ),
         ) {
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(state.photoPath?.let { File(it) })
-                    .diskCachePolicy(CachePolicy.DISABLED)
-                    .memoryCachePolicy(CachePolicy.DISABLED)
-                    .build(),
+                model =
+                    ImageRequest
+                        .Builder(context)
+                        .data(state.photoPath?.let { File(it) })
+                        .diskCachePolicy(CachePolicy.DISABLED)
+                        .memoryCachePolicy(CachePolicy.DISABLED)
+                        .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 onSuccess = { result ->
                     val d = result.painter.intrinsicSize
                     intrinsicSize = IntSize(d.width.toInt(), d.height.toInt())
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
 
             if (containerSize != IntSize.Zero && intrinsicSize != IntSize.Zero) {
@@ -201,11 +209,12 @@ fun FullscreenPhotoScreen(
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     state.faceRegions.forEach { face ->
                         val coords = face.regionJson.toFaceRegionCoords()
-                        val color = when {
-                            face.id == currentFaceRegionId -> Color.Magenta
-                            face.ignored -> Color.Gray
-                            else -> Color.Green
-                        }
+                        val color =
+                            when {
+                                face.id == currentFaceRegionId -> Color.Magenta
+                                face.ignored -> Color.Gray
+                                else -> Color.Green
+                            }
                         drawFaceRect(coords, color, imageRect, strokeScale = 1f / scale)
                     }
                 }
@@ -214,16 +223,17 @@ fun FullscreenPhotoScreen(
 
         // Bottom bar: rotate left | redetect | rotate right
         Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             FilledTonalIconButton(onClick = { rotate(-90f) }) {
                 Icon(
                     Icons.Default.RotateLeft,
-                    contentDescription = stringResource(R.string.action_rotate_left)
+                    contentDescription = stringResource(R.string.action_rotate_left),
                 )
             }
             Button(onClick = onRedetect) {
@@ -232,7 +242,7 @@ fun FullscreenPhotoScreen(
             FilledTonalIconButton(onClick = { rotate(90f) }) {
                 Icon(
                     Icons.Default.RotateRight,
-                    contentDescription = stringResource(R.string.action_rotate_right)
+                    contentDescription = stringResource(R.string.action_rotate_right),
                 )
             }
         }
@@ -242,24 +252,31 @@ fun FullscreenPhotoScreen(
 /**
  * Computes the new EXIF orientation after rotating by [deltaDegrees] (90 or -90).
  */
-private fun rotateExifOrientation(current: Int, deltaDegrees: Int): Int {
+private fun rotateExifOrientation(
+    current: Int,
+    deltaDegrees: Int,
+): Int {
     // Normalize current orientation to degrees
-    val currentDeg = when (current) {
-        ExifInterface.ORIENTATION_ROTATE_90  -> 90
-        ExifInterface.ORIENTATION_ROTATE_180 -> 180
-        ExifInterface.ORIENTATION_ROTATE_270 -> 270
-        else                                  -> 0
-    }
+    val currentDeg =
+        when (current) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270
+            else -> 0
+        }
     val newDeg = ((currentDeg + deltaDegrees) + 360) % 360
     return when (newDeg) {
-        90  -> ExifInterface.ORIENTATION_ROTATE_90
+        90 -> ExifInterface.ORIENTATION_ROTATE_90
         180 -> ExifInterface.ORIENTATION_ROTATE_180
         270 -> ExifInterface.ORIENTATION_ROTATE_270
         else -> ExifInterface.ORIENTATION_NORMAL
     }
 }
 
-private fun fitRect(intrinsic: IntSize, container: IntSize): Rect {
+private fun fitRect(
+    intrinsic: IntSize,
+    container: IntSize,
+): Rect {
     val scaleX = container.width.toFloat() / intrinsic.width.toFloat()
     val scaleY = container.height.toFloat() / intrinsic.height.toFloat()
     val scale = min(scaleX, scaleY)
@@ -274,7 +291,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFaceRect(
     coords: FaceRegionCoords,
     color: Color,
     imageRect: Rect,
-    strokeScale: Float
+    strokeScale: Float,
 ) {
     val imgW = imageRect.width
     val imgH = imageRect.height
@@ -290,6 +307,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFaceRect(
         color = color,
         topLeft = Offset(left, top),
         size = Size(right - left, bottom - top),
-        style = Stroke(width = 3.dp.toPx() * strokeScale)
+        style = Stroke(width = 3.dp.toPx() * strokeScale),
     )
 }

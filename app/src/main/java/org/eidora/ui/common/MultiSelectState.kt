@@ -10,19 +10,22 @@ package org.eidora.ui.common
 data class MultiSelectState<T>(
     val selectedIds: Set<T> = emptySet(),
     val lastSelectedId: T? = null,
-    val isActive: Boolean = false
+    val isActive: Boolean = false,
 ) {
     /**
      * Toggles a single item. Activates multiselect on first selection.
      */
     fun toggle(id: T): MultiSelectState<T> {
         val newSelected = selectedIds.toMutableSet()
-        if (newSelected.contains(id)) newSelected.remove(id)
-        else newSelected.add(id)
+        if (newSelected.contains(id)) {
+            newSelected.remove(id)
+        } else {
+            newSelected.add(id)
+        }
         return copy(
             selectedIds = newSelected,
             isActive = newSelected.isNotEmpty(),
-            lastSelectedId = if (newSelected.isNotEmpty()) id else null
+            lastSelectedId = if (newSelected.isNotEmpty()) id else null,
         )
     }
 
@@ -33,7 +36,10 @@ data class MultiSelectState<T>(
      * @param id the item that was long-pressed
      * @param orderedIds the full ordered list of visible item IDs
      */
-    fun rangeSelect(id: T, orderedIds: List<T>): MultiSelectState<T> {
+    fun rangeSelect(
+        id: T,
+        orderedIds: List<T>,
+    ): MultiSelectState<T> {
         val lastId = lastSelectedId
         if (lastId == null || lastId == id) {
             return toggle(id)
@@ -46,16 +52,18 @@ data class MultiSelectState<T>(
             return toggle(id)
         }
 
-        val range = if (lastIndex < currentIndex)
-            orderedIds.subList(lastIndex, currentIndex + 1)
-        else
-            orderedIds.subList(currentIndex, lastIndex + 1)
+        val range =
+            if (lastIndex < currentIndex) {
+                orderedIds.subList(lastIndex, currentIndex + 1)
+            } else {
+                orderedIds.subList(currentIndex, lastIndex + 1)
+            }
 
         val newSelected = selectedIds.toMutableSet().also { it.addAll(range) }
         return copy(
             selectedIds = newSelected,
             isActive = true,
-            lastSelectedId = id
+            lastSelectedId = id,
         )
     }
 

@@ -27,32 +27,35 @@ fun CircleThumbnail(
     modifier: Modifier = Modifier,
     borderColor: Color? = null,
     borderWidth: Dp = 3.dp,
-    overlay: @Composable BoxScope.() -> Unit = {}
+    overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .then(
-                if (borderColor != null)
-                    Modifier
-                        .background(borderColor, CircleShape)
-                        .padding(borderWidth)
-                else Modifier
-            )
-            .clip(CircleShape)
+        modifier =
+            modifier
+                .aspectRatio(1f)
+                .then(
+                    if (borderColor != null) {
+                        Modifier
+                            .background(borderColor, CircleShape)
+                            .padding(borderWidth)
+                    } else {
+                        Modifier
+                    },
+                ).clip(CircleShape),
     ) {
         if (file != null && file.exists()) {
             AsyncImage(
                 model = file,
                 contentDescription = contentDescription,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
         } else {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF9E9E9E))
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF9E9E9E)),
             )
         }
         overlay()
@@ -66,19 +69,20 @@ fun CircleThumbnail(
 fun CircleColorLabel(
     color: Color,
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(CircleShape)
-            .background(color),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .aspectRatio(1f)
+                .clip(CircleShape)
+                .background(color),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.titleMedium,
-            color = Color.White
+            color = Color.White,
         )
     }
 }

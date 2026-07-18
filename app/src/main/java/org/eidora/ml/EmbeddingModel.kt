@@ -27,8 +27,9 @@ private const val EMBEDDING_DIM = 512
  * Output: 512-dim embedding (unnormalized; cosineDistance normalizes).
  * Thread-safe: the TFLite interpreter is guarded by a mutex.
  */
-class EmbeddingModel(context: Context) : Closeable {
-
+class EmbeddingModel(
+    context: Context,
+) : Closeable {
     private val interpreter: Interpreter
     private val gpuDelegate: GpuDelegate?
     private val mutex = Mutex()
@@ -36,11 +37,14 @@ class EmbeddingModel(context: Context) : Closeable {
     val backend: String
 
     init {
-        val buffer = context.assets.openFd("arcface_w600k_mbf_float32.tflite").use { afd ->
-            java.io.FileInputStream(afd.fileDescriptor).channel.map(
-                FileChannel.MapMode.READ_ONLY, afd.startOffset, afd.declaredLength
-            )
-        }
+        val buffer =
+            context.assets.openFd("arcface_w600k_mbf_float32.tflite").use { afd ->
+                java.io.FileInputStream(afd.fileDescriptor).channel.map(
+                    FileChannel.MapMode.READ_ONLY,
+                    afd.startOffset,
+                    afd.declaredLength,
+                )
+            }
 
         val gpu = tryCreateGpu(buffer)
         if (gpu != null) {
@@ -94,15 +98,25 @@ class EmbeddingModel(context: Context) : Closeable {
             val r = ((px shr 16 and 0xFF) - 127.5f) / 127.5f
             val g = ((px shr 8 and 0xFF) - 127.5f) / 127.5f
             val b = ((px and 0xFF) - 127.5f) / 127.5f
-            buffer.putFloat(r); buffer.putFloat(g); buffer.putFloat(b)
+            buffer.putFloat(r)
+            buffer.putFloat(g)
+            buffer.putFloat(b)
         }
         buffer.rewind()
         return buffer
     }
 
     override fun close() {
-        try { interpreter.close() } catch (t: Throwable) { /* ignore */ }
-        try { gpuDelegate?.close() } catch (t: Throwable) { /* ignore */ }
+        try {
+            interpreter.close()
+        } catch (t: Throwable) {
+            // ignore
+        }
+        try {
+            gpuDelegate?.close()
+        } catch (t: Throwable) {
+            // ignore
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -110,7 +124,6 @@ class EmbeddingModel(context: Context) : Closeable {
     // -----------------------------------------------------------------------
 
     companion object {
-
         fun floatArrayToBytes(array: FloatArray): ByteArray {
             val buffer = ByteBuffer.allocate(array.size * 4).order(ByteOrder.LITTLE_ENDIAN)
             array.forEach { buffer.putFloat(it) }
@@ -122,7 +135,10 @@ class EmbeddingModel(context: Context) : Closeable {
             return FloatArray(bytes.size / 4) { buffer.float }
         }
 
-        fun cosineDistance(a: FloatArray, b: FloatArray): Float {
+        fun cosineDistance(
+            a: FloatArray,
+            b: FloatArray,
+        ): Float {
             var dot = 0f
             var normA = 0f
             var normB = 0f
@@ -135,8 +151,7 @@ class EmbeddingModel(context: Context) : Closeable {
             return if (denom < 1e-10f) 1f else 1f - (dot / denom)
         }
 
-        fun centroid(embeddings: List<FloatArray>): FloatArray =
-            weightedCentroid(embeddings.map { it to 1f })
+        fun centroid(embeddings: List<FloatArray>): FloatArray = weightedCentroid(embeddings.map { it to 1f })
 
         /**
          * Weighted centroid: each embedding is weighted by its quality score.

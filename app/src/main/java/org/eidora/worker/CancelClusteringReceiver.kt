@@ -10,7 +10,10 @@ import androidx.work.WorkManager
  * Triggered by the "Abbrechen" action in the clustering notification.
  */
 class CancelClusteringReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         WorkManager.getInstance(context).cancelUniqueWork(SyncPipeline.UNIQUE_CLUSTERING_NAME)
     }
 }

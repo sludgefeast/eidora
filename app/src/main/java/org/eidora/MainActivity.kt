@@ -8,19 +8,24 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.*
+import androidx.compose.material3.Checkbox
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -30,31 +35,27 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import kotlinx.coroutines.launch
+import org.eidora.data.db.DatabaseProvider
+import org.eidora.data.repository.FaceRepository
 import org.eidora.ui.fullscreen.FullscreenPhotoScreen
 import org.eidora.ui.fullscreen.FullscreenViewModel
 import org.eidora.ui.persondetail.PersonDetailScreen
 import org.eidora.ui.persondetail.PersonDetailViewModel
-import org.eidora.ui.persons.VIRTUAL_IGNORED
-import org.eidora.ui.persons.VIRTUAL_UNKNOWN
 import org.eidora.ui.persons.PersonsScreen
 import org.eidora.ui.persons.PersonsViewModel
+import org.eidora.ui.persons.VIRTUAL_IGNORED
+import org.eidora.ui.persons.VIRTUAL_UNKNOWN
 import org.eidora.ui.photos.PhotosScreen
 import org.eidora.ui.photos.PhotosViewModel
 import org.eidora.ui.theme.EidoraTheme
-import android.util.Log
-import org.eidora.data.db.DatabaseProvider
-import org.eidora.data.repository.FaceRepository
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Checkbox
 import org.eidora.worker.SyncPipeline
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        androidx.core.view.WindowCompat
+            .setDecorFitsSystemWindows(window, false)
         setContent {
             EidoraTheme {
                 EidoraApp()
@@ -64,9 +65,11 @@ class MainActivity : ComponentActivity() {
 }
 
 private fun requiredMediaPermission() =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_IMAGES
-    else Manifest.permission.READ_EXTERNAL_STORAGE
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
 
 private fun hasAllFilesAccess() =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
@@ -84,17 +87,20 @@ fun EidoraApp() {
     var hasNotifications by remember {
         mutableStateOf(
             Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED,
         )
     }
 
     val mediaLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasMedia = it }
-    val filesLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        hasFiles = hasAllFilesAccess()
-    }
-    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        hasNotifications = it
-    }
+    val filesLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            hasFiles = hasAllFilesAccess()
+        }
+    val notificationLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            hasNotifications = it
+        }
 
     val hasAllPermissions = hasMedia && hasFiles && hasNotifications
 
@@ -118,7 +124,7 @@ fun EidoraApp() {
                 Text(
                     "Faces needs the following permissions to work:",
                     style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 16.dp),
                 )
                 if (!hasMedia) {
                     Button(onClick = { mediaLauncher.launch(permission) }, modifier = Modifier.padding(bottom = 8.dp)) {
@@ -127,10 +133,12 @@ fun EidoraApp() {
                 }
                 if (!hasFiles) {
                     Button(onClick = {
-                        filesLauncher.launch(Intent(
-                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                            Uri.parse("package:${context.packageName}")
-                        ))
+                        filesLauncher.launch(
+                            Intent(
+                                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                Uri.parse("package:${context.packageName}"),
+                            ),
+                        )
                     }, modifier = Modifier.padding(bottom = 8.dp)) {
                         Text(stringResource(R.string.permission_files))
                     }
@@ -150,7 +158,12 @@ fun EidoraApp() {
     }
 
     val navController = rememberNavController()
-    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    val currentRoute =
+        navController
+            .currentBackStackEntryAsState()
+            .value
+            ?.destination
+            ?.route
 
     val personsVm: PersonsViewModel = viewModel()
     var menuExpanded by remember { mutableStateOf(false) }
@@ -173,7 +186,7 @@ fun EidoraApp() {
                 TextButton(onClick = { showRejectAllConfirm = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
-            }
+            },
         )
     }
 
@@ -186,10 +199,11 @@ fun EidoraApp() {
                 TextButton(onClick = {
                     showReanalyseAllConfirm = false
                     reanalyseScope.launch {
-                        val repo = org.eidora.data.repository.FaceRepository(
-                            context,
-                            DatabaseProvider.getInstance(context)
-                        )
+                        val repo =
+                            org.eidora.data.repository.FaceRepository(
+                                context,
+                                DatabaseProvider.getInstance(context),
+                            )
                         repo.resetAllFaces()
                         SyncPipeline.enqueueForce(context)
                     }
@@ -199,7 +213,7 @@ fun EidoraApp() {
                 TextButton(onClick = { showReanalyseAllConfirm = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
-            }
+            },
         )
     }
 
@@ -216,23 +230,27 @@ fun EidoraApp() {
                     Text(
                         stringResource(R.string.clustering_dialog_hint),
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                        modifier = Modifier.padding(bottom = 12.dp),
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = clusteringRejectSuggestions,
-                            onCheckedChange = { clusteringRejectSuggestions = it }
+                            onCheckedChange = { clusteringRejectSuggestions = it },
                         )
-                        Text(stringResource(R.string.clustering_option_reject_suggestions),
-                            modifier = Modifier.padding(start = 4.dp))
+                        Text(
+                            stringResource(R.string.clustering_option_reject_suggestions),
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = clusteringRemoveUnconfirmed,
-                            onCheckedChange = { clusteringRemoveUnconfirmed = it }
+                            onCheckedChange = { clusteringRemoveUnconfirmed = it },
                         )
-                        Text(stringResource(R.string.clustering_option_remove_unconfirmed),
-                            modifier = Modifier.padding(start = 4.dp))
+                        Text(
+                            stringResource(R.string.clustering_option_remove_unconfirmed),
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
                     }
                 }
             },
@@ -242,7 +260,7 @@ fun EidoraApp() {
                     SyncPipeline.enqueueClustering(
                         context,
                         rejectSuggestions = clusteringRejectSuggestions,
-                        removeUnconfirmed = clusteringRemoveUnconfirmed
+                        removeUnconfirmed = clusteringRemoveUnconfirmed,
                     )
                 }) { Text(stringResource(R.string.action_start)) }
             },
@@ -250,7 +268,7 @@ fun EidoraApp() {
                 TextButton(onClick = { showClusteringDialog = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
-            }
+            },
         )
     }
 
@@ -269,17 +287,17 @@ fun EidoraApp() {
                             }
                             DropdownMenu(
                                 expanded = menuExpanded2,
-                                onDismissRequest = { menuExpanded2 = false }
+                                onDismissRequest = { menuExpanded2 = false },
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.settings_title)) },
                                     onClick = {
                                         menuExpanded2 = false
                                         navController.navigate("settings")
-                                    }
+                                    },
                                 )
                             }
-                        }
+                        },
                     )
                 }
                 "persons" -> {
@@ -292,7 +310,7 @@ fun EidoraApp() {
                             }
                             DropdownMenu(
                                 expanded = menuExpanded,
-                                onDismissRequest = { menuExpanded = false }
+                                onDismissRequest = { menuExpanded = false },
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.action_start_clustering)) },
@@ -301,31 +319,31 @@ fun EidoraApp() {
                                         clusteringRejectSuggestions = false
                                         clusteringRemoveUnconfirmed = false
                                         showClusteringDialog = true
-                                    }
+                                    },
                                 )
                                 DropdownMenuItem(
                                     text = {
                                         Text(
                                             stringResource(R.string.action_reject_all_suggestions),
-                                            color = MaterialTheme.colorScheme.error
+                                            color = MaterialTheme.colorScheme.error,
                                         )
                                     },
                                     onClick = {
                                         menuExpanded = false
                                         showRejectAllConfirm = true
-                                    }
+                                    },
                                 )
                                 DropdownMenuItem(
                                     text = {
                                         Text(
                                             stringResource(R.string.action_reanalyse_all),
-                                            color = MaterialTheme.colorScheme.error
+                                            color = MaterialTheme.colorScheme.error,
                                         )
                                     },
                                     onClick = {
                                         menuExpanded = false
                                         showReanalyseAllConfirm = true
-                                    }
+                                    },
                                 )
                                 HorizontalDivider()
                                 DropdownMenuItem(
@@ -333,10 +351,10 @@ fun EidoraApp() {
                                     onClick = {
                                         menuExpanded = false
                                         navController.navigate("settings")
-                                    }
+                                    },
                                 )
                             }
-                        }
+                        },
                     )
                 }
             }
@@ -347,28 +365,28 @@ fun EidoraApp() {
                     selected = currentRoute == "persons",
                     onClick = { navController.navigate("persons") { launchSingleTop = true } },
                     icon = { Icon(Icons.Default.People, null) },
-                    label = { Text(stringResource(R.string.nav_persons)) }
+                    label = { Text(stringResource(R.string.nav_persons)) },
                 )
                 NavigationBarItem(
                     selected = currentRoute == "photos",
                     onClick = { navController.navigate("photos") { launchSingleTop = true } },
                     icon = { Icon(Icons.Default.Photo, null) },
-                    label = { Text(stringResource(R.string.nav_photos)) }
+                    label = { Text(stringResource(R.string.nav_photos)) },
                 )
             }
-        }
+        },
     ) { padding ->
         NavHost(navController, startDestination = "persons", modifier = Modifier.padding(padding)) {
             composable("persons") {
                 PersonsScreen(
                     viewModel = personsVm,
                     onPersonClick = { navController.navigate("person_detail/$it") },
-                    onPersonLongClick = { }
+                    onPersonLongClick = { },
                 )
             }
             composable(
                 "person_detail/{personId}",
-                listOf(navArgument("personId") { type = NavType.StringType })
+                listOf(navArgument("personId") { type = NavType.StringType }),
             ) { back ->
                 val personId = back.arguments?.getString("personId") ?: return@composable
                 val vm: PersonDetailViewModel = viewModel()
@@ -390,15 +408,19 @@ fun EidoraApp() {
                     onShowPhotos = { pid -> navController.navigate("person_photos/$pid") },
                     onFaceClick = { faceId, photoId ->
                         navController.navigate("fullscreen/$photoId?faceId=$faceId")
-                    }
+                    },
                 )
             }
             composable(
                 "fullscreen/{photoId}?faceId={faceId}",
                 listOf(
                     navArgument("photoId") { type = NavType.StringType },
-                    navArgument("faceId") { type = NavType.StringType; nullable = true; defaultValue = null }
-                )
+                    navArgument("faceId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
             ) { back ->
                 val photoId = back.arguments?.getString("photoId") ?: return@composable
                 val faceId = back.arguments?.getString("faceId")
@@ -415,19 +437,19 @@ fun EidoraApp() {
                     viewModel = vm,
                     onPhotoClick = { photoId, _ ->
                         navController.navigate("fullscreen/$photoId")
-                    }
+                    },
                 )
             }
             composable("settings") {
                 val vm: org.eidora.ui.settings.SettingsViewModel = viewModel()
                 org.eidora.ui.settings.SettingsScreen(
                     viewModel = vm,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(
                 "person_photos/{personId}",
-                listOf(navArgument("personId") { type = NavType.StringType })
+                listOf(navArgument("personId") { type = NavType.StringType }),
             ) { back ->
                 val personId = back.arguments?.getString("personId") ?: return@composable
                 val vm: PhotosViewModel = viewModel()
@@ -436,11 +458,12 @@ fun EidoraApp() {
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                     onPhotoClick = { photoId, faceId ->
-                        if (faceId != null)
+                        if (faceId != null) {
                             navController.navigate("fullscreen/$photoId?faceId=$faceId")
-                        else
+                        } else {
                             navController.navigate("fullscreen/$photoId")
-                    }
+                        }
+                    },
                 )
             }
         }

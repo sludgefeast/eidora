@@ -14,12 +14,15 @@ private const val CHECK_INTERVAL_MS = 5000L
 data class PowerStatus(
     val batteryPercent: Int,
     val batteryTempCelsius: Float,
-    val thermalStatus: Int  // PowerManager.THERMAL_STATUS_*
+    val thermalStatus: Int, // PowerManager.THERMAL_STATUS_*
 )
 
 sealed class PowerGateResult {
     object Ok : PowerGateResult()
-    data class Blocked(val reason: String) : PowerGateResult()
+
+    data class Blocked(
+        val reason: String,
+    ) : PowerGateResult()
 }
 
 /**
@@ -27,8 +30,9 @@ sealed class PowerGateResult {
  * from SettingsRepository and blocks (with a status message) while the
  * current device state exceeds them.
  */
-class PowerGate(private val context: Context) {
-
+class PowerGate(
+    private val context: Context,
+) {
     fun currentStatus(): PowerStatus {
         val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
@@ -38,10 +42,13 @@ class PowerGate(private val context: Context) {
         val percent = if (level >= 0 && scale > 0) (level * 100) / scale else -1
         val tempC = if (tempTenths >= 0) tempTenths / 10f else -1f
 
-        val thermal = try {
-            val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-            if (android.os.Build.VERSION.SDK_INT >= 29) pm.currentThermalStatus else 0
-        } catch (t: Throwable) { 0 }
+        val thermal =
+            try {
+                val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+                if (android.os.Build.VERSION.SDK_INT >= 29) pm.currentThermalStatus else 0
+            } catch (t: Throwable) {
+                0
+            }
 
         return PowerStatus(percent, tempC, thermal)
     }
@@ -49,17 +56,20 @@ class PowerGate(private val context: Context) {
     fun evaluate(
         status: PowerStatus,
         minBatteryPercent: Int,
-        maxBatteryTempCelsius: Float
+        maxBatteryTempCelsius: Float,
     ): PowerGateResult {
         if (status.batteryPercent in 0 until minBatteryPercent) {
             return PowerGateResult.Blocked(
-                context.getString(org.eidora.R.string.powergate_battery_low, minBatteryPercent, status.batteryPercent)
+                context.getString(org.eidora.R.string.powergate_battery_low, minBatteryPercent, status.batteryPercent),
             )
         }
         if (status.batteryTempCelsius > 0f && status.batteryTempCelsius > maxBatteryTempCelsius) {
             return PowerGateResult.Blocked(
-                context.getString(org.eidora.R.string.powergate_battery_hot,
-                    "%.1f".format(status.batteryTempCelsius), "%.1f".format(maxBatteryTempCelsius))
+                context.getString(
+                    org.eidora.R.string.powergate_battery_hot,
+                    "%.1f".format(status.batteryTempCelsius),
+                    "%.1f".format(maxBatteryTempCelsius),
+                ),
             )
         }
         if (status.thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE) {
@@ -75,7 +85,7 @@ class PowerGate(private val context: Context) {
     suspend fun awaitOk(
         minBatteryPercent: Int,
         maxBatteryTempCelsius: Float,
-        onWait: suspend (String) -> Unit
+        onWait: suspend (String) -> Unit,
     ) {
         while (true) {
             val status = currentStatus()

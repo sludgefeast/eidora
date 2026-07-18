@@ -9,12 +9,12 @@ object DatabaseProvider {
 
     fun getInstance(context: Context): EidoraDatabase =
         instance ?: synchronized(this) {
-            instance ?: Room.databaseBuilder(
-                context.applicationContext,
-                EidoraDatabase::class.java,
-                "faces.db"
-            )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            instance ?: Room
+                .databaseBuilder(
+                    context.applicationContext,
+                    EidoraDatabase::class.java,
+                    "faces.db",
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
                 .also { instance = it }
         }
