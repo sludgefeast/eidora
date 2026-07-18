@@ -50,10 +50,11 @@ object ThumbnailHelper {
         }
 
         // Second pass: decode at reduced resolution
-        val decodeOpts = BitmapFactory.Options().apply {
-            inSampleSize = sampleSize
-            inPreferredConfig = android.graphics.Bitmap.Config.RGB_565 // 2 bytes/px vs 4
-        }
+        val decodeOpts =
+            BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = android.graphics.Bitmap.Config.RGB_565 // 2 bytes/px vs 4
+            }
         val raw = BitmapFactory.decodeFile(file.absolutePath, decodeOpts) ?: return null
         val orientation =
             try {

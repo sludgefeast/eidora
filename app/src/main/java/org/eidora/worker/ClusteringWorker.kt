@@ -103,7 +103,9 @@ class ClusteringWorker(
                         maxBatteryTempCelsius = 40.0f,
                     )
                 }
-            powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius, isStopped = { isStopped }) { reason ->
+            powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius, isStopped = {
+                isStopped
+            }) { reason ->
                 try {
                     setForeground(
                         NotificationHelper.clusteringForegroundInfo(
@@ -178,19 +180,22 @@ class ClusteringWorker(
                         return Result.failure()
                     }
                     if (index % 50 == 0 && index > 0) {
-                        powerGate.awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius, isStopped = { isStopped }) { reason ->
-                            try {
-                                setForeground(
-                                    NotificationHelper.clusteringForegroundInfo(
-                                        applicationContext,
-                                        (index * 30) / unknownFacesAll.size,
-                                        reason,
-                                    ),
-                                )
-                            } catch (t: Throwable) {
-                                // ignore
+                        powerGate
+                            .awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius, isStopped = {
+                                isStopped
+                            }) { reason ->
+                                try {
+                                    setForeground(
+                                        NotificationHelper.clusteringForegroundInfo(
+                                            applicationContext,
+                                            (index * 30) / unknownFacesAll.size,
+                                            reason,
+                                        ),
+                                    )
+                                } catch (t: Throwable) {
+                                    // ignore
+                                }
                             }
-                        }
                     }
                     try {
                         val embedding = EmbeddingModel.bytesToFloatArray(face.faceRegion.embedding!!)
