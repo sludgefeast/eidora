@@ -18,9 +18,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
 import androidx.compose.material3.Checkbox
 import androidx.compose.runtime.*
@@ -166,86 +174,111 @@ fun EidoraApp() {
     var mediaAsked by rememberSaveable { mutableStateOf(false) }
 
     if (!hasRequiredPermissions) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(32.dp),
+        val permanentlyDenied = mediaAsked && activity != null &&
+            !ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
+        ) {
+            Spacer(Modifier.weight(0.15f))
+
+            // App icon / brand mark
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .align(Alignment.CenterHorizontally)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    stringResource(R.string.permission_intro_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                Icon(
+                    imageVector = Icons.Default.Face,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(40.dp),
                 )
-                Text(
-                    stringResource(R.string.permission_intro_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 24.dp),
-                )
+            }
 
-                if (!hasMedia) {
-                    Text(
-                        stringResource(R.string.permission_photo_rationale),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                    // Detect permanent denial: we asked, it's still denied, and the
-                    // system no longer offers the rationale dialog.
-                    val permanentlyDenied = mediaAsked && activity != null &&
-                        !ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
-                    Button(
-                        onClick = {
-                            if (permanentlyDenied) {
-                                // Send the user to the app settings to grant manually
-                                filesLauncher.launch(
-                                    Intent(
-                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                        Uri.parse("package:${context.packageName}"),
-                                    ),
-                                )
-                            } else {
-                                mediaAsked = true
-                                mediaLauncher.launch(permission)
-                            }
-                        },
-                        modifier = Modifier.padding(bottom = 16.dp),
-                    ) {
-                        Text(
-                            if (permanentlyDenied) {
-                                stringResource(R.string.permission_open_settings)
-                            } else {
-                                stringResource(R.string.permission_photo)
-                            },
-                        )
-                    }
-                }
+            Spacer(Modifier.height(24.dp))
 
-                if (!hasFiles) {
-                    Text(
-                        stringResource(R.string.permission_files_rationale),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                    Button(
-                        onClick = {
+            Text(
+                stringResource(R.string.permission_intro_title),
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                stringResource(R.string.permission_intro_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(Modifier.height(32.dp))
+
+            // Permission rows
+            PermissionRow(
+                icon = Icons.Default.PhotoLibrary,
+                title = stringResource(R.string.permission_photo),
+                description = stringResource(R.string.permission_photo_rationale),
+                granted = hasMedia,
+            )
+            Spacer(Modifier.height(12.dp))
+            PermissionRow(
+                icon = Icons.Default.Folder,
+                title = stringResource(R.string.permission_files),
+                description = stringResource(R.string.permission_files_rationale),
+                granted = hasFiles,
+            )
+
+            Spacer(Modifier.weight(1f))
+
+            // Single primary action that requests the next missing permission
+            Button(
+                onClick = {
+                    when {
+                        !hasMedia && permanentlyDenied -> {
+                            filesLauncher.launch(
+                                Intent(
+                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    Uri.parse("package:${context.packageName}"),
+                                ),
+                            )
+                        }
+                        !hasMedia -> {
+                            mediaAsked = true
+                            mediaLauncher.launch(permission)
+                        }
+                        !hasFiles -> {
                             filesLauncher.launch(
                                 Intent(
                                     Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
                                     Uri.parse("package:${context.packageName}"),
                                 ),
                             )
-                        },
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    ) {
-                        Text(stringResource(R.string.permission_files))
+                        }
                     }
-                }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+            ) {
+                Text(
+                    text = when {
+                        !hasMedia && permanentlyDenied -> stringResource(R.string.permission_open_settings)
+                        else -> stringResource(R.string.permission_continue)
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
+
+            Spacer(Modifier.height(24.dp))
         }
         return
     }
@@ -557,6 +590,59 @@ fun EidoraApp() {
                             navController.navigate("fullscreen/$photoId")
                         }
                     },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String,
+    granted: Boolean,
+) {
+    Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(16.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp),
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp),
+            ) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (granted) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.RadioButtonUnchecked,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }

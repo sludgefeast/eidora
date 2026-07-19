@@ -99,8 +99,8 @@
     <string name="powergate_battery_low">Pausiert: Akku unter %1$d %% (aktuell %2$d %%)</string>
     <string name="powergate_battery_hot">Pausiert: Akku %1$s °C über %2$s °C</string>
     <string name="powergate_thermal">Pausiert: Gerät drosselt wegen Hitze</string>
-    <string name="permission_photo">Fotozugriff erlauben</string>
-    <string name="permission_files">Dateizugriff erlauben</string>
+    <string name="permission_photo">Fotos</string>
+    <string name="permission_files">Dateizugriff</string>
     <string name="permission_notifications">Benachrichtigungen erlauben</string>
     <string name="model_download_failed_title">Modell-Download fehlgeschlagen</string>
     <string name="model_download_failed_message">Das Gesichtserkennungsmodell konnte nach mehreren Versuchen nicht heruntergeladen werden. Prüfe ob eine App-Aktualisierung verfügbar ist oder deine Netzwerkverbindung.</string>
@@ -157,4 +157,5 @@
     <string name="setting_confirm_on_name_suggestion_description">Wenn du einem Vorschlag einen Namen gibst, werden auch alle seine Gesichter bestätigt.</string>
     <string name="setting_confirm_on_merge_suggestion">Bestätigen beim Verschmelzen eines Vorschlags</string>
     <string name="setting_confirm_on_merge_suggestion_description">Wenn du einen Vorschlag mit einer bestehenden Person verschmilzt, werden die verschmolzenen Gesichter bestätigt.</string>
+    <string name="permission_continue">Weiter</string>
 </resources>

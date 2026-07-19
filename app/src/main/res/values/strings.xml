@@ -99,8 +99,8 @@
     <string name="powergate_battery_low">Paused: battery below %1$d%% (currently %2$d%%)</string>
     <string name="powergate_battery_hot">Paused: battery %1$s°C above %2$s°C</string>
     <string name="powergate_thermal">Paused: device thermal throttling</string>
-    <string name="permission_photo">Grant photo access</string>
-    <string name="permission_files">Grant file access</string>
+    <string name="permission_photo">Photos</string>
+    <string name="permission_files">File access</string>
     <string name="permission_notifications">Grant notification access</string>
     <string name="model_download_failed_title">Model download failed</string>
     <string name="model_download_failed_message">Could not download the face recognition model after several attempts. Check for an app update or your network connection.</string>
@@ -157,4 +157,5 @@
     <string name="setting_confirm_on_name_suggestion_description">When you give a suggestion a name, also confirm all of its faces.</string>
     <string name="setting_confirm_on_merge_suggestion">Confirm when merging a suggestion</string>
     <string name="setting_confirm_on_merge_suggestion_description">When you merge a suggestion into an existing person, confirm the merged faces.</string>
+    <string name="permission_continue">Continue</string>
 </resources>
