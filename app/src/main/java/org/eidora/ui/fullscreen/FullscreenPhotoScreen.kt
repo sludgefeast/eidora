@@ -140,7 +140,10 @@ fun FullscreenPhotoScreen(
                     android.util.Log.e("FullscreenPhoto", "Failed to save rotation", t)
                 }
             }
-            displayRotation = 0f
+            // Bump imageKey to force Coil to reload the file. The visual
+            // rotation (displayRotation) is reset in AsyncImage.onSuccess once
+            // the reoriented bitmap is actually on screen, avoiding a flicker
+            // back to 0° before the new image is ready.
             imageKey++
         }
     }
@@ -194,12 +197,17 @@ fun FullscreenPhotoScreen(
                         .data(state.photoPath?.let { File(it) })
                         .diskCachePolicy(CachePolicy.DISABLED)
                         .memoryCachePolicy(CachePolicy.DISABLED)
+                        // Vary the cache key by imageKey so a rotation forces a reload
+                        .setParameter("rotationKey", imageKey)
                         .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 onSuccess = { result ->
                     val d = result.painter.intrinsicSize
                     intrinsicSize = IntSize(d.width.toInt(), d.height.toInt())
+                    // The freshly loaded bitmap already has the new orientation
+                    // baked in (Coil applies EXIF), so reset the visual rotation.
+                    displayRotation = 0f
                 },
                 modifier = Modifier.fillMaxSize(),
             )
