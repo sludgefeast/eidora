@@ -146,4 +146,7 @@
     <string name="permission_photo_rationale">Required to read and analyse your photos.</string>
     <string name="permission_files_rationale">Required to write recognised names back into your photo files (XMP metadata), compatible with DigiKam and Aves.</string>
     <string name="permission_open_settings">Open app settings</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_resume">Resume</string>
+    <string name="powergate_paused">Paused</string>
 </resources>

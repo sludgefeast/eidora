@@ -121,6 +121,7 @@ object NotificationHelper {
         text: String,
         progress: Int,
         cancelIntent: android.app.PendingIntent? = null,
+        showPauseResume: Boolean = true,
     ): Notification {
         val builder =
             NotificationCompat
@@ -130,8 +131,25 @@ object NotificationHelper {
                 .setContentTitle(title)
                 .setContentText(text)
                 .setContentIntent(contentIntent(context))
-                .setOngoing(true)
+                .setDeleteIntent(CancelReceiver.deleteIntent(context))
+                .setOngoing(false)
                 .setSilent(true)
+
+        if (showPauseResume) {
+            if (PauseState.isPaused(context)) {
+                builder.addAction(
+                    android.R.drawable.ic_media_play,
+                    context.getString(R.string.action_resume),
+                    PauseReceiver.resumeIntent(context),
+                )
+            } else {
+                builder.addAction(
+                    android.R.drawable.ic_media_pause,
+                    context.getString(R.string.action_pause),
+                    PauseReceiver.pauseIntent(context),
+                )
+            }
+        }
 
         if (cancelIntent != null) {
             builder.addAction(

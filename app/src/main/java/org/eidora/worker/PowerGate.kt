@@ -90,6 +90,12 @@ class PowerGate(
     ) {
         while (true) {
             if (isStopped()) return
+            // Manual pause takes precedence over power conditions
+            if (PauseState.isPaused(context)) {
+                onWait(context.getString(org.eidora.R.string.powergate_paused))
+                delay(CHECK_INTERVAL_MS)
+                continue
+            }
             val status = currentStatus()
             val result = evaluate(status, minBatteryPercent, maxBatteryTempCelsius)
             if (result is PowerGateResult.Ok) return

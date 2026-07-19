@@ -146,4 +146,7 @@
     <string name="permission_photo_rationale">Erforderlich um deine Fotos zu lesen und zu analysieren.</string>
     <string name="permission_files_rationale">Erforderlich um erkannte Namen in deine Fotodateien zurückzuschreiben (XMP-Metadaten), kompatibel mit DigiKam und Aves.</string>
     <string name="permission_open_settings">App-Einstellungen öffnen</string>
+    <string name="action_pause">Pausieren</string>
+    <string name="action_resume">Fortfahren</string>
+    <string name="powergate_paused">Pausiert</string>
 </resources>

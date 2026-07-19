@@ -66,6 +66,12 @@
         <receiver
             android:name=".worker.CancelClusteringReceiver"
             android:exported="false" />
+        <receiver
+            android:name=".worker.PauseReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".worker.CancelReceiver"
+            android:exported="false" />
 
     </application>
 
