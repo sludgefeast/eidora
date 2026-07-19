@@ -104,22 +104,24 @@ class ClusteringWorker(
                     )
                 }
             powerGate.awaitOk(
-                minBatteryPercent = powerConfig.minBatteryPercent,
-                maxBatteryTempCelsius = powerConfig.maxBatteryTempCelsius,
-                onWait = { reason ->
-                    try {
-                        setForeground(
-                            NotificationHelper.clusteringForegroundInfo(
-                                applicationContext,
-                                0,
-                                reason,
-                                cancelIntent = cancelPendingIntent(applicationContext),
-                            ),
-                        )
-                    } catch (t: Throwable) {
+                powerConfig.minBatteryPercent,
+                powerConfig.maxBatteryTempCelsius,
+                isStopped = { isStopped },
+            ) { reason ->
+                try {
+                    setForeground(
+                        NotificationHelper.clusteringForegroundInfo(
+                            applicationContext,
+                            0,
+                            reason,
+                            cancelIntent = cancelPendingIntent(applicationContext),
+                        ),
+                    )
+                } catch (t: Throwable) {
                     // ignore
                 }
             }
+            if (isStopped) return Result.success()
 
             val pendingEmbeddings = faceDao.findWithoutEmbedding()
             if (pendingEmbeddings.isNotEmpty()) {
