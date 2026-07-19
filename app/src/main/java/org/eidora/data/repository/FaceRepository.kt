@@ -164,13 +164,19 @@ class FaceRepository(
     suspend fun assignFaceToPerson(
         faceRegionId: String,
         personId: String,
+        confirm: Boolean = true,
     ) {
         val face = faceDao.findById(faceRegionId) ?: return
         val previousPersonId = face.personId
         val person = personDao.findById(personId) ?: return
-        val personName = person.name ?: return
-        faceDao.updatePersonAndName(faceRegionId, personId, personName)
-        markPendingXmpWrite(face.photoId)
+        if (confirm) {
+            val personName = person.name ?: return
+            faceDao.updatePersonAndName(faceRegionId, personId, personName)
+            markPendingXmpWrite(face.photoId)
+        } else {
+            // Attach without a name → unconfirmed. No XMP write (nothing named yet).
+            faceDao.updatePersonId(faceRegionId, personId)
+        }
         previousPersonId?.let {
             recomputeCentroid(it)
             deletePersonIfOrphaned(it)
@@ -181,13 +187,14 @@ class FaceRepository(
     suspend fun assignFaceToNewPerson(
         faceRegionId: String,
         name: String,
+        confirm: Boolean = true,
     ): PersonEntity {
         val existing = personDao.findByName(name)
         val person =
             existing ?: PersonEntity(UUID.randomUUID().toString(), name).also {
                 personDao.insert(it)
             }
-        assignFaceToPerson(faceRegionId, person.id)
+        assignFaceToPerson(faceRegionId, person.id, confirm = confirm)
         return person
     }
 
@@ -210,9 +217,36 @@ class FaceRepository(
     // Merge persons
     // -----------------------------------------------------------------------
 
+    /**
+     * Merges [sourceIds] into [winnerId].
+     * @param confirmFaces when true, all faces of the winner are named (confirmed).
+     *   When false, each face keeps its current confirmed/unconfirmed status.
+     *   "Merge persons" passes false (preserve); "name/merge suggestion" passes true.
+     */
+    /**
+     * Names an unnamed suggestion person.
+     * @param confirm when true, all the suggestion's faces are also named
+     *   (confirmed) and their XMP is written. When false, only the person
+     *   record gets a name; the faces stay unconfirmed.
+     */
+    suspend fun nameSuggestion(
+        personId: String,
+        name: String,
+        confirm: Boolean,
+    ) {
+        personDao.updateName(personId, name)
+        if (confirm) {
+            faceDao.updateConfirmedNamesForPerson(personId, name)
+            val photoIds = faceDao.findByPersonId(personId).map { it.photoId }.distinct()
+            photoIds.forEach { markPendingXmpWrite(it) }
+        }
+        recomputeCentroid(personId)
+    }
+
     suspend fun mergePersons(
         sourceIds: List<String>,
         winnerId: String,
+        confirmFaces: Boolean = false,
     ) {
         val winner = personDao.findById(winnerId) ?: return
         val winnerName = winner.name ?: return
@@ -220,10 +254,13 @@ class FaceRepository(
             faceDao.reassignPerson(sourceId, winnerId)
             personDao.deleteById(sourceId)
         }
-        faceDao.updateConfirmedNamesForPerson(winnerId, winnerName)
+        if (confirmFaces) {
+            faceDao.updateConfirmedNamesForPerson(winnerId, winnerName)
+        }
         recomputeCentroid(winnerId)
         val faces = faceDao.findByPersonId(winnerId)
-        val photoIds = faces.map { it.photoId }.distinct()
+        // Only photos with a confirmed (named) face need an XMP write.
+        val photoIds = faces.filter { it.name != null }.map { it.photoId }.distinct()
         photoIds.forEach { markPendingXmpWrite(it) }
     }
 

@@ -36,6 +36,7 @@ class PersonsViewModel(
 ) : AndroidViewModel(app) {
     private val db = DatabaseProvider.getInstance(app)
     private val repo = FaceRepository(app, db)
+    private val settingsRepo = org.eidora.data.settings.SettingsProvider.get(app)
     private val faceDao = db.faceRegionDao()
     private val personDao = db.personDao()
 
@@ -137,9 +138,13 @@ class PersonsViewModel(
         viewModelScope.launch {
             val existing = personDao.findByName(name)
             if (existing != null && existing.id != personId) {
-                repo.mergePersons(listOf(personId, existing.id), existing.id)
+                // Naming matches an existing person → merge suggestion into it
+                val confirm = settingsRepo.getConfirmOnMergeSuggestion()
+                repo.mergePersons(listOf(personId, existing.id), existing.id, confirmFaces = confirm)
             } else {
-                personDao.updateName(personId, name)
+                // Plain naming of a suggestion
+                val confirm = settingsRepo.getConfirmOnNameSuggestion()
+                repo.nameSuggestion(personId, name, confirm = confirm)
             }
         }
     }

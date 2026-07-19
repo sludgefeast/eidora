@@ -149,4 +149,12 @@
     <string name="action_pause">Pausieren</string>
     <string name="action_resume">Fortfahren</string>
     <string name="powergate_paused">Pausiert</string>
+    <string name="settings_confirm_title">Bestätigungsverhalten</string>
+    <string name="settings_confirm_description">Legt fest, ob manuelle Operationen Gesichter als bestätigt markieren (Name wird ins Foto geschrieben) oder als unbestätigte Vorschläge belassen.</string>
+    <string name="setting_confirm_on_assign">Bestätigen beim Zuordnen eines Gesichts</string>
+    <string name="setting_confirm_on_assign_description">Wenn du ein Gesicht einer Person zuordnest, wird es als bestätigt markiert.</string>
+    <string name="setting_confirm_on_name_suggestion">Bestätigen beim Benennen eines Vorschlags</string>
+    <string name="setting_confirm_on_name_suggestion_description">Wenn du einem Vorschlag einen Namen gibst, werden auch alle seine Gesichter bestätigt.</string>
+    <string name="setting_confirm_on_merge_suggestion">Bestätigen beim Verschmelzen eines Vorschlags</string>
+    <string name="setting_confirm_on_merge_suggestion_description">Wenn du einen Vorschlag mit einer bestehenden Person verschmilzt, werden die verschmolzenen Gesichter bestätigt.</string>
 </resources>

@@ -44,6 +44,7 @@ class PersonDetailViewModel(
 ) : AndroidViewModel(app) {
     private val db = DatabaseProvider.getInstance(app)
     private val repo = FaceRepository(app, db)
+    private val settingsRepo = org.eidora.data.settings.SettingsProvider.get(app)
     private val faceDao = db.faceRegionDao()
     private val personDao = db.personDao()
 
@@ -230,9 +231,11 @@ class PersonDetailViewModel(
         _uiState.update { it.copy(mergeConflict = null) }
         onMerged(conflict.targetPersonId)
         viewModelScope.launch {
+            val confirm = settingsRepo.getConfirmOnMergeSuggestion()
             repo.mergePersons(
                 listOf(conflict.sourcePersonId, conflict.targetPersonId),
                 conflict.targetPersonId,
+                confirmFaces = confirm,
             )
         }
     }
@@ -331,7 +334,8 @@ class PersonDetailViewModel(
     fun assignToExistingPerson(personId: String) {
         val faceIds = _uiState.value.assignTargetFaceIds.toList()
         viewModelScope.launch {
-            faceIds.forEach { repo.assignFaceToPerson(it, personId) }
+            val confirm = settingsRepo.getConfirmOnAssign()
+            faceIds.forEach { repo.assignFaceToPerson(it, personId, confirm = confirm) }
             clearSelection()
             dismissAssignSheet()
         }
@@ -340,8 +344,9 @@ class PersonDetailViewModel(
     fun assignToNewPerson(name: String) {
         val faceIds = _uiState.value.assignTargetFaceIds.toList()
         viewModelScope.launch {
-            val person = repo.assignFaceToNewPerson(faceIds.first(), name)
-            faceIds.drop(1).forEach { repo.assignFaceToPerson(it, person.id) }
+            val confirm = settingsRepo.getConfirmOnAssign()
+            val person = repo.assignFaceToNewPerson(faceIds.first(), name, confirm = confirm)
+            faceIds.drop(1).forEach { repo.assignFaceToPerson(it, person.id, confirm = confirm) }
             clearSelection()
             dismissAssignSheet()
         }

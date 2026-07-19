@@ -24,6 +24,12 @@ private val KEY_ALLOW_MOBILE_MODEL_DOWNLOAD =
         "allow_mobile_model_download",
     )
 private val KEY_FOLDER_WHITELIST = stringPreferencesKey("folder_whitelist")
+private val KEY_CONFIRM_ON_ASSIGN =
+    androidx.datastore.preferences.core.booleanPreferencesKey("confirm_on_assign")
+private val KEY_CONFIRM_ON_NAME_SUGGESTION =
+    androidx.datastore.preferences.core.booleanPreferencesKey("confirm_on_name_suggestion")
+private val KEY_CONFIRM_ON_MERGE_SUGGESTION =
+    androidx.datastore.preferences.core.booleanPreferencesKey("confirm_on_merge_suggestion")
 
 data class ClusteringConfig(
     val edgeThreshold: Float,
@@ -125,12 +131,50 @@ class SettingsRepository(
         }
     }
 
+    // ---- Confirmation behaviour for manual face assignment ------------------
+    // Whether each manual operation marks the affected faces as confirmed
+    // (name written) or leaves them unconfirmed (suggestion only).
+
+    val confirmOnAssign: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_CONFIRM_ON_ASSIGN] ?: DEFAULT_CONFIRM_ON_ASSIGN }
+
+    val confirmOnNameSuggestion: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_CONFIRM_ON_NAME_SUGGESTION] ?: DEFAULT_CONFIRM_ON_NAME_SUGGESTION }
+
+    val confirmOnMergeSuggestion: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_CONFIRM_ON_MERGE_SUGGESTION] ?: DEFAULT_CONFIRM_ON_MERGE_SUGGESTION }
+
+    suspend fun getConfirmOnAssign(): Boolean = confirmOnAssign.first()
+
+    suspend fun getConfirmOnNameSuggestion(): Boolean = confirmOnNameSuggestion.first()
+
+    suspend fun getConfirmOnMergeSuggestion(): Boolean = confirmOnMergeSuggestion.first()
+
+    suspend fun setConfirmOnAssign(value: Boolean) {
+        context.dataStore.edit { it[KEY_CONFIRM_ON_ASSIGN] = value }
+    }
+
+    suspend fun setConfirmOnNameSuggestion(value: Boolean) {
+        context.dataStore.edit { it[KEY_CONFIRM_ON_NAME_SUGGESTION] = value }
+    }
+
+    suspend fun setConfirmOnMergeSuggestion(value: Boolean) {
+        context.dataStore.edit { it[KEY_CONFIRM_ON_MERGE_SUGGESTION] = value }
+    }
+
     companion object {
         const val DEFAULT_EDGE_THRESHOLD = 0.50f
         const val DEFAULT_CLUSTER_MATCH_THRESHOLD = 0.55f
         const val DEFAULT_INDIVIDUAL_MATCH_THRESHOLD = 0.50f
         const val DEFAULT_MIN_CLUSTER_SIZE = 5
         const val DEFAULT_TIME_WEIGHT = 1.0f
+
+        // Manual assignment confirms faces by default; naming a suggestion
+        // does not auto-confirm all its faces (they stay suggestions);
+        // merging a suggestion into a person confirms by default.
+        const val DEFAULT_CONFIRM_ON_ASSIGN = true
+        const val DEFAULT_CONFIRM_ON_NAME_SUGGESTION = false
+        const val DEFAULT_CONFIRM_ON_MERGE_SUGGESTION = true
 
         // Only Camera is selected by default
         val DEFAULT_FOLDER_WHITELIST: Set<String> = setOf("DCIM/Camera")

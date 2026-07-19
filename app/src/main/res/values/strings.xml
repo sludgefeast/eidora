@@ -149,4 +149,12 @@
     <string name="action_pause">Pause</string>
     <string name="action_resume">Resume</string>
     <string name="powergate_paused">Paused</string>
+    <string name="settings_confirm_title">Confirmation behaviour</string>
+    <string name="settings_confirm_description">Controls whether manual operations mark faces as confirmed (name written into the photo) or leave them as unconfirmed suggestions.</string>
+    <string name="setting_confirm_on_assign">Confirm when assigning a face</string>
+    <string name="setting_confirm_on_assign_description">When you assign a face to a person, mark it as confirmed.</string>
+    <string name="setting_confirm_on_name_suggestion">Confirm when naming a suggestion</string>
+    <string name="setting_confirm_on_name_suggestion_description">When you give a suggestion a name, also confirm all of its faces.</string>
+    <string name="setting_confirm_on_merge_suggestion">Confirm when merging a suggestion</string>
+    <string name="setting_confirm_on_merge_suggestion_description">When you merge a suggestion into an existing person, confirm the merged faces.</string>
 </resources>

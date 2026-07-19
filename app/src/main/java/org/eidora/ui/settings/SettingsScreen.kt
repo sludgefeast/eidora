@@ -212,6 +212,35 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(24.dp))
 
+            // Section: confirmation behaviour
+            SectionHeader(stringResource(R.string.settings_confirm_title))
+            Text(
+                text = stringResource(R.string.settings_confirm_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+            SwitchSetting(
+                label = stringResource(R.string.setting_confirm_on_assign),
+                description = stringResource(R.string.setting_confirm_on_assign_description),
+                checked = state.confirmOnAssign,
+                onCheckedChange = { viewModel.setConfirmOnAssign(it) },
+            )
+            SwitchSetting(
+                label = stringResource(R.string.setting_confirm_on_name_suggestion),
+                description = stringResource(R.string.setting_confirm_on_name_suggestion_description),
+                checked = state.confirmOnNameSuggestion,
+                onCheckedChange = { viewModel.setConfirmOnNameSuggestion(it) },
+            )
+            SwitchSetting(
+                label = stringResource(R.string.setting_confirm_on_merge_suggestion),
+                description = stringResource(R.string.setting_confirm_on_merge_suggestion_description),
+                checked = state.confirmOnMergeSuggestion,
+                onCheckedChange = { viewModel.setConfirmOnMergeSuggestion(it) },
+            )
+
+            Spacer(Modifier.height(24.dp))
+
             // Section: power
             SectionHeader(stringResource(R.string.settings_power_title))
             Text(
@@ -250,6 +279,34 @@ private fun SectionHeader(text: String) {
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
     )
+}
+
+@Composable
+@Composable
+private fun SwitchSetting(
+    label: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 6.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.padding(start = 12.dp),
+        )
+    }
 }
 
 @Composable

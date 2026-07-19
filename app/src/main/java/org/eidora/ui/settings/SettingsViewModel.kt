@@ -26,6 +26,9 @@ data class SettingsUiState(
         ),
     val availableFolders: List<String> = emptyList(),
     val folderWhitelist: Set<String> = SettingsRepository.DEFAULT_FOLDER_WHITELIST,
+    val confirmOnAssign: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_ASSIGN,
+    val confirmOnNameSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_NAME_SUGGESTION,
+    val confirmOnMergeSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_MERGE_SUGGESTION,
 )
 
 class SettingsViewModel(
@@ -52,6 +55,27 @@ class SettingsViewModel(
                 _uiState.update { it.copy(folderWhitelist = wl) }
             }
         }
+        viewModelScope.launch {
+            repo.confirmOnAssign.collect { v -> _uiState.update { it.copy(confirmOnAssign = v) } }
+        }
+        viewModelScope.launch {
+            repo.confirmOnNameSuggestion.collect { v -> _uiState.update { it.copy(confirmOnNameSuggestion = v) } }
+        }
+        viewModelScope.launch {
+            repo.confirmOnMergeSuggestion.collect { v -> _uiState.update { it.copy(confirmOnMergeSuggestion = v) } }
+        }
+    }
+
+    fun setConfirmOnAssign(value: Boolean) {
+        viewModelScope.launch { repo.setConfirmOnAssign(value) }
+    }
+
+    fun setConfirmOnNameSuggestion(value: Boolean) {
+        viewModelScope.launch { repo.setConfirmOnNameSuggestion(value) }
+    }
+
+    fun setConfirmOnMergeSuggestion(value: Boolean) {
+        viewModelScope.launch { repo.setConfirmOnMergeSuggestion(value) }
     }
 
     fun setClusteringConfig(config: ClusteringConfig) {
