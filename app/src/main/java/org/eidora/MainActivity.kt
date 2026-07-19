@@ -30,10 +30,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -95,6 +100,25 @@ fun EidoraApp() {
         )
     }
 
+    // Re-check all permissions whenever the app returns to the foreground.
+    // This catches the case where the user grants/revokes a permission in
+    // the Android settings and comes back.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasMedia = ContextCompat.checkSelfPermission(context, permission) ==
+                    PackageManager.PERMISSION_GRANTED
+                hasFiles = hasAllFilesAccess()
+                hasNotifications = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val mediaLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasMedia = it }
     val filesLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -105,13 +129,15 @@ fun EidoraApp() {
             hasNotifications = it
         }
 
-    val hasAllPermissions = hasMedia && hasFiles && hasNotifications
+    // Notification permission is optional – the app works without it,
+    // only the progress notifications won't show. Media + file access are required.
+    val hasRequiredPermissions = hasMedia && hasFiles
 
     // Enqueue the pipeline only once per app start, even if permissions
     // change multiple times or the composition recomposes.
     var pipelineEnqueued by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(hasAllPermissions, pipelineEnqueued) {
-        if (hasAllPermissions && !pipelineEnqueued) {
+    LaunchedEffect(hasRequiredPermissions, pipelineEnqueued) {
+        if (hasRequiredPermissions && !pipelineEnqueued) {
             try {
                 SyncPipeline.enqueue(context)
                 pipelineEnqueued = true
@@ -121,38 +147,102 @@ fun EidoraApp() {
         }
     }
 
-    if (!hasAllPermissions) {
+    // Once required permissions are in place, ask for the optional
+    // notification permission a single time (Android shows its own dialog;
+    // if the user denies, we never nag again from here).
+    var notificationAsked by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(hasRequiredPermissions, hasNotifications) {
+        if (hasRequiredPermissions && !hasNotifications && !notificationAsked) {
+            notificationAsked = true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    // Track whether we've already asked for media permission, to detect
+    // permanent denial (asked before + still not granted + system won't show dialog).
+    val activity = context as? android.app.Activity
+    var mediaAsked by rememberSaveable { mutableStateOf(false) }
+
+    if (!hasRequiredPermissions) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(32.dp),
+            ) {
                 Text(
-                    "Faces needs the following permissions to work:",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(bottom = 16.dp),
+                    stringResource(R.string.permission_intro_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
+                Text(
+                    stringResource(R.string.permission_intro_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 24.dp),
+                )
+
                 if (!hasMedia) {
-                    Button(onClick = { mediaLauncher.launch(permission) }, modifier = Modifier.padding(bottom = 8.dp)) {
-                        Text(stringResource(R.string.permission_photo))
-                    }
-                }
-                if (!hasFiles) {
-                    Button(onClick = {
-                        filesLauncher.launch(
-                            Intent(
-                                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                                Uri.parse("package:${context.packageName}"),
-                            ),
+                    Text(
+                        stringResource(R.string.permission_photo_rationale),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                    // Detect permanent denial: we asked, it's still denied, and the
+                    // system no longer offers the rationale dialog.
+                    val permanentlyDenied = mediaAsked && activity != null &&
+                        !ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
+                    Button(
+                        onClick = {
+                            if (permanentlyDenied) {
+                                // Send the user to the app settings to grant manually
+                                filesLauncher.launch(
+                                    Intent(
+                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.parse("package:${context.packageName}"),
+                                    ),
+                                )
+                            } else {
+                                mediaAsked = true
+                                mediaLauncher.launch(permission)
+                            }
+                        },
+                        modifier = Modifier.padding(bottom = 16.dp),
+                    ) {
+                        Text(
+                            if (permanentlyDenied) {
+                                stringResource(R.string.permission_open_settings)
+                            } else {
+                                stringResource(R.string.permission_photo)
+                            },
                         )
-                    }, modifier = Modifier.padding(bottom = 8.dp)) {
-                        Text(stringResource(R.string.permission_files))
                     }
                 }
-                if (!hasNotifications) {
-                    Button(onClick = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        }
-                    }) {
-                        Text(stringResource(R.string.permission_notifications))
+
+                if (!hasFiles) {
+                    Text(
+                        stringResource(R.string.permission_files_rationale),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                    Button(
+                        onClick = {
+                            filesLauncher.launch(
+                                Intent(
+                                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                    Uri.parse("package:${context.packageName}"),
+                                ),
+                            )
+                        },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    ) {
+                        Text(stringResource(R.string.permission_files))
                     }
                 }
             }

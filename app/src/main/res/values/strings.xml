@@ -141,4 +141,9 @@
     <string name="action_rotate_right">Rotate right</string>
     <string name="action_show_person_photos">Show all photos</string>
     <string name="person_photos_empty">No confirmed photos for this person yet.</string>
+    <string name="permission_intro_title">Welcome to Eidora</string>
+    <string name="permission_intro_body">Eidora detects and groups faces in your photos — entirely on your device, without any cloud. To do this it needs access to your photos.</string>
+    <string name="permission_photo_rationale">Required to read and analyse your photos.</string>
+    <string name="permission_files_rationale">Required to write recognised names back into your photo files (XMP metadata), compatible with DigiKam and Aves.</string>
+    <string name="permission_open_settings">Open app settings</string>
 </resources>

@@ -18,6 +18,10 @@ class ClusteringWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        if (!org.eidora.util.PermissionChecker.hasWorkerPermissions(applicationContext)) {
+            Log.w(TAG, "Missing media/all-files permission – aborting clustering")
+            return Result.failure()
+        }
         val db = DatabaseProvider.getInstance(applicationContext)
         val faceDao = db.faceRegionDao()
         val personDao = db.personDao()

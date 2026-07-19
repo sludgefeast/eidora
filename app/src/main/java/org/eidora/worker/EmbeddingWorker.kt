@@ -31,6 +31,10 @@ class EmbeddingWorker(
 ) : CoroutineWorker(context, params) {
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     override suspend fun doWork(): Result {
+        if (!org.eidora.util.PermissionChecker.hasWorkerPermissions(applicationContext)) {
+            Log.w(TAG, "Missing media/all-files permission – aborting embedding calculation")
+            return Result.failure()
+        }
         val db = DatabaseProvider.getInstance(applicationContext)
         val faceDao = db.faceRegionDao()
         val photoDao = db.photoDao()

@@ -141,4 +141,9 @@
     <string name="action_rotate_right">Rechts drehen</string>
     <string name="action_show_person_photos">Alle Fotos anzeigen</string>
     <string name="person_photos_empty">Noch keine bestätigten Fotos für diese Person.</string>
+    <string name="permission_intro_title">Willkommen bei Eidora</string>
+    <string name="permission_intro_body">Eidora erkennt und gruppiert Gesichter in deinen Fotos — vollständig auf deinem Gerät, ohne Cloud. Dafür benötigt die App Zugriff auf deine Fotos.</string>
+    <string name="permission_photo_rationale">Erforderlich um deine Fotos zu lesen und zu analysieren.</string>
+    <string name="permission_files_rationale">Erforderlich um erkannte Namen in deine Fotodateien zurückzuschreiben (XMP-Metadaten), kompatibel mit DigiKam und Aves.</string>
+    <string name="permission_open_settings">App-Einstellungen öffnen</string>
 </resources>

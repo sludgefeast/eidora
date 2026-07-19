@@ -41,6 +41,10 @@ class PhotoSyncWorker(
     }
 
     override suspend fun doWork(): Result {
+        if (!org.eidora.util.PermissionChecker.hasWorkerPermissions(applicationContext)) {
+            Log.w(TAG, "Missing media/all-files permission – aborting sync")
+            return Result.failure()
+        }
         val singlePhotoId = inputData.getString(KEY_PHOTO_ID)
         return try {
             if (singlePhotoId != null) {

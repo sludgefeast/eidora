@@ -25,6 +25,10 @@ class XmpWriteWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        if (!org.eidora.util.PermissionChecker.hasWorkerPermissions(applicationContext)) {
+            Log.w(TAG, "Missing media/all-files permission – aborting XMP write")
+            return Result.failure()
+        }
         val db = DatabaseProvider.getInstance(applicationContext)
         val photoDao = db.photoDao()
         val faceDao = db.faceRegionDao()
