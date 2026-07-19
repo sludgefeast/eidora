@@ -159,6 +159,10 @@ interface PersonDao {
         AND EXISTS (
             SELECT 1 FROM face_regions f WHERE f.personId = p.id
         )
+        ORDER BY (
+            SELECT COUNT(*) FROM face_regions f
+            WHERE f.personId = p.id AND f.ignored = 0
+        ) DESC
     """,
     )
     fun observeSuggestions(): Flow<List<PersonEntity>>
