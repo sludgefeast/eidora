@@ -100,21 +100,9 @@ object SyncPipeline {
             )
     }
 
-    fun cancelClustering(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_CLUSTERING_NAME)
-    }
-
     // -----------------------------------------------------------------------
     // State queries for mutual exclusion
     // -----------------------------------------------------------------------
-
-    fun isSyncRunning(context: Context): Boolean =
-        WorkManager
-            .getInstance(context)
-            .getWorkInfosForUniqueWork(UNIQUE_SYNC_NAME)
-            .get()
-            ?.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
-            ?: false
 
     fun isClusteringRunning(context: Context): Boolean =
         WorkManager

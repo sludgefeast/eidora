@@ -20,9 +20,6 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE id = :id")
     suspend fun findById(id: String): PhotoEntity?
 
-    @Query("SELECT path FROM photos")
-    suspend fun getAllPaths(): List<String>
-
     @Query("SELECT * FROM photos")
     suspend fun getAll(): List<PhotoEntity>
 
@@ -72,9 +69,6 @@ interface PhotoDao {
 
     @Query("SELECT * FROM photos ORDER BY CASE WHEN takenAt IS NULL THEN 1 ELSE 0 END, takenAt DESC")
     fun observeAllSortedByDate(): Flow<List<PhotoEntity>>
-
-    @Query("SELECT * FROM photos")
-    fun observeAll(): Flow<List<PhotoEntity>>
 }
 
 // ---------------------------------------------------------------------------
@@ -104,9 +98,6 @@ interface PersonDao {
 
     @Query("DELETE FROM persons")
     suspend fun deleteAll()
-
-    @Query("SELECT * FROM persons WHERE name IS NOT NULL")
-    fun observeAll(): Flow<List<PersonEntity>>
 
     @Update
     suspend fun update(person: PersonEntity)
@@ -166,16 +157,6 @@ interface PersonDao {
     """,
     )
     fun observeSuggestions(): Flow<List<PersonEntity>>
-
-    @Query(
-        """
-        SELECT MAX(ph.takenAt) 
-        FROM face_regions f 
-        JOIN photos ph ON ph.id = f.photoId 
-        WHERE f.personId = :personId
-    """,
-    )
-    suspend fun getNewestPhotoTakenAt(personId: String): Long?
 }
 
 data class PersonWithCount(
@@ -192,9 +173,6 @@ data class PersonWithCount(
 interface FaceRegionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(faceRegion: FaceRegionEntity)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(faceRegions: List<FaceRegionEntity>)
 
     @Query("SELECT * FROM face_regions WHERE id = :id")
     suspend fun findById(id: String): FaceRegionEntity?
@@ -230,9 +208,6 @@ interface FaceRegionDao {
 
     @Query("SELECT * FROM face_regions WHERE embedding IS NULL AND ignored = 0")
     suspend fun findWithoutEmbedding(): List<FaceRegionEntity>
-
-    @Query("SELECT * FROM face_regions WHERE personId IS NULL AND ignored = 0")
-    suspend fun findUnclusteredAndNotIgnored(): List<FaceRegionEntity>
 
     @Query("UPDATE face_regions SET quality_score = :score WHERE id = :id")
     suspend fun updateQualityScore(

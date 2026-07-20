@@ -22,7 +22,6 @@
     <string name="action_redetect">Re-detect faces</string>
     <string name="action_assign_to_person">Assign to person</string>
     <string name="action_merge">Merge</string>
-    <string name="action_rename">Rename</string>
     <string name="action_cancel">Cancel</string>
 
     <!-- Assign to person sheet -->
@@ -42,11 +41,8 @@
     <!-- Sync notification -->
     <string name="notification_channel_sync">Sync</string>
     <string name="notification_sync_title">Sync</string>
-    <string name="notification_sync_running">Syncing photos…</string>
-    <string name="notification_sync_done">Sync complete</string>
 
     <!-- Errors -->
-    <string name="error_generic">Something went wrong</string>
     <string name="label_no_date">No date</string>
     <string name="notification_download_model">Downloading face recognition model…</string>
     <string name="action_reject_suggestion">Reject suggestion</string>
@@ -57,9 +53,6 @@
     <string name="merge_conflict_message">A person named &quot;%1$s&quot; already exists. Merge into the existing person?</string>
     <string name="action_merge_into_existing">Merge</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_filename_patterns_title">Filename patterns</string>
-    <string name="settings_filename_patterns_description">Only photos whose filename matches at least one of these patterns will be processed. Use * as a wildcard. Empty means all photos.</string>
-    <string name="action_add">Add</string>
     <string name="action_delete">Delete</string>
     <string name="settings_clustering_title">Clustering</string>
     <string name="settings_clustering_description">Controls how faces are grouped into persons. Lower thresholds mean stricter matching.</string>
@@ -98,7 +91,6 @@
     <string name="powergate_thermal">Paused: device thermal throttling</string>
     <string name="permission_photo">Photos</string>
     <string name="permission_files">File access</string>
-    <string name="permission_notifications">Grant notification access</string>
     <string name="model_download_failed_title">Model download failed</string>
     <string name="model_download_failed_message">Could not download the face recognition model after several attempts. Check for an app update or your network connection.</string>
     <string name="setting_time_weight">Temporal weight</string>
@@ -137,7 +129,6 @@
     <string name="action_rotate_left">Rotate left</string>
     <string name="action_rotate_right">Rotate right</string>
     <string name="action_show_person_photos">Show all photos</string>
-    <string name="person_photos_empty">No confirmed photos for this person yet.</string>
     <string name="permission_intro_title">Welcome to Eidora</string>
     <string name="permission_intro_body">Eidora detects and groups faces in your photos — entirely on your device, without any cloud. To do this it needs access to your photos.</string>
     <string name="permission_photo_rationale">Required to read and analyse your photos.</string>

@@ -22,7 +22,6 @@
     <string name="action_redetect">Gesichter neu bestimmen</string>
     <string name="action_assign_to_person">Person zuordnen</string>
     <string name="action_merge">Zusammenführen</string>
-    <string name="action_rename">Umbenennen</string>
     <string name="action_cancel">Abbrechen</string>
 
     <!-- Assign to person sheet -->
@@ -42,11 +41,8 @@
     <!-- Sync notification -->
     <string name="notification_channel_sync">Synchronisierung</string>
     <string name="notification_sync_title">Synchronisierung</string>
-    <string name="notification_sync_running">Fotos werden synchronisiert…</string>
-    <string name="notification_sync_done">Synchronisierung abgeschlossen</string>
 
     <!-- Errors -->
-    <string name="error_generic">Ein Fehler ist aufgetreten</string>
     <string name="label_no_date">Kein Datum</string>
     <string name="notification_download_model">Gesichtserkennungsmodell wird heruntergeladen…</string>
     <string name="action_reject_suggestion">Vorschlag verwerfen</string>
@@ -57,9 +53,6 @@
     <string name="merge_conflict_message">Eine Person mit dem Namen &quot;%1$s&quot; existiert bereits. In die bestehende Person zusammenführen?</string>
     <string name="action_merge_into_existing">Zusammenführen</string>
     <string name="settings_title">Einstellungen</string>
-    <string name="settings_filename_patterns_title">Dateinamensmuster</string>
-    <string name="settings_filename_patterns_description">Nur Fotos, deren Dateiname mindestens einem dieser Muster entspricht, werden verarbeitet. Nutze * als Platzhalter. Leer bedeutet alle Fotos.</string>
-    <string name="action_add">Hinzufügen</string>
     <string name="action_delete">Löschen</string>
     <string name="settings_clustering_title">Clustering</string>
     <string name="settings_clustering_description">Steuert wie Gesichter zu Personen gruppiert werden. Niedrigere Schwellwerte bedeuten strengere Übereinstimmung.</string>
@@ -98,7 +91,6 @@
     <string name="powergate_thermal">Pausiert: Gerät drosselt wegen Hitze</string>
     <string name="permission_photo">Fotos</string>
     <string name="permission_files">Dateizugriff</string>
-    <string name="permission_notifications">Benachrichtigungen erlauben</string>
     <string name="model_download_failed_title">Modell-Download fehlgeschlagen</string>
     <string name="model_download_failed_message">Das Gesichtserkennungsmodell konnte nach mehreren Versuchen nicht heruntergeladen werden. Prüfe ob eine App-Aktualisierung verfügbar ist oder deine Netzwerkverbindung.</string>
     <string name="setting_time_weight">Zeitlicher Einfluss</string>
@@ -137,7 +129,6 @@
     <string name="action_rotate_left">Links drehen</string>
     <string name="action_rotate_right">Rechts drehen</string>
     <string name="action_show_person_photos">Alle Fotos anzeigen</string>
-    <string name="person_photos_empty">Noch keine bestätigten Fotos für diese Person.</string>
     <string name="permission_intro_title">Willkommen bei Eidora</string>
     <string name="permission_intro_body">Eidora erkennt und gruppiert Gesichter in deinen Fotos — vollständig auf deinem Gerät, ohne Cloud. Dafür benötigt die App Zugriff auf deine Fotos.</string>
     <string name="permission_photo_rationale">Erforderlich um deine Fotos zu lesen und zu analysieren.</string>

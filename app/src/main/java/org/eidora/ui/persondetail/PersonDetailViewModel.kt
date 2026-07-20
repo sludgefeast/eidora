@@ -315,21 +315,6 @@ class PersonDetailViewModel(
         _uiState.update { it.copy(showAssignSheet = false, assignTargetFaceIds = emptySet()) }
     }
 
-    fun filteredPersons(): List<PersonWithCount> {
-        val q =
-            _uiState.value.personSearchQuery
-                .trim()
-                .lowercase()
-        return if (q.isEmpty()) {
-            _uiState.value.allPersons
-        } else {
-            _uiState.value.allPersons.filter {
-                it.person.name
-                    ?.lowercase()
-                    ?.contains(q) == true
-            }
-        }
-    }
 
     fun assignToExistingPerson(personId: String) {
         val faceIds = _uiState.value.assignTargetFaceIds.toList()

@@ -31,11 +31,6 @@ object PermissionChecker {
     fun hasAllFilesAccess(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
 
-    /** True if notifications may be posted (Android 13+). */
-    fun hasNotificationAccess(context: Context): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
 
     /**
      * The core permissions every worker needs to do useful work:

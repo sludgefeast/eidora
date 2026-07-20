@@ -316,8 +316,6 @@ class FaceRepository(
 
     fun observePersonsWithCount(): Flow<List<PersonWithCount>> = personDao.observeAllWithConfirmedCount()
 
-    fun observeFacesByPerson(personId: String): Flow<List<FaceRegionWithPhoto>> = faceDao.observeByPersonId(personId)
-
     fun observeUnknownFaces(): Flow<List<FaceRegionWithPhoto>> = faceDao.observeUnknown()
 
     fun observeIgnoredFaces(): Flow<List<FaceRegionWithPhoto>> = faceDao.observeIgnored()

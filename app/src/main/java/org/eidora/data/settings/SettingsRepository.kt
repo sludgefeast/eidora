@@ -177,18 +177,5 @@ class SettingsRepository(
 
         const val DEFAULT_MIN_BATTERY_PERCENT = 20
         const val DEFAULT_MAX_BATTERY_TEMP = 40.0f
-
-        fun patternToRegex(pattern: String): Regex {
-            val escaped = pattern.split("*").joinToString(".*") { Regex.escape(it) }
-            return Regex("^$escaped$", RegexOption.IGNORE_CASE)
-        }
-
-        fun matchesAnyPattern(
-            filename: String,
-            patterns: List<String>,
-        ): Boolean {
-            if (patterns.isEmpty()) return true
-            return patterns.any { patternToRegex(it).matches(filename) }
-        }
     }
 }

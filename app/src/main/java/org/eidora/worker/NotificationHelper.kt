@@ -1,7 +1,6 @@
 package org.eidora.worker
 
 import android.app.Notification
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -32,15 +31,6 @@ object NotificationHelper {
                 progress,
             )
         return makeForegroundInfo(NOTIFICATION_ID_SYNC, notification)
-    }
-
-    fun embeddingForegroundInfo(
-        context: Context,
-        progress: Int,
-    ): ForegroundInfo {
-        val notification =
-            buildNotification(context, context.getString(R.string.notif_embedding_title), "$progress%", progress)
-        return makeForegroundInfo(NOTIFICATION_ID_EMBEDDING, notification)
     }
 
     fun embeddingForegroundInfoWithMessage(
@@ -82,13 +72,6 @@ object NotificationHelper {
                 progress,
             )
         return makeForegroundInfo(NOTIFICATION_ID_DOWNLOAD, notification)
-    }
-
-    fun cancelSync(context: Context) {
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.cancel(NOTIFICATION_ID_SYNC)
-        nm.cancel(NOTIFICATION_ID_EMBEDDING)
-        nm.cancel(NOTIFICATION_ID_CLUSTERING)
     }
 
     private fun makeForegroundInfo(
