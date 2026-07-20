@@ -529,8 +529,9 @@ class PhotoSyncWorker(
     ) {
         val det = detector
         if (det == null) {
-            Log.w(TAG, "SCRFD detector not available, skipping ${file.name}")
-            photoDao.updateAnalyzed(photoId, true)
+            // Models not downloaded yet (or init failed). Do NOT mark the photo
+            // as analyzed – it will be picked up again once models are present.
+            Log.w(TAG, "SCRFD detector not available, deferring ${file.name}")
             return
         }
 

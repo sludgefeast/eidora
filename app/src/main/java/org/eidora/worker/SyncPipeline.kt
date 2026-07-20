@@ -14,8 +14,8 @@ object SyncPipeline {
     const val PERIODIC_SYNC_NAME = "eidora-periodic-sync"
 
     // -----------------------------------------------------------------------
-    // Sync (Photo → ModelDownload → Embedding)
-    // Clustering is no longer chained here – it runs independently on demand.
+    // Sync (Photo → Embedding). Model download is NOT part of the chain –
+    // it runs only after explicit user consent via enqueueModelDownload().
     // -----------------------------------------------------------------------
 
     fun enqueue(context: Context) {
@@ -28,8 +28,7 @@ object SyncPipeline {
                 UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.KEEP,
                 PhotoSyncWorker.buildRequest(),
-            ).then(ModelDownloadWorker.buildRequest())
-            .then(EmbeddingWorker.buildRequest())
+            ).then(EmbeddingWorker.buildRequest())
             .enqueue()
     }
 
@@ -45,8 +44,7 @@ object SyncPipeline {
                 UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.REPLACE,
                 PhotoSyncWorker.buildForceRequest(),
-            ).then(ModelDownloadWorker.buildRequest())
-            .then(EmbeddingWorker.buildRequest())
+            ).then(EmbeddingWorker.buildRequest())
             .enqueue()
     }
 
@@ -64,8 +62,7 @@ object SyncPipeline {
                 UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
                 syncRequest,
-            ).then(ModelDownloadWorker.buildRequest())
-            .then(EmbeddingWorker.buildRequest())
+            ).then(EmbeddingWorker.buildRequest())
             .enqueue()
     }
 
@@ -89,6 +86,17 @@ object SyncPipeline {
                 UNIQUE_CLUSTERING_NAME,
                 ExistingWorkPolicy.KEEP,
                 ClusteringWorker.buildRequest(rejectSuggestions, removeUnconfirmed),
+            )
+    }
+
+    /** User-initiated model download (after the consent dialog). */
+    fun enqueueModelDownload(context: Context) {
+        WorkManager
+            .getInstance(context)
+            .enqueueUniqueWork(
+                "eidora-model-download",
+                ExistingWorkPolicy.KEEP,
+                ModelDownloadWorker.buildRequest(),
             )
     }
 

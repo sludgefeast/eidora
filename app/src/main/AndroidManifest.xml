@@ -61,9 +61,6 @@
             tools:node="merge" />
 
         <receiver
-            android:name=".worker.AllowMobileDownloadReceiver"
-            android:exported="false" />
-        <receiver
             android:name=".worker.CancelClusteringReceiver"
             android:exported="false" />
         <receiver

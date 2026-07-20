@@ -19,10 +19,6 @@ private val KEY_MIN_CLUSTER_SIZE = intPreferencesKey("min_cluster_size")
 private val KEY_TIME_WEIGHT = floatPreferencesKey("clustering_time_weight")
 private val KEY_MIN_BATTERY_PERCENT = intPreferencesKey("min_battery_percent")
 private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius")
-private val KEY_ALLOW_MOBILE_MODEL_DOWNLOAD =
-    androidx.datastore.preferences.core.booleanPreferencesKey(
-        "allow_mobile_model_download",
-    )
 private val KEY_FOLDER_WHITELIST = stringPreferencesKey("folder_whitelist")
 private val KEY_CONFIRM_ON_ASSIGN =
     androidx.datastore.preferences.core.booleanPreferencesKey("confirm_on_assign")
@@ -117,19 +113,6 @@ class SettingsRepository(
     }
 
     // ---- Model download over mobile network ---------------------------------
-
-    val allowMobileModelDownload: Flow<Boolean> =
-        context.dataStore.data.map { prefs ->
-            prefs[KEY_ALLOW_MOBILE_MODEL_DOWNLOAD] ?: false
-        }
-
-    suspend fun getAllowMobileModelDownload(): Boolean = allowMobileModelDownload.first()
-
-    suspend fun setAllowMobileModelDownload(allow: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[KEY_ALLOW_MOBILE_MODEL_DOWNLOAD] = allow
-        }
-    }
 
     // ---- Confirmation behaviour for manual face assignment ------------------
     // Whether each manual operation marks the affected faces as confirmed

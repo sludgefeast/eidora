@@ -283,6 +283,13 @@ fun EidoraApp() {
         return
     }
 
+    // ---- Model gate: block the main UI until ML models are downloaded ----
+    var modelsReady by remember { mutableStateOf(org.eidora.ml.ModelDownloader.allModelsReady(context)) }
+    if (!modelsReady) {
+        org.eidora.ui.common.ModelDownloadScreen(onModelsReady = { modelsReady = true })
+        return
+    }
+
     val navController = rememberNavController()
     val currentRoute =
         navController

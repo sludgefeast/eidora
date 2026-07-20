@@ -61,15 +61,12 @@ class ScrfdDetector(
     private val scaleOutputs: Map<Int, ScaleOutputs>
 
     init {
-        // Bundled as an APK asset at build time (downloaded from the
-        // models-v2 release by the build workflow).
+        // Loaded from filesDir – downloaded at runtime after user consent
+        // (see ModelDownloader / ModelDownloadWorker).
+        val modelFile = java.io.File(context.filesDir, "scrfd_2.5g_kps_640_float32.tflite")
         val buffer =
-            context.assets.openFd("scrfd_2.5g_kps_640_float32.tflite").use { afd ->
-                java.io.FileInputStream(afd.fileDescriptor).channel.map(
-                    FileChannel.MapMode.READ_ONLY,
-                    afd.startOffset,
-                    afd.declaredLength,
-                )
+            java.io.FileInputStream(modelFile).channel.use { channel ->
+                channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size())
             }
 
         val gpu = tryCreateGpu(buffer)

@@ -79,9 +79,6 @@
     <string name="setting_min_battery_percent_description">Verarbeitung pausiert unter diesem Akkustand.</string>
     <string name="setting_max_battery_temp">Maximale Akkutemperatur (°C)</string>
     <string name="setting_max_battery_temp_description">Verarbeitung pausiert bei Überschreitung dieser Temperatur.</string>
-    <string name="mobile_download_title">Download über Mobilfunk?</string>
-    <string name="mobile_download_message">Das Gesichtserkennungsmodell ist etwa 90 MB groß. Es ist kein WLAN verfügbar. Über Mobilfunk herunterladen?</string>
-    <string name="mobile_download_confirm">Jetzt herunterladen</string>
     <string name="notif_embedding_title">Berechne Embeddings</string>
     <string name="notif_clustering_title">Gruppiere Gesichter</string>
     <string name="notif_running">Läuft…</string>
@@ -158,4 +155,16 @@
     <string name="setting_confirm_on_merge_suggestion">Bestätigen beim Verschmelzen eines Vorschlags</string>
     <string name="setting_confirm_on_merge_suggestion_description">Wenn du einen Vorschlag mit einer bestehenden Person verschmilzt, werden die verschmolzenen Gesichter bestätigt.</string>
     <string name="permission_continue">Weiter</string>
+    <string name="model_gate_title">Machine-Learning-Modelle erforderlich</string>
+    <string name="model_gate_body">Eidora benötigt zwei ML-Modelle für Gesichtserkennung und -wiedererkennung. Sie werden einmalig von den Eidora-GitHub-Releases heruntergeladen und auf deinem Gerät gespeichert. Die Verarbeitung bleibt vollständig lokal.</string>
+    <string name="model_purpose_detection">Gesichtserkennung: findet Gesichter und ihre Merkmalspunkte in deinen Fotos</string>
+    <string name="model_purpose_embedding">Wiedererkennung: berechnet pro Gesicht eine kompakte Signatur, damit dieselbe Person gruppiert werden kann</string>
+    <string name="model_license_label">Lizenz</string>
+    <string name="model_size_checking">Prüfe Verfügbarkeit…</string>
+    <string name="model_size_unknown">Größe unbekannt</string>
+    <string name="model_download_button">Modelle herunterladen</string>
+    <string name="model_downloading">Modelle werden heruntergeladen…</string>
+    <string name="model_unavailable_title">Modelle nicht verfügbar</string>
+    <string name="model_unavailable_body">Die Modelle für diese App-Version stehen nicht mehr zum Download bereit. Vermutlich gibt es eine neuere Version von Eidora – bitte aktualisiere die App.</string>
+    <string name="model_check_retry">Erneut prüfen</string>
 </resources>

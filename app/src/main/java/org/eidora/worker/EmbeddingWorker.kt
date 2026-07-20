@@ -39,6 +39,13 @@ class EmbeddingWorker(
         val faceDao = db.faceRegionDao()
         val photoDao = db.photoDao()
 
+        // Models are downloaded only after explicit user consent. If they are
+        // not present yet, end quietly – the UI prompts the user to download.
+        if (!org.eidora.ml.ModelDownloader.allModelsReady(applicationContext)) {
+            Log.i(TAG, "ML models not downloaded yet – skipping embedding run")
+            return Result.success()
+        }
+
         val model =
             try {
                 EmbeddingModel(applicationContext)

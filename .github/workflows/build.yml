@@ -70,29 +70,6 @@ jobs:
           path: app/build/reports/tests/testDebugUnitTest
           retention-days: 7
 
-      - name: Download SCRFD model from models-v2 release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p app/src/main/assets
-          gh release download models-v2 \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern "scrfd_2.5g_kps_640_float32.tflite" \
-            --dir app/src/main/assets \
-            --clobber
-          ls -la app/src/main/assets/
-
-      - name: Download ArcFace model from models-v3 release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release download models-v3 \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern "arcface_w600k_mbf_float32.tflite" \
-            --dir app/src/main/assets \
-            --clobber
-          ls -la app/src/main/assets/
-
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 

@@ -37,13 +37,11 @@ class EmbeddingModel(
     val backend: String
 
     init {
+        // Loaded from filesDir – downloaded at runtime after user consent.
+        val modelFile = java.io.File(context.filesDir, "arcface_w600k_mbf_float32.tflite")
         val buffer =
-            context.assets.openFd("arcface_w600k_mbf_float32.tflite").use { afd ->
-                java.io.FileInputStream(afd.fileDescriptor).channel.map(
-                    FileChannel.MapMode.READ_ONLY,
-                    afd.startOffset,
-                    afd.declaredLength,
-                )
+            java.io.FileInputStream(modelFile).channel.use { channel ->
+                channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size())
             }
 
         val gpu = tryCreateGpu(buffer)

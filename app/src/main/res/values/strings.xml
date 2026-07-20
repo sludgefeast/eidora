@@ -79,9 +79,6 @@
     <string name="setting_min_battery_percent_description">Processing pauses when battery is below this level.</string>
     <string name="setting_max_battery_temp">Maximum battery temperature (°C)</string>
     <string name="setting_max_battery_temp_description">Processing pauses when battery temperature exceeds this value.</string>
-    <string name="mobile_download_title">Download over mobile data?</string>
-    <string name="mobile_download_message">The face recognition model is about 90 MB. Wi-Fi is not available. Download over mobile data?</string>
-    <string name="mobile_download_confirm">Download now</string>
     <string name="notif_embedding_title">Computing embeddings</string>
     <string name="notif_clustering_title">Clustering faces</string>
     <string name="notif_running">Running…</string>
@@ -158,4 +155,16 @@
     <string name="setting_confirm_on_merge_suggestion">Confirm when merging a suggestion</string>
     <string name="setting_confirm_on_merge_suggestion_description">When you merge a suggestion into an existing person, confirm the merged faces.</string>
     <string name="permission_continue">Continue</string>
+    <string name="model_gate_title">Machine learning models required</string>
+    <string name="model_gate_body">Eidora needs two ML models for face detection and recognition. They are downloaded once from the Eidora GitHub releases and stored on your device. All processing stays local.</string>
+    <string name="model_purpose_detection">Face detection: finds faces and their key points in your photos</string>
+    <string name="model_purpose_embedding">Face recognition: computes a compact signature per face so the same person can be grouped</string>
+    <string name="model_license_label">License</string>
+    <string name="model_size_checking">Checking availability…</string>
+    <string name="model_size_unknown">Size unknown</string>
+    <string name="model_download_button">Download models</string>
+    <string name="model_downloading">Downloading models…</string>
+    <string name="model_unavailable_title">Models not available</string>
+    <string name="model_unavailable_body">The models for this app version are no longer available for download. A newer version of Eidora is probably available – please update the app.</string>
+    <string name="model_check_retry">Check again</string>
 </resources>

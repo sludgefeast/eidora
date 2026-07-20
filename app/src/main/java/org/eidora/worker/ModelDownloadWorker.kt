@@ -1,19 +1,14 @@
 package org.eidora.worker
 
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.*
 import org.eidora.R
-import org.eidora.data.settings.SettingsProvider
 import org.eidora.ml.ModelDownloader
-import org.eidora.util.NetworkHelper
 
 private const val TAG = "ModelDownloadWorker"
-private const val NOTIFICATION_ID_MOBILE_WAIT = 1005
 
 class ModelDownloadWorker(
     context: Context,
@@ -25,36 +20,6 @@ class ModelDownloadWorker(
         if (ModelDownloader.allModelsReady(applicationContext)) {
             Log.i(TAG, "All models already downloaded, skipping")
             return Result.success()
-        }
-
-        // Check network policy: wait for Wi-Fi unless user has allowed mobile.
-        val allowMobile =
-            try {
-                SettingsProvider.get(applicationContext).getAllowMobileModelDownload()
-            } catch (t: Throwable) {
-                false
-            }
-
-        if (!allowMobile) {
-            val net = NetworkHelper.currentStatus(applicationContext)
-            if (net == NetworkHelper.NetworkStatus.MOBILE) {
-                Log.i(
-                    TAG,
-                    "Only mobile network available and user has not allowed mobile download – showing prompt notification",
-                )
-                showMobileAllowNotification()
-                return Result.retry()
-            }
-            if (net == NetworkHelper.NetworkStatus.NONE) {
-                return Result.retry()
-            }
-        }
-
-        // Dismiss any previous prompt notification
-        try {
-            NotificationManagerCompat.from(applicationContext).cancel(NOTIFICATION_ID_MOBILE_WAIT)
-        } catch (t: Throwable) {
-            // ignore
         }
 
         return try {
@@ -72,7 +37,11 @@ class ModelDownloadWorker(
 
             when (outcome) {
                 ModelDownloader.DownloadOutcome.SUCCESS -> {
-                    Log.i(TAG, "Model download successful")
+                    Log.i(TAG, "Model download successful – triggering full sync")
+                    // Photos deferred while models were missing have analyzed=false
+                    // but old DATE_MODIFIED values; a force sync rescans everything
+                    // and the !analyzed recovery path picks them up.
+                    SyncPipeline.enqueueForce(applicationContext)
                     Result.success()
                 }
                 ModelDownloader.DownloadOutcome.HASH_MISMATCH -> {
@@ -126,40 +95,6 @@ class ModelDownloadWorker(
             NotificationManagerCompat.from(ctx).notify(1006, notification)
         } catch (t: Throwable) {
             // ignore
-        }
-    }
-
-    private fun showMobileAllowNotification() {
-        val ctx = applicationContext
-
-        val allowIntent =
-            Intent(ctx, AllowMobileDownloadReceiver::class.java).apply {
-                action = AllowMobileDownloadReceiver.ACTION_ALLOW
-            }
-        val allowPending =
-            PendingIntent.getBroadcast(
-                ctx,
-                0,
-                allowIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-
-        val notification =
-            NotificationCompat
-                .Builder(ctx, "sync")
-                .setSmallIcon(R.drawable.ic_notification)
-                .setColor(android.graphics.Color.parseColor("#EC4899"))
-                .setContentTitle(ctx.getString(R.string.mobile_download_title))
-                .setContentText(ctx.getString(R.string.mobile_download_message))
-                .setStyle(NotificationCompat.BigTextStyle().bigText(ctx.getString(R.string.mobile_download_message)))
-                .addAction(0, ctx.getString(R.string.mobile_download_confirm), allowPending)
-                .setOngoing(true)
-                .build()
-
-        try {
-            NotificationManagerCompat.from(ctx).notify(NOTIFICATION_ID_MOBILE_WAIT, notification)
-        } catch (t: Throwable) {
-            Log.w(TAG, "Failed to show mobile-allow notification", t)
         }
     }
 
