@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.asFlow
@@ -89,12 +90,17 @@ class EmbeddingWorker(
                     while (isActive) {
                         val current = done.get()
                         val progress = if (total == 0) 0 else (current * 100) / total
-                        val eta = PhotoSyncWorker.formatEta(applicationContext, startedAt, current, total)
-                        // If a pause reason is set, show that; otherwise show progress + ETA
+                        // A non-empty status is a PowerGate/pause reason: show it
+                        // without an ETA (elapsed time keeps growing while paused,
+                        // which would inflate the estimate) and without the
+                        // Pause action.
                         val status = currentStatus.get()
+                        val blocked = status.isNotEmpty()
+                        val eta =
+                            if (blocked) "" else PhotoSyncWorker.formatEta(applicationContext, startedAt, current, total)
                         val message =
                             when {
-                                status.isNotEmpty() -> status
+                                blocked -> status
                                 eta.isNotEmpty() -> "$progress% – $eta"
                                 else -> "$progress%"
                             }
@@ -104,6 +110,7 @@ class EmbeddingWorker(
                                     applicationContext,
                                     progress,
                                     message,
+                                    gateBlocked = blocked,
                                 ),
                             )
                         } catch (t: Throwable) {
@@ -113,6 +120,7 @@ class EmbeddingWorker(
                     }
                 }
 
+            try {
             // Producer: crop face bitmaps in parallel on IO dispatcher
             // Consumer (implicit): compute embedding via mutex-guarded interpreter,
             // then write result back to DB
@@ -181,7 +189,11 @@ class EmbeddingWorker(
                     )
                 }
 
-            notifierJob.cancel()
+            } finally {
+                // MUST run even on cancellation – a leaked notifier from a
+                // stopped run would fight the next run over the notification.
+                notifierScope.cancel()
+            }
 
             Result.success()
         } catch (t: Throwable) {

@@ -110,6 +110,7 @@ class ClusteringWorker(
                                             applicationContext,
                                             (index * 30) / unknownFacesAll.size,
                                             reason,
+                                            gateBlocked = true,
                                         ),
                                     )
                                 } catch (t: Throwable) {
@@ -483,6 +484,7 @@ class ClusteringWorker(
                         0,
                         reason,
                         cancelIntent = cancelPendingIntent(applicationContext),
+                        gateBlocked = true,
                     ),
                 )
             } catch (t: Throwable) {

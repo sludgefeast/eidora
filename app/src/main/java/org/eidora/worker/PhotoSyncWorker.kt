@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
@@ -90,6 +91,58 @@ class PhotoSyncWorker(
             android.util.Log.w("FACES", "setForeground failed", t)
         }
 
+        // ---- Single notification writer -----------------------------------
+        // All phases (media scan, analysis) report via these shared fields;
+        // ONLY the notifier loop below calls setForeground. Multiple writers
+        // (previously: async scan callbacks racing the notifier) made the
+        // notification flip between "scanning" and analysis messages.
+        val doneCount =
+            java.util.concurrent.atomic
+                .AtomicInteger(0)
+        val totalCount =
+            java.util.concurrent.atomic
+                .AtomicInteger(0)
+        val currentFile =
+            java.util.concurrent.atomic
+                .AtomicReference<String>(applicationContext.getString(org.eidora.R.string.notif_scanning_start))
+        val gateBlocked =
+            java.util.concurrent.atomic
+                .AtomicBoolean(false)
+        val startedAnalysisAt =
+            java.util.concurrent.atomic
+                .AtomicLong(0L)
+
+        val notifierScope =
+            kotlinx.coroutines.CoroutineScope(
+                kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob(),
+            )
+        notifierScope.launch {
+                while (isActive) {
+                    val total = totalCount.get()
+                    val current = doneCount.get()
+                    val progress = if (total == 0) 0 else (current * 100) / total
+                    val file = currentFile.get()
+                    val blocked = gateBlocked.get()
+                    val startedAt = startedAnalysisAt.get()
+                    val eta =
+                        if (blocked || total == 0 || startedAt == 0L) {
+                            ""
+                        } else {
+                            formatEta(applicationContext, startedAt, current, total)
+                        }
+                    val message = if (eta.isNotEmpty()) "$file – $eta" else file
+                    try {
+                        setForeground(
+                            NotificationHelper.syncForegroundInfo(applicationContext, progress, message, gateBlocked = blocked),
+                        )
+                    } catch (t: Throwable) {
+                        // ignore
+                    }
+                    kotlinx.coroutines.delay(500)
+                }
+            }
+
+        try {
         val folderWhitelist =
             try {
                 org.eidora.data.settings.SettingsProvider
@@ -102,17 +155,7 @@ class PhotoSyncWorker(
         val mediaEntries =
             try {
                 collectJpegsFromMediaStore(folderWhitelist) { count ->
-                    try {
-                        setForegroundAsync(
-                            NotificationHelper.syncForegroundInfo(
-                                applicationContext,
-                                0,
-                                applicationContext.getString(org.eidora.R.string.notif_scanning, count),
-                            ),
-                        )
-                    } catch (t: Throwable) {
-                        // ignore progress errors
-                    }
+                    currentFile.set(applicationContext.getString(org.eidora.R.string.notif_scanning, count))
                 }
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to query MediaStore for JPEGs", t)
@@ -134,16 +177,7 @@ class PhotoSyncWorker(
                     folderWhitelist,
                     sinceModifiedSec = if (isForce) 0L else lastSyncSec,
                 ) { count ->
-                    try {
-                        setForegroundAsync(
-                            NotificationHelper.syncForegroundInfo(
-                                applicationContext,
-                                0,
-                                applicationContext.getString(org.eidora.R.string.notif_scanning, count),
-                            ),
-                        )
-                    } catch (t: Throwable) {
-                    }
+                    currentFile.set(applicationContext.getString(org.eidora.R.string.notif_scanning, count))
                 }
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to query MediaStore for JPEGs", t)
@@ -193,14 +227,11 @@ class PhotoSyncWorker(
         setProgress(workDataOf(KEY_STATUS to applicationContext.getString(org.eidora.R.string.notif_scanning_start)))
         val jpegFiles = workEntries.map { it.file }
 
-        val doneCount =
-            java.util.concurrent.atomic
-                .AtomicInteger(0)
-        val currentFile =
-            java.util.concurrent.atomic
-                .AtomicReference<String>("")
+        // Analysis phase begins: publish totals so the notifier switches from
+        // scan messages to per-file progress with ETA.
+        totalCount.set(jpegFiles.size)
+        startedAnalysisAt.set(System.currentTimeMillis())
         val total = jpegFiles.size
-        val startedAt = System.currentTimeMillis()
 
         val powerGate = PowerGate(applicationContext)
         val powerConfig =
@@ -215,27 +246,6 @@ class PhotoSyncWorker(
                 )
             }
 
-        val notifierScope =
-            kotlinx.coroutines.CoroutineScope(
-                kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob(),
-            )
-        val notifierJob =
-            notifierScope.launch {
-                while (isActive) {
-                    val current = doneCount.get()
-                    val progress = if (total == 0) 0 else (current * 100) / total
-                    val file = currentFile.get()
-                    val eta = formatEta(applicationContext, startedAt, current, total)
-                    val message = if (eta.isNotEmpty()) "$file – $eta" else file
-                    try {
-                        setForeground(NotificationHelper.syncForegroundInfo(applicationContext, progress, message))
-                    } catch (t: Throwable) {
-                        // ignore
-                    }
-                    kotlinx.coroutines.delay(500)
-                }
-            }
-
         @OptIn(ExperimentalCoroutinesApi::class)
         flow { jpegFiles.forEach { emit(it) } }
             .flatMapMerge(concurrency = SYNC_PARALLELISM) { file ->
@@ -244,8 +254,10 @@ class PhotoSyncWorker(
                         powerConfig.minBatteryPercent,
                         powerConfig.maxBatteryTempCelsius,
                     ) { reason ->
+                        gateBlocked.set(true)
                         currentFile.set(reason)
                     }
+                    gateBlocked.set(false)
                     currentFile.set(file.name)
                     try {
                         processFile(file)
@@ -258,8 +270,6 @@ class PhotoSyncWorker(
                 val current = doneCount.incrementAndGet()
                 setProgress(workDataOf(KEY_PROGRESS to (current * 100) / total))
             }
-
-        notifierJob.cancel()
 
         try {
             personDao.deleteOrphaned()
@@ -280,6 +290,12 @@ class PhotoSyncWorker(
             ),
         )
         return Result.success()
+        } finally {
+            // MUST run even on cancellation: a leaked notifier loop from a
+            // previous (stopped) run would fight the new run's notifier over
+            // the same notification, making the message jump back and forth.
+            notifierScope.cancel()
+        }
     }
 
     // -----------------------------------------------------------------------

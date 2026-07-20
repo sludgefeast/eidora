@@ -37,9 +37,10 @@ object NotificationHelper {
         context: Context,
         progress: Int,
         message: String,
+        gateBlocked: Boolean = false,
     ): ForegroundInfo {
         val notification =
-            buildNotification(context, context.getString(R.string.notif_embedding_title), message, progress)
+            buildNotification(context, context.getString(R.string.notif_embedding_title), message, progress, gateBlocked = gateBlocked)
         return makeForegroundInfo(NOTIFICATION_ID_EMBEDDING, notification)
     }
 
@@ -104,7 +105,7 @@ object NotificationHelper {
         text: String,
         progress: Int,
         cancelIntent: android.app.PendingIntent? = null,
-        showPauseResume: Boolean = true,
+        gateBlocked: Boolean = false,
     ): Notification {
         val builder =
             NotificationCompat
@@ -118,20 +119,21 @@ object NotificationHelper {
                 .setOngoing(false)
                 .setSilent(true)
 
-        if (showPauseResume) {
-            if (PauseState.isPaused(context)) {
-                builder.addAction(
-                    android.R.drawable.ic_media_play,
-                    context.getString(R.string.action_resume),
-                    PauseReceiver.resumeIntent(context),
-                )
-            } else {
-                builder.addAction(
-                    android.R.drawable.ic_media_pause,
-                    context.getString(R.string.action_pause),
-                    PauseReceiver.pauseIntent(context),
-                )
-            }
+        // Manual pause always offers Resume. A power/thermal gate block offers
+        // no pause action at all – pausing a run that is already blocked by the
+        // PowerGate would be meaningless.
+        if (PauseState.isPaused(context)) {
+            builder.addAction(
+                android.R.drawable.ic_media_play,
+                context.getString(R.string.action_resume),
+                PauseReceiver.resumeIntent(context),
+            )
+        } else if (!gateBlocked) {
+            builder.addAction(
+                android.R.drawable.ic_media_pause,
+                context.getString(R.string.action_pause),
+                PauseReceiver.pauseIntent(context),
+            )
         }
 
         if (cancelIntent != null) {
