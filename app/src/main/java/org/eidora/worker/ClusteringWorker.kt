@@ -27,104 +27,17 @@ class ClusteringWorker(
         val personDao = db.personDao()
 
         try {
-            // ----- Mutual exclusion: wait for active sync to finish -----
-            val wm = WorkManager.getInstance(applicationContext)
-            val syncStates = setOf(WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED)
-            var waited = false
-            while (true) {
-                val syncRunning =
-                    wm
-                        .getWorkInfosForUniqueWork(SyncPipeline.UNIQUE_SYNC_NAME)
-                        .get()
-                        ?.any { it.state in syncStates } == true
-                if (!syncRunning) break
-                if (!waited) {
-                    waited = true
-                    Log.i(TAG, "Sync is active – clustering waiting")
-                    try {
-                        setForeground(
-                            NotificationHelper.clusteringForegroundInfo(
-                                applicationContext,
-                                0,
-                                applicationContext.getString(org.eidora.R.string.notif_waiting_for_sync),
-                                cancelIntent = cancelPendingIntent(applicationContext),
-                            ),
-                        )
-                    } catch (t: Throwable) {
-                        // ignore
-                    }
-                }
-                if (isStopped) return Result.success()
-                kotlinx.coroutines.delay(5_000)
-            }
+            if (!awaitSyncToFinish()) return Result.success() // stopped while waiting
 
             reportProgress(0, applicationContext.getString(org.eidora.R.string.notif_preparing))
 
-            // ----- Pre-cleaning (from input data) -----
-            val rejectSuggestions = inputData.getBoolean(KEY_REJECT_SUGGESTIONS, false)
-            val removeUnconfirmed = inputData.getBoolean(KEY_REMOVE_UNCONFIRMED, false)
-            if (rejectSuggestions || removeUnconfirmed) {
-                val repo =
-                    org.eidora.data.repository
-                        .FaceRepository(applicationContext, db)
-                if (rejectSuggestions) {
-                    Log.i(TAG, "Pre-clustering: rejecting all suggestions")
-                    repo.rejectAllSuggestions()
-                }
-                if (removeUnconfirmed) {
-                    Log.i(TAG, "Pre-clustering: removing unconfirmed faces from persons")
-                    personDao.getAll().forEach { person ->
-                        repo.removeUnconfirmedFaces(person.id)
-                    }
-                }
-            }
+            runPreCleaning(db, personDao)
 
-            val config =
-                try {
-                    org.eidora.data.settings.SettingsProvider
-                        .get(applicationContext)
-                        .getClusteringConfig()
-                } catch (t: Throwable) {
-                    Log.w(TAG, "Failed to load clustering config, using defaults", t)
-                    org.eidora.data.settings.ClusteringConfig(
-                        edgeThreshold = 0.30f,
-                        clusterMatchThreshold = 0.30f,
-                        individualMatchThreshold = 0.25f,
-                        minClusterSize = 2,
-                        timeWeight = 1.0f,
-                    )
-                }
-
+            val config = loadClusteringConfig()
+            val powerConfig = loadPowerConfig()
             val powerGate = PowerGate(applicationContext)
-            val powerConfig =
-                try {
-                    org.eidora.data.settings.SettingsProvider
-                        .get(applicationContext)
-                        .getPowerConfig()
-                } catch (t: Throwable) {
-                    org.eidora.data.settings.PowerConfig(
-                        minBatteryPercent = 20,
-                        maxBatteryTempCelsius = 40.0f,
-                    )
-                }
-            powerGate.awaitOk(
-                powerConfig.minBatteryPercent,
-                powerConfig.maxBatteryTempCelsius,
-                isStopped = { isStopped },
-            ) { reason ->
-                try {
-                    setForeground(
-                        NotificationHelper.clusteringForegroundInfo(
-                            applicationContext,
-                            0,
-                            reason,
-                            cancelIntent = cancelPendingIntent(applicationContext),
-                        ),
-                    )
-                } catch (t: Throwable) {
-                    // ignore
-                }
-            }
+
+            gateOnPower(powerGate, powerConfig)
             if (isStopped) return Result.success()
 
             val pendingEmbeddings = faceDao.findWithoutEmbedding()
@@ -470,6 +383,108 @@ class ClusteringWorker(
                 androidx.core.app.NotificationManagerCompat
                     .from(applicationContext)
                     .cancel(NotificationHelper.NOTIFICATION_ID_CLUSTERING)
+            } catch (t: Throwable) {
+                // ignore
+            }
+        }
+    }
+
+    /**
+     * Waits until any active sync finishes, so sync and clustering don't run
+     * concurrently. Shows a "waiting" notification. Returns false if the worker
+     * was stopped while waiting.
+     */
+    private suspend fun awaitSyncToFinish(): Boolean {
+        val wm = WorkManager.getInstance(applicationContext)
+        val syncStates = setOf(WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED)
+        var waited = false
+        while (true) {
+            val syncRunning =
+                wm
+                    .getWorkInfosForUniqueWork(SyncPipeline.UNIQUE_SYNC_NAME)
+                    .get()
+                    ?.any { it.state in syncStates } == true
+            if (!syncRunning) return true
+            if (!waited) {
+                waited = true
+                Log.i(TAG, "Sync is active – clustering waiting")
+                try {
+                    setForeground(
+                        NotificationHelper.clusteringForegroundInfo(
+                            applicationContext,
+                            0,
+                            applicationContext.getString(org.eidora.R.string.notif_waiting_for_sync),
+                            cancelIntent = cancelPendingIntent(applicationContext),
+                        ),
+                    )
+                } catch (t: Throwable) {
+                    // ignore
+                }
+            }
+            if (isStopped) return false
+            kotlinx.coroutines.delay(5_000)
+        }
+    }
+
+    /** Optional pre-clustering cleanup requested via input data. */
+    private suspend fun runPreCleaning(
+        db: org.eidora.data.db.EidoraDatabase,
+        personDao: org.eidora.data.db.PersonDao,
+    ) {
+        val rejectSuggestions = inputData.getBoolean(KEY_REJECT_SUGGESTIONS, false)
+        val removeUnconfirmed = inputData.getBoolean(KEY_REMOVE_UNCONFIRMED, false)
+        if (!rejectSuggestions && !removeUnconfirmed) return
+        val repo = org.eidora.data.repository.FaceRepository(applicationContext, db)
+        if (rejectSuggestions) {
+            Log.i(TAG, "Pre-clustering: rejecting all suggestions")
+            repo.rejectAllSuggestions()
+        }
+        if (removeUnconfirmed) {
+            Log.i(TAG, "Pre-clustering: removing unconfirmed faces from persons")
+            personDao.getAll().forEach { person -> repo.removeUnconfirmedFaces(person.id) }
+        }
+    }
+
+    private suspend fun loadClusteringConfig(): org.eidora.data.settings.ClusteringConfig =
+        try {
+            org.eidora.data.settings.SettingsProvider.get(applicationContext).getClusteringConfig()
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to load clustering config, using defaults", t)
+            org.eidora.data.settings.ClusteringConfig(
+                edgeThreshold = 0.30f,
+                clusterMatchThreshold = 0.30f,
+                individualMatchThreshold = 0.25f,
+                minClusterSize = 2,
+                timeWeight = 1.0f,
+            )
+        }
+
+    private suspend fun loadPowerConfig(): org.eidora.data.settings.PowerConfig =
+        try {
+            org.eidora.data.settings.SettingsProvider.get(applicationContext).getPowerConfig()
+        } catch (t: Throwable) {
+            org.eidora.data.settings.PowerConfig(minBatteryPercent = 20, maxBatteryTempCelsius = 40.0f)
+        }
+
+    /** Suspends until battery/thermal conditions allow work, updating the notification. */
+    private suspend fun gateOnPower(
+        powerGate: PowerGate,
+        powerConfig: org.eidora.data.settings.PowerConfig,
+    ) {
+        powerGate.awaitOk(
+            powerConfig.minBatteryPercent,
+            powerConfig.maxBatteryTempCelsius,
+            isStopped = { isStopped },
+        ) { reason ->
+            try {
+                setForeground(
+                    NotificationHelper.clusteringForegroundInfo(
+                        applicationContext,
+                        0,
+                        reason,
+                        cancelIntent = cancelPendingIntent(applicationContext),
+                    ),
+                )
             } catch (t: Throwable) {
                 // ignore
             }

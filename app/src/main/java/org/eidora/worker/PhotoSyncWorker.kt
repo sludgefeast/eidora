@@ -181,48 +181,13 @@ class PhotoSyncWorker(
                 "(${changedEntries.size} changed since ${lastSyncSec}s, ${unanalyzed.size} unanalyzed)",
         )
 
-        // -----------------------------------------------------------------------
         // Step 2: Deletion check – only run periodically (every ~24h) or on force.
-        // Uses only _ID + DATA columns (no full scan) for efficiency.
-        // -----------------------------------------------------------------------
         val lastDeletionCheck = prefs.getLong("last_deletion_check_sec", 0L)
         val deletionCheckIntervalSec = 24 * 3600L
         val isPeriodic = inputData.keyValueMap.isEmpty()
         if (isForce || isPeriodic || nowSec - lastDeletionCheck > deletionCheckIntervalSec) {
             if (isStopped) return Result.success()
-            Log.i(TAG, "Running deletion check")
-            try {
-                // Lightweight query: only path column, no modifiedAt needed
-                val allMediaPaths = mutableSetOf<String>()
-                val uri = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-                val proj = arrayOf(android.provider.MediaStore.Images.Media.DATA)
-                val sel = "${android.provider.MediaStore.Images.Media.MIME_TYPE} = ?"
-                applicationContext.contentResolver
-                    .query(uri, proj, sel, arrayOf("image/jpeg"), null)
-                    ?.use { cursor ->
-                        val col = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DATA)
-                        while (cursor.moveToNext()) {
-                            if (isStopped) break
-                            cursor.getString(col)?.let { allMediaPaths.add(it) }
-                        }
-                    }
-
-                if (!isStopped) {
-                    val dbPaths = photoDao.getAllPathsWithModified().map { it.path }.toSet()
-                    (dbPaths - allMediaPaths).forEach { path ->
-                        if (isStopped) return@forEach
-                        try {
-                            deletePhoto(path)
-                        } catch (t: Throwable) {
-                            Log.e(TAG, "Failed to delete photo $path", t)
-                        }
-                    }
-                    prefs.edit().putLong("last_deletion_check_sec", nowSec).apply()
-                }
-            } catch (t: Throwable) {
-                if (t is kotlinx.coroutines.CancellationException) throw t
-                Log.e(TAG, "Deletion check failed", t)
-            }
+            runDeletionCheck(prefs, nowSec)
         }
 
         setProgress(workDataOf(KEY_STATUS to applicationContext.getString(org.eidora.R.string.notif_scanning_start)))
@@ -367,6 +332,47 @@ class PhotoSyncWorker(
         val file: File,
         val modifiedSec: Long,
     )
+
+    /**
+     * Removes DB photos whose files no longer exist in the MediaStore.
+     * Uses a lightweight DATA-only query (no full metadata scan).
+     * Respects cancellation via isStopped.
+     */
+    private suspend fun runDeletionCheck(
+        prefs: android.content.SharedPreferences,
+        nowSec: Long,
+    ) {
+        Log.i(TAG, "Running deletion check")
+        try {
+            val allMediaPaths = mutableSetOf<String>()
+            val uri = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            val proj = arrayOf(android.provider.MediaStore.Images.Media.DATA)
+            val sel = "${android.provider.MediaStore.Images.Media.MIME_TYPE} = ?"
+            applicationContext.contentResolver
+                .query(uri, proj, sel, arrayOf("image/jpeg"), null)
+                ?.use { cursor ->
+                    val col = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Images.Media.DATA)
+                    while (cursor.moveToNext()) {
+                        if (isStopped) break
+                        cursor.getString(col)?.let { allMediaPaths.add(it) }
+                    }
+                }
+            if (isStopped) return
+            val dbPaths = photoDao.getAllPathsWithModified().map { it.path }.toSet()
+            (dbPaths - allMediaPaths).forEach { path ->
+                if (isStopped) return@forEach
+                try {
+                    deletePhoto(path)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to delete photo $path", t)
+                }
+            }
+            prefs.edit().putLong("last_deletion_check_sec", nowSec).apply()
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            Log.e(TAG, "Deletion check failed", t)
+        }
+    }
 
     private fun collectJpegsFromMediaStore(
         folderWhitelist: Set<String>,
@@ -513,11 +519,11 @@ class PhotoSyncWorker(
                 Log.e(TAG, "Failed to refresh person tags for ${file.name}", t)
             }
         } else {
-            runMlKit(file, photoId)
+            runFaceDetection(file, photoId)
         }
     }
 
-    private suspend fun runMlKit(
+    private suspend fun runFaceDetection(
         file: File,
         photoId: String,
     ) {
