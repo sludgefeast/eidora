@@ -92,7 +92,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
 
     // Preferences DataStore
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
 
 
     // TFLite for FaceNet
