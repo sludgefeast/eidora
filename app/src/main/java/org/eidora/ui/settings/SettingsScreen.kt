@@ -282,7 +282,6 @@ private fun SectionHeader(text: String) {
 }
 
 @Composable
-@Composable
 private fun SwitchSetting(
     label: String,
     description: String,
