@@ -57,6 +57,12 @@ android {
     androidResources {
         noCompress += "tflite"
     }
+
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+        }
+    }
 }
 
 dependencies {
@@ -113,4 +119,9 @@ dependencies {
 
     // Core KTX
     implementation(libs.androidx.core.ktx)
+
+    // Unit testing (JUnit 5)
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
+    testRuntimeOnly(libs.junit.jupiter.engine)
 }

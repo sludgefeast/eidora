@@ -17,6 +17,7 @@ coil = "2.7.0"
 kotlinx-serialization = "1.7.3"
 kotlinx-coroutines = "1.9.0"
 core-ktx = "1.15.0"
+junit-jupiter = "5.11.4"
 
 appcompat = "1.7.0"
 
@@ -65,6 +66,11 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 # Core
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
+
+# Testing (JUnit 5)
+junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit-jupiter" }
+junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit-jupiter" }
+junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit-jupiter" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

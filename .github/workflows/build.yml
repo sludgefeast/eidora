@@ -9,6 +9,11 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip unit tests'
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -51,6 +56,18 @@ jobs:
         with:
           name: ktlint-report
           path: build/ktlint-report.xml
+          retention-days: 7
+
+      - name: Run unit tests
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_tests) }}
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Upload test report
+        if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.skip_tests) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/testDebugUnitTest
           retention-days: 7
 
       - name: Download SCRFD model from models-v2 release
