@@ -74,7 +74,12 @@ class MainActivity : ComponentActivity() {
             .setDecorFitsSystemWindows(window, false)
         setContent {
             EidoraTheme {
-                EidoraApp()
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
+                    EidoraApp()
+                }
             }
         }
     }
