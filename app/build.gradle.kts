@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.aboutlibraries)
 }
 
 android {
@@ -119,6 +120,10 @@ dependencies {
 
     // Core KTX
     implementation(libs.androidx.core.ktx)
+
+    // About / open-source license list
+    implementation(libs.aboutlibraries.core)
+    implementation(libs.aboutlibraries.compose.m3)
 
     // Unit testing (JUnit 5)
     testImplementation(libs.junit.jupiter.api)

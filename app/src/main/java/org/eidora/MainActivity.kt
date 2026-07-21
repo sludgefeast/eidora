@@ -455,6 +455,13 @@ fun EidoraApp() {
                                         navController.navigate("settings")
                                     },
                                 )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.about_open)) },
+                                    onClick = {
+                                        menuExpanded2 = false
+                                        navController.navigate("about")
+                                    },
+                                )
                             }
                         },
                     )
@@ -510,6 +517,13 @@ fun EidoraApp() {
                                     onClick = {
                                         menuExpanded = false
                                         navController.navigate("settings")
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.about_open)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        navController.navigate("about")
                                     },
                                 )
                             }
@@ -605,6 +619,9 @@ fun EidoraApp() {
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                 )
+            }
+            composable("about") {
+                org.eidora.ui.about.AboutScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 "person_photos/{personId}",

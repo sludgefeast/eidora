@@ -169,4 +169,12 @@
     <string name="namesake_message">Eine Person namens \"%1$s\" existiert bereits, ist aber durch deine aktuelle Ordnerauswahl ausgeblendet. Möchtest du diesen Vorschlag mit dieser Person zusammenführen oder als eigene Person behalten?</string>
     <string name="namesake_merge">Zusammenführen</string>
     <string name="namesake_keep_separate">Getrennt behalten</string>
+    <string name="about_title">Über</string>
+    <string name="about_open">Über Eidora</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_tagline">Lokale Gesichtserkennung auf deinem Gerät.</string>
+    <string name="about_license_line">Eidora ist freie Software unter der GPLv3.</string>
+    <string name="about_models_line">ML-Modelle: InsightFace, nur nicht-kommerzielle Forschung.</string>
+    <string name="about_libraries_header">Open-Source-Bibliotheken</string>
+    <string name="action_back">Zurück</string>
 </resources>
