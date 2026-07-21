@@ -42,10 +42,12 @@ data class PhotosUiState(
     val isPersonMode get() = personName != null
 }
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class PhotosViewModel(
     app: Application,
 ) : AndroidViewModel(app) {
     private val db = DatabaseProvider.getInstance(app)
+    private val settingsRepo = org.eidora.data.settings.SettingsProvider.get(app)
     private val repo = FaceRepository(app, db)
     private val context: Context get() = getApplication()
 
@@ -57,7 +59,9 @@ class PhotosViewModel(
 
     init {
         viewModelScope.launch {
-            db.photoDao().observeAllSortedByDate().collect { photos ->
+            settingsRepo.folderWhitelist
+                .flatMapLatest { folders -> db.photoDao().observeAllSortedByDate(folders.toList()) }
+                .collect { photos ->
                 _uiState.update { it.copy(items = buildListItems(photos)) }
             }
         }

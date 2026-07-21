@@ -158,4 +158,15 @@
     <string name="model_unavailable_title">Models not available</string>
     <string name="model_unavailable_body">The models for this app version are no longer available for download. A newer version of Eidora is probably available – please update the app.</string>
     <string name="model_check_retry">Check again</string>
+    <string name="settings_folders_cleanup">Clean up database</string>
+    <string name="settings_folders_cleanup_description">Permanently removes photos, faces and persons from folders that are no longer selected.</string>
+    <string name="settings_folders_cleanup_done">Removed %1$d photos from the database.</string>
+    <string name="wizard_folders_title">Choose your folders</string>
+    <string name="wizard_folders_body">Select which photo folders Eidora should analyse. You can change this later in the settings.</string>
+    <string name="wizard_folders_empty">No photo folders found.</string>
+    <string name="wizard_folders_continue">Continue</string>
+    <string name="namesake_title">Name already exists</string>
+    <string name="namesake_message">A person named \"%1$s\" already exists but is hidden by your current folder selection. Do you want to merge this suggestion into that person, or keep it as a separate person?</string>
+    <string name="namesake_merge">Merge</string>
+    <string name="namesake_keep_separate">Keep separate</string>
 </resources>

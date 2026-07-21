@@ -314,11 +314,25 @@ class FaceRepository(
     // Observe
     // -----------------------------------------------------------------------
 
-    fun observePersonsWithCount(): Flow<List<PersonWithCount>> = personDao.observeAllWithConfirmedCount()
+    /**
+     * Purges photos (and, via FK cascade, their face regions) whose folder is
+     * not in the current whitelist, then removes any persons left without faces.
+     * Use after the user narrows the folder selection to reclaim space.
+     * Returns the number of photos removed.
+     */
+    suspend fun cleanupFoldersNotIn(folders: List<String>): Int {
+        val before = photoDao.count()
+        photoDao.deleteNotInFolders(folders)
+        personDao.deleteOrphaned()
+        val after = photoDao.count()
+        return (before - after).coerceAtLeast(0)
+    }
 
-    fun observeUnknownFaces(): Flow<List<FaceRegionWithPhoto>> = faceDao.observeUnknown()
+    fun observePersonsWithCount(folders: List<String>): Flow<List<PersonWithCount>> = personDao.observeAllWithConfirmedCount(folders)
 
-    fun observeIgnoredFaces(): Flow<List<FaceRegionWithPhoto>> = faceDao.observeIgnored()
+    fun observeUnknownFaces(folders: List<String>): Flow<List<FaceRegionWithPhoto>> = faceDao.observeUnknown(folders)
+
+    fun observeIgnoredFaces(folders: List<String>): Flow<List<FaceRegionWithPhoto>> = faceDao.observeIgnored(folders)
 
     // -----------------------------------------------------------------------
     // Private helpers

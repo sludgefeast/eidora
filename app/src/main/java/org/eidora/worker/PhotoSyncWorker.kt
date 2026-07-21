@@ -225,7 +225,7 @@ class PhotoSyncWorker(
         }
 
         setProgress(workDataOf(KEY_STATUS to applicationContext.getString(org.eidora.R.string.notif_scanning_start)))
-        val jpegFiles = workEntries.map { it.file }
+        val jpegFiles = workEntries
 
         // Analysis phase begins: publish totals so the notifier switches from
         // scan messages to per-file progress with ETA.
@@ -248,7 +248,7 @@ class PhotoSyncWorker(
 
         @OptIn(ExperimentalCoroutinesApi::class)
         flow { jpegFiles.forEach { emit(it) } }
-            .flatMapMerge(concurrency = SYNC_PARALLELISM) { file ->
+            .flatMapMerge(concurrency = SYNC_PARALLELISM) { entry ->
                 flow {
                     powerGate.awaitOk(
                         powerConfig.minBatteryPercent,
@@ -258,13 +258,13 @@ class PhotoSyncWorker(
                         currentFile.set(reason)
                     }
                     gateBlocked.set(false)
-                    currentFile.set(file.name)
+                    currentFile.set(entry.file.name)
                     try {
-                        processFile(file)
+                        processFile(entry.file, entry.folder)
                     } catch (t: Throwable) {
-                        Log.e(TAG, "Failed to process file ${file.name}, skipping", t)
+                        Log.e(TAG, "Failed to process file ${entry.file.name}, skipping", t)
                     }
-                    emit(file)
+                    emit(entry)
                 }
             }.collect { _ ->
                 val current = doneCount.incrementAndGet()
@@ -347,6 +347,8 @@ class PhotoSyncWorker(
     data class MediaEntry(
         val file: File,
         val modifiedSec: Long,
+        /** MediaStore RELATIVE_PATH without trailing slash, e.g. "DCIM/Camera". */
+        val folder: String,
     )
 
     /**
@@ -440,13 +442,16 @@ class PhotoSyncWorker(
                     }
                     val path = cursor.getString(dataCol) ?: continue
                     val file = File(path)
-                    if (file.isFile) result.add(MediaEntry(file, cursor.getLong(modCol)))
+                    if (file.isFile) result.add(MediaEntry(file, cursor.getLong(modCol), relPath))
                 }
             }
         return result
     }
 
-    private suspend fun processFile(file: File) {
+    private suspend fun processFile(
+        file: File,
+        folder: String,
+    ) {
         val path = file.absolutePath
         val modifiedAt = file.lastModified()
         val takenAt =
@@ -465,6 +470,7 @@ class PhotoSyncWorker(
                     PhotoEntity(
                         id = photoId,
                         path = path,
+                        folder = folder,
                         modifiedAt = modifiedAt,
                         takenAt = takenAt,
                         analyzed = false,
@@ -474,6 +480,7 @@ class PhotoSyncWorker(
             }
             existing.modifiedAt != modifiedAt -> {
                 photoDao.update(existing.id, modifiedAt, takenAt, analyzed = false)
+                photoDao.updateFolder(existing.id, folder)
                 deleteFaceRegionsForPhoto(existing.id)
                 importXmpAndAnalyze(file, existing.id)
             }

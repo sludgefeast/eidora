@@ -35,6 +35,26 @@ class SettingsViewModel(
     app: Application,
 ) : AndroidViewModel(app) {
     private val repo = SettingsProvider.get(app)
+    private val faceRepo =
+        org.eidora.data.repository
+            .FaceRepository(app, org.eidora.data.db.DatabaseProvider.getInstance(app))
+
+    /**
+     * Removes all photos/faces/persons outside the current folder whitelist
+     * from the database. Reports the number of removed photos via [onDone].
+     */
+    fun cleanupExcludedFolders(onDone: (Int) -> Unit) {
+        viewModelScope.launch {
+            val folders = repo.getFolderWhitelist().toList()
+            val removed =
+                try {
+                    faceRepo.cleanupFoldersNotIn(folders)
+                } catch (t: Throwable) {
+                    0
+                }
+            onDone(removed)
+        }
+    }
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()

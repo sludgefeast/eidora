@@ -283,6 +283,24 @@ fun EidoraApp() {
         return
     }
 
+    // ---- Folder wizard: first-run selection of which folders to process ----
+    var wizardDone by remember {
+        mutableStateOf<Boolean?>(null)
+    }
+    LaunchedEffect(Unit) {
+        wizardDone = org.eidora.data.settings.SettingsProvider
+            .get(context)
+            .getFolderWizardDone()
+    }
+    when (wizardDone) {
+        null -> return // still loading the flag
+        false -> {
+            org.eidora.ui.common.FolderWizardScreen(onDone = { wizardDone = true })
+            return
+        }
+        else -> Unit // completed – continue
+    }
+
     // ---- Model gate: block the main UI until ML models are downloaded ----
     var modelsReady by remember { mutableStateOf(org.eidora.ml.ModelDownloader.allModelsReady(context)) }
     if (!modelsReady) {

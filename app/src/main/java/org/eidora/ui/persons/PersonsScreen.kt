@@ -170,6 +170,25 @@ fun PersonsScreen(
             onDismiss = { viewModel.cancelMerge() },
         )
     }
+
+    // Namesake conflict: a hidden person already has this name
+    state.namesakeConflict?.let { conflict ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissNamesakeConflict() },
+            title = { Text(stringResource(R.string.namesake_title)) },
+            text = { Text(stringResource(R.string.namesake_message, conflict.name)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmNamesakeMerge() }) {
+                    Text(stringResource(R.string.namesake_merge))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.keepNamesakeSeparate() }) {
+                    Text(stringResource(R.string.namesake_keep_separate))
+                }
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)

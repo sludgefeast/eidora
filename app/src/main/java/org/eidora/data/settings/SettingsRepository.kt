@@ -20,6 +20,8 @@ private val KEY_TIME_WEIGHT = floatPreferencesKey("clustering_time_weight")
 private val KEY_MIN_BATTERY_PERCENT = intPreferencesKey("min_battery_percent")
 private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius")
 private val KEY_FOLDER_WHITELIST = stringPreferencesKey("folder_whitelist")
+private val KEY_FOLDER_WIZARD_DONE =
+    androidx.datastore.preferences.core.booleanPreferencesKey("folder_wizard_done")
 private val KEY_CONFIRM_ON_ASSIGN =
     androidx.datastore.preferences.core.booleanPreferencesKey("confirm_on_assign")
 private val KEY_CONFIRM_ON_NAME_SUGGESTION =
@@ -110,6 +112,16 @@ class SettingsRepository(
         context.dataStore.edit { prefs ->
             prefs[KEY_FOLDER_WHITELIST] = folders.joinToString("\n")
         }
+    }
+
+    /** True once the first-run folder selection wizard has been completed. */
+    val folderWizardDone: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_FOLDER_WIZARD_DONE] ?: false }
+
+    suspend fun getFolderWizardDone(): Boolean = folderWizardDone.first()
+
+    suspend fun setFolderWizardDone(done: Boolean) {
+        context.dataStore.edit { it[KEY_FOLDER_WIZARD_DONE] = done }
     }
 
     // ---- Model download over mobile network ---------------------------------

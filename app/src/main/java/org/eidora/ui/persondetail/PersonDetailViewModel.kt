@@ -57,7 +57,8 @@ class PersonDetailViewModel(
         // Observe all named persons independently of load mode,
         // so the "Assign to person" sheet always has options.
         viewModelScope.launch {
-            repo.observePersonsWithCount().collect { persons: List<PersonWithCount> ->
+            val folders = settingsRepo.getFolderWhitelist().toList()
+            repo.observePersonsWithCount(folders).collect { persons: List<PersonWithCount> ->
                 _uiState.update { it.copy(allPersons = persons) }
             }
         }
@@ -80,7 +81,8 @@ class PersonDetailViewModel(
                 )
             }
 
-            faceDao.observeByPersonId(personId).collect { faces: List<FaceRegionWithPhoto> ->
+            val folders = settingsRepo.getFolderWhitelist().toList()
+            faceDao.observeByPersonId(personId, folders).collect { faces: List<FaceRegionWithPhoto> ->
                 _uiState.update {
                     it.copy(
                         unconfirmedFaces =
@@ -99,7 +101,8 @@ class PersonDetailViewModel(
 
     fun loadUnknown() {
         viewModelScope.launch {
-            repo.observeUnknownFaces().collect { faces: List<FaceRegionWithPhoto> ->
+            val folders = settingsRepo.getFolderWhitelist().toList()
+            repo.observeUnknownFaces(folders).collect { faces: List<FaceRegionWithPhoto> ->
                 _uiState.update {
                     it.copy(
                         personName =
@@ -116,7 +119,8 @@ class PersonDetailViewModel(
 
     fun loadIgnored() {
         viewModelScope.launch {
-            repo.observeIgnoredFaces().collect { faces: List<FaceRegionWithPhoto> ->
+            val folders = settingsRepo.getFolderWhitelist().toList()
+            repo.observeIgnoredFaces(folders).collect { faces: List<FaceRegionWithPhoto> ->
                 _uiState.update {
                     it.copy(
                         personName =

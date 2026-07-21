@@ -158,4 +158,15 @@
     <string name="model_unavailable_title">Modelle nicht verfügbar</string>
     <string name="model_unavailable_body">Die Modelle für diese App-Version stehen nicht mehr zum Download bereit. Vermutlich gibt es eine neuere Version von Eidora – bitte aktualisiere die App.</string>
     <string name="model_check_retry">Erneut prüfen</string>
+    <string name="settings_folders_cleanup">Datenbank bereinigen</string>
+    <string name="settings_folders_cleanup_description">Entfernt Fotos, Gesichter und Personen aus nicht mehr ausgewählten Ordnern dauerhaft.</string>
+    <string name="settings_folders_cleanup_done">%1$d Fotos aus der Datenbank entfernt.</string>
+    <string name="wizard_folders_title">Ordner auswählen</string>
+    <string name="wizard_folders_body">Wähle aus, welche Foto-Ordner Eidora analysieren soll. Du kannst das später in den Einstellungen ändern.</string>
+    <string name="wizard_folders_empty">Keine Foto-Ordner gefunden.</string>
+    <string name="wizard_folders_continue">Weiter</string>
+    <string name="namesake_title">Name existiert bereits</string>
+    <string name="namesake_message">Eine Person namens \"%1$s\" existiert bereits, ist aber durch deine aktuelle Ordnerauswahl ausgeblendet. Möchtest du diesen Vorschlag mit dieser Person zusammenführen oder als eigene Person behalten?</string>
+    <string name="namesake_merge">Zusammenführen</string>
+    <string name="namesake_keep_separate">Getrennt behalten</string>
 </resources>

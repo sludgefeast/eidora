@@ -156,6 +156,31 @@ fun SettingsScreen(
                 }
             }
 
+            val cleanupContext = androidx.compose.ui.platform.LocalContext.current
+            OutlinedButton(
+                onClick = {
+                    viewModel.cleanupExcludedFolders { removed ->
+                        android.widget.Toast
+                            .makeText(
+                                cleanupContext,
+                                cleanupContext.getString(R.string.settings_folders_cleanup_done, removed),
+                                android.widget.Toast.LENGTH_LONG,
+                            ).show()
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+            ) {
+                Text(stringResource(R.string.settings_folders_cleanup))
+            }
+            Text(
+                text = stringResource(R.string.settings_folders_cleanup_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+
             Spacer(Modifier.height(24.dp))
 
             // Section: clustering

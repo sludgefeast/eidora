@@ -10,6 +10,8 @@ import androidx.room.PrimaryKey
 data class PhotoEntity(
     @PrimaryKey val id: String,
     val path: String,
+    /** MediaStore relative path of the containing folder, e.g. "DCIM/Camera". */
+    val folder: String = "",
     val modifiedAt: Long,
     val takenAt: Long?,
     val analyzed: Boolean = false,
@@ -18,7 +20,9 @@ data class PhotoEntity(
 
 @Entity(
     tableName = "persons",
-    indices = [Index(value = ["name"], unique = true)],
+    // Non-unique: two different people may share a name. The user resolves
+    // same-name collisions explicitly (merge or keep separate).
+    indices = [Index(value = ["name"])],
 )
 data class PersonEntity(
     @PrimaryKey val id: String,

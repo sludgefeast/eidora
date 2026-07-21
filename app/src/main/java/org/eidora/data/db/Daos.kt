@@ -67,8 +67,26 @@ interface PhotoDao {
     @Query("DELETE FROM photos WHERE id = :id")
     suspend fun deleteById(id: String)
 
-    @Query("SELECT * FROM photos ORDER BY CASE WHEN takenAt IS NULL THEN 1 ELSE 0 END, takenAt DESC")
-    fun observeAllSortedByDate(): Flow<List<PhotoEntity>>
+    @Query(
+        """
+        SELECT * FROM photos
+        WHERE folder IN (:folders)
+        ORDER BY CASE WHEN takenAt IS NULL THEN 1 ELSE 0 END, takenAt DESC
+    """,
+    )
+    fun observeAllSortedByDate(folders: List<String>): Flow<List<PhotoEntity>>
+
+    @Query("SELECT COUNT(*) FROM photos")
+    suspend fun count(): Int
+
+    @Query("UPDATE photos SET folder = :folder WHERE id = :id")
+    suspend fun updateFolder(
+        id: String,
+        folder: String,
+    )
+
+    @Query("DELETE FROM photos WHERE folder NOT IN (:folders)")
+    suspend fun deleteNotInFolders(folders: List<String>)
 }
 
 // ---------------------------------------------------------------------------
@@ -80,12 +98,29 @@ interface PersonDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(person: PersonEntity): Long
 
-    // For inserting suggestion persons with null name (bypasses unique index on name)
+    // Suggestion persons have a null name. Kept as a separate entry point for
+    // clarity; the name index is non-unique so no special handling is needed.
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWithNullableName(person: PersonEntity)
 
     @Query("SELECT * FROM persons WHERE name = :name LIMIT 1")
     suspend fun findByName(name: String): PersonEntity?
+
+    /**
+     * Number of a person's (non-ignored) faces whose photos are in the given
+     * folders. Zero means the person is currently hidden by the folder filter.
+     */
+    @Query(
+        """
+        SELECT COUNT(*) FROM face_regions f
+        JOIN photos ph ON ph.id = f.photoId
+        WHERE f.personId = :personId AND f.ignored = 0 AND ph.folder IN (:folders)
+    """,
+    )
+    suspend fun countFacesInFolders(
+        personId: String,
+        folders: List<String>,
+    ): Int
 
     @Query("SELECT * FROM persons WHERE id = :id")
     suspend fun findById(id: String): PersonEntity?
@@ -134,12 +169,14 @@ interface PersonDao {
                COUNT(CASE WHEN f.name IS NULL AND f.ignored = 0 THEN 1 END) as unconfirmedCount
         FROM persons p
         LEFT JOIN face_regions f ON f.personId = p.id
+            AND f.photoId IN (SELECT id FROM photos WHERE folder IN (:folders))
         WHERE p.name IS NOT NULL
         GROUP BY p.id
+        HAVING COUNT(f.id) > 0
         ORDER BY confirmedCount DESC, p.name ASC
     """,
     )
-    fun observeAllWithConfirmedCount(): Flow<List<PersonWithCount>>
+    fun observeAllWithConfirmedCount(folders: List<String>): Flow<List<PersonWithCount>>
 
     // Suggestion persons: have personId set on faces but no name yet
     @Query(
@@ -148,15 +185,18 @@ interface PersonDao {
         FROM persons p
         WHERE p.name IS NULL
         AND EXISTS (
-            SELECT 1 FROM face_regions f WHERE f.personId = p.id
+            SELECT 1 FROM face_regions f
+            JOIN photos ph ON ph.id = f.photoId
+            WHERE f.personId = p.id AND ph.folder IN (:folders)
         )
         ORDER BY (
             SELECT COUNT(*) FROM face_regions f
-            WHERE f.personId = p.id AND f.ignored = 0
+            JOIN photos ph ON ph.id = f.photoId
+            WHERE f.personId = p.id AND f.ignored = 0 AND ph.folder IN (:folders)
         ) DESC
     """,
     )
-    fun observeSuggestions(): Flow<List<PersonEntity>>
+    fun observeSuggestions(folders: List<String>): Flow<List<PersonEntity>>
 }
 
 data class PersonWithCount(
@@ -266,35 +306,38 @@ interface FaceRegionDao {
         SELECT f.*, ph.takenAt as photoTakenAt
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
-        WHERE f.personId = :personId
+        WHERE f.personId = :personId AND ph.folder IN (:folders)
         ORDER BY 
             CASE WHEN f.name IS NULL THEN 0 ELSE 1 END ASC,
             ph.takenAt DESC
     """,
     )
-    fun observeByPersonId(personId: String): Flow<List<FaceRegionWithPhoto>>
+    fun observeByPersonId(
+        personId: String,
+        folders: List<String>,
+    ): Flow<List<FaceRegionWithPhoto>>
 
     @Query(
         """
         SELECT f.*, ph.takenAt as photoTakenAt
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
-        WHERE f.personId IS NULL AND f.ignored = 0
+        WHERE f.personId IS NULL AND f.ignored = 0 AND ph.folder IN (:folders)
         ORDER BY ph.takenAt DESC
     """,
     )
-    fun observeUnknown(): Flow<List<FaceRegionWithPhoto>>
+    fun observeUnknown(folders: List<String>): Flow<List<FaceRegionWithPhoto>>
 
     @Query(
         """
         SELECT f.*, ph.takenAt as photoTakenAt
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
-        WHERE f.ignored = 1
+        WHERE f.ignored = 1 AND ph.folder IN (:folders)
         ORDER BY ph.takenAt DESC
     """,
     )
-    fun observeIgnored(): Flow<List<FaceRegionWithPhoto>>
+    fun observeIgnored(folders: List<String>): Flow<List<FaceRegionWithPhoto>>
 
     @Query("UPDATE face_regions SET name = :name WHERE personId = :personId AND name IS NOT NULL")
     suspend fun updateConfirmedNamesForPerson(
@@ -308,11 +351,23 @@ interface FaceRegionDao {
         targetPersonId: String,
     )
 
-    @Query("SELECT COUNT(*) FROM face_regions WHERE personId IS NULL AND ignored = 0")
-    fun observeUnknownCount(): Flow<Int>
+    @Query(
+        """
+        SELECT COUNT(*) FROM face_regions f
+        JOIN photos ph ON ph.id = f.photoId
+        WHERE f.personId IS NULL AND f.ignored = 0 AND ph.folder IN (:folders)
+    """,
+    )
+    fun observeUnknownCount(folders: List<String>): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM face_regions WHERE ignored = 1")
-    fun observeIgnoredCount(): Flow<Int>
+    @Query(
+        """
+        SELECT COUNT(*) FROM face_regions f
+        JOIN photos ph ON ph.id = f.photoId
+        WHERE f.ignored = 1 AND ph.folder IN (:folders)
+    """,
+    )
+    fun observeIgnoredCount(folders: List<String>): Flow<Int>
 
     // Fix 5: reactive flow of all face regions for a single photo
     @Query("SELECT * FROM face_regions WHERE photoId = :photoId")
