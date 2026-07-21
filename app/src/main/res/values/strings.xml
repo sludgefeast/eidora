@@ -166,9 +166,7 @@
     <string name="wizard_folders_empty">No photo folders found.</string>
     <string name="wizard_folders_continue">Continue</string>
     <string name="namesake_title">Name already exists</string>
-    <string name="namesake_message">A person named \"%1$s\" already exists but is hidden by your current folder selection. Do you want to merge this suggestion into that person, or keep it as a separate person?</string>
-    <string name="namesake_merge">Merge</string>
-    <string name="namesake_keep_separate">Keep separate</string>
+    <string name="namesake_message">A person named \"%1$s\" is already visible. Choose which one to merge into, or cancel to keep them separate.</string>
     <string name="about_title">About</string>
     <string name="about_open">About Eidora</string>
     <string name="about_version">Version %1$s</string>
@@ -177,4 +175,5 @@
     <string name="about_models_line">ML models: InsightFace, non-commercial research use only.</string>
     <string name="about_libraries_header">Open-source libraries</string>
     <string name="action_back">Back</string>
+    <string name="namesake_merge_into">Merge into %1$s</string>
 </resources>

@@ -166,9 +166,7 @@
     <string name="wizard_folders_empty">Keine Foto-Ordner gefunden.</string>
     <string name="wizard_folders_continue">Weiter</string>
     <string name="namesake_title">Name existiert bereits</string>
-    <string name="namesake_message">Eine Person namens \"%1$s\" existiert bereits, ist aber durch deine aktuelle Ordnerauswahl ausgeblendet. Möchtest du diesen Vorschlag mit dieser Person zusammenführen oder als eigene Person behalten?</string>
-    <string name="namesake_merge">Zusammenführen</string>
-    <string name="namesake_keep_separate">Getrennt behalten</string>
+    <string name="namesake_message">Eine Person namens \"%1$s\" ist bereits sichtbar. Wähle aus, mit welcher zusammengeführt werden soll, oder brich ab.</string>
     <string name="about_title">Über</string>
     <string name="about_open">Über Eidora</string>
     <string name="about_version">Version %1$s</string>
@@ -177,4 +175,5 @@
     <string name="about_models_line">ML-Modelle: InsightFace, nur nicht-kommerzielle Forschung.</string>
     <string name="about_libraries_header">Open-Source-Bibliotheken</string>
     <string name="action_back">Zurück</string>
+    <string name="namesake_merge_into">Mit %1$s zusammenführen</string>
 </resources>

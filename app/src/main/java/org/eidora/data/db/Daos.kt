@@ -110,26 +110,41 @@ interface PersonDao {
     suspend fun findByName(name: String): PersonEntity?
 
     /**
-     * Number of a person's (non-ignored) faces whose photos are in the given
-     * folders. Zero means the person is currently hidden by the folder filter.
+     * Named persons sharing [name] that have at least one non-ignored face in
+     * the given folders (i.e. currently visible). Excludes [excludePersonId]
+     * (the person being renamed). Ordered by visible face count descending.
      */
     @Query(
         """
-        SELECT COUNT(*) FROM face_regions f
-        JOIN photos ph ON ph.id = f.photoId
-        WHERE f.personId = :personId AND f.ignored = 0 AND ph.folder IN (:folders)
+        SELECT p.* FROM persons p
+        WHERE p.name = :name AND p.id != :excludePersonId
+        AND EXISTS (
+            SELECT 1 FROM face_regions f
+            JOIN photos ph ON ph.id = f.photoId
+            WHERE f.personId = p.id AND f.ignored = 0 AND ph.folder IN (:folders)
+        )
+        ORDER BY (
+            SELECT COUNT(*) FROM face_regions f
+            JOIN photos ph ON ph.id = f.photoId
+            WHERE f.personId = p.id AND f.ignored = 0 AND ph.folder IN (:folders)
+        ) DESC
     """,
     )
-    suspend fun countFacesInFolders(
-        personId: String,
+    suspend fun findVisibleNamesakes(
+        name: String,
+        excludePersonId: String,
         folders: List<String>,
-    ): Int
+    ): List<PersonEntity>
+
 
     @Query("SELECT * FROM persons WHERE id = :id")
     suspend fun findById(id: String): PersonEntity?
 
     @Query("SELECT * FROM persons WHERE name IS NOT NULL")
     suspend fun getAll(): List<PersonEntity>
+
+    @Query("SELECT id FROM persons")
+    suspend fun allIds(): List<String>
 
     @Query("SELECT * FROM persons WHERE name IS NULL")
     suspend fun getSuggestions(): List<PersonEntity>
@@ -248,6 +263,38 @@ interface FaceRegionDao {
 
     @Query("SELECT * FROM face_regions WHERE personId = :personId")
     suspend fun findByPersonId(personId: String): List<FaceRegionEntity>
+
+    /** Face ids of a person whose photos are OUTSIDE the given folders. */
+    @Query(
+        """
+        SELECT f.id FROM face_regions f
+        JOIN photos ph ON ph.id = f.photoId
+        WHERE f.personId = :personId AND ph.folder NOT IN (:folders)
+    """,
+    )
+    suspend fun faceIdsOutsideFolders(
+        personId: String,
+        folders: List<String>,
+    ): List<String>
+
+    /** Number of a person's faces whose photos are INSIDE the given folders. */
+    @Query(
+        """
+        SELECT COUNT(*) FROM face_regions f
+        JOIN photos ph ON ph.id = f.photoId
+        WHERE f.personId = :personId AND ph.folder IN (:folders)
+    """,
+    )
+    suspend fun countInsideFolders(
+        personId: String,
+        folders: List<String>,
+    ): Int
+
+    @Query("UPDATE face_regions SET personId = :newPersonId WHERE id IN (:faceIds)")
+    suspend fun reassignFaces(
+        faceIds: List<String>,
+        newPersonId: String,
+    )
 
     @Query("SELECT * FROM face_regions WHERE embedding IS NULL AND ignored = 0")
     suspend fun findWithoutEmbedding(): List<FaceRegionEntity>

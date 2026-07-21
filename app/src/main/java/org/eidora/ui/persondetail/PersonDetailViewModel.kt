@@ -29,17 +29,21 @@ data class PersonDetailUiState(
     val allPersons: List<PersonWithCount> = emptyList(),
     val personSearchQuery: String = "",
     val isReassigning: Boolean = false,
-    val mergeConflict: MergeConflict? = null,
+    val renameConflict: RenameConflict? = null,
 ) {
     val selectedFaceIds get() = multiSelect.selectedIds
     val isMultiSelectActive get() = multiSelect.isActive
 }
 
-data class MergeConflict(
+/**
+ * Raised when renaming a person to a name already used by one or more VISIBLE
+ * persons. The user picks one candidate to merge into, or cancels. Hidden
+ * namesakes are ignored.
+ */
+data class RenameConflict(
     val sourcePersonId: String,
-    val targetPersonId: String,
-    val targetPersonName: String,
-    val targetRepresentativeFaceId: String?,
+    val name: String,
+    val candidates: List<org.eidora.data.db.PersonEntity>,
 )
 
 class PersonDetailViewModel(
@@ -207,16 +211,19 @@ class PersonDetailViewModel(
         viewModelScope.launch {
             val trimmed = newName.trim()
             if (trimmed.isBlank()) return@launch
-            val existing = personDao.findByName(trimmed)
-            if (existing != null && existing.id != personId) {
+            val folders = settingsRepo.getFolderWhitelist().toList()
+            val namesakes = personDao.findVisibleNamesakes(trimmed, personId, folders)
+            if (namesakes.isNotEmpty()) {
+                // Visible person(s) already use this name → user must choose one
+                // to merge into (or cancel). Hidden namesakes are ignored, so a
+                // duplicate name across the visibility boundary may result.
                 _uiState.update {
                     it.copy(
-                        mergeConflict =
-                            MergeConflict(
+                        renameConflict =
+                            RenameConflict(
                                 sourcePersonId = personId,
-                                targetPersonId = existing.id,
-                                targetPersonName = trimmed,
-                                targetRepresentativeFaceId = existing.representativeFaceId,
+                                name = trimmed,
+                                candidates = namesakes,
                             ),
                     )
                 }
@@ -232,23 +239,26 @@ class PersonDetailViewModel(
         }
     }
 
-    fun confirmMergeConflict(onMerged: (String) -> Unit = {}) {
-        val conflict = _uiState.value.mergeConflict ?: return
-        // Dismiss dialog and navigate immediately – merge continues in background
-        _uiState.update { it.copy(mergeConflict = null) }
-        onMerged(conflict.targetPersonId)
+    /** User picked a visible namesake to merge the current person into. */
+    fun mergeIntoNamesake(
+        targetPersonId: String,
+        onMerged: (String) -> Unit = {},
+    ) {
+        val conflict = _uiState.value.renameConflict ?: return
+        _uiState.update { it.copy(renameConflict = null) }
+        onMerged(targetPersonId)
         viewModelScope.launch {
             val confirm = settingsRepo.getConfirmOnMergeSuggestion()
             repo.mergePersons(
-                listOf(conflict.sourcePersonId, conflict.targetPersonId),
-                conflict.targetPersonId,
+                listOf(conflict.sourcePersonId, targetPersonId),
+                targetPersonId,
                 confirmFaces = confirm,
             )
         }
     }
 
-    fun cancelMergeConflict() {
-        _uiState.update { it.copy(mergeConflict = null) }
+    fun cancelRenameConflict() {
+        _uiState.update { it.copy(renameConflict = null) }
     }
 
     /**

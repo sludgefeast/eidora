@@ -36,7 +36,6 @@ import org.eidora.R
 import org.eidora.data.db.FaceRegionWithPhoto
 import org.eidora.ui.common.CircleThumbnail
 import org.eidora.ui.common.LazyGridScrollbar
-import org.eidora.ui.common.MergeConfirmDialog
 import org.eidora.util.ThumbnailHelper
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -421,22 +420,37 @@ fun PersonDetailScreen(
             onDismiss = { viewModel.dismissAssignSheet() },
         )
     }
-    state.mergeConflict?.let { conflict ->
-        val context = LocalContext.current
-        val thumbnail =
-            conflict.targetRepresentativeFaceId?.let {
-                ThumbnailHelper.thumbnailFile(context, it)
-            }
-        MergeConfirmDialog(
-            existingPersonName = conflict.targetPersonName,
-            existingRepresentativeThumbnail = thumbnail,
-            onConfirmMerge = {
-                viewModel.confirmMergeConflict { targetId ->
-                    isEditingName = false
-                    onNavigateToPerson(targetId)
+    state.renameConflict?.let { conflict ->
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelRenameConflict() },
+            title = { Text(stringResource(R.string.namesake_title)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.namesake_message, conflict.name))
+                    Spacer(Modifier.height(12.dp))
+                    conflict.candidates.forEach { candidate ->
+                        TextButton(
+                            onClick = {
+                                viewModel.mergeIntoNamesake(candidate.id) { targetId ->
+                                    isEditingName = false
+                                    onNavigateToPerson(targetId)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                stringResource(R.string.namesake_merge_into, candidate.name ?: conflict.name),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
                 }
             },
-            onCancel = { viewModel.cancelMergeConflict() },
+            confirmButton = {
+                TextButton(onClick = { viewModel.cancelRenameConflict() }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
         )
     }
 }

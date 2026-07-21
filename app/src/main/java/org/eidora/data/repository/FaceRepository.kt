@@ -323,6 +323,40 @@ class FaceRepository(
      * Use after the user narrows the folder selection to reclaim space.
      * Returns the number of photos removed.
      */
+    /**
+     * Ensures every person contains either only visible (in-folder) or only
+     * hidden (out-of-folder) faces. Any person that currently mixes both is
+     * split: its hidden faces are moved to a new person that copies the name,
+     * and both persons' centroids/representatives are recomputed.
+     *
+     * Call after the folder whitelist changes. Returns the number of new
+     * persons created by splitting.
+     */
+    suspend fun splitPersonsByVisibility(folders: List<String>): Int {
+        if (folders.isEmpty()) return 0
+        var created = 0
+        val personIds = personDao.allIds()
+        for (personId in personIds) {
+            val hiddenFaceIds = faceDao.faceIdsOutsideFolders(personId, folders)
+            if (hiddenFaceIds.isEmpty()) continue // all visible → nothing to do
+            val visibleCount = faceDao.countInsideFolders(personId, folders)
+            if (visibleCount == 0) continue // all hidden → nothing to do
+            // Mixed: move the hidden faces into a new person with the same name.
+            val original = personDao.findById(personId) ?: continue
+            val newPerson =
+                PersonEntity(
+                    id = UUID.randomUUID().toString(),
+                    name = original.name,
+                )
+            personDao.insertWithNullableName(newPerson)
+            faceDao.reassignFaces(hiddenFaceIds, newPerson.id)
+            recomputeCentroid(personId)
+            recomputeCentroid(newPerson.id)
+            created++
+        }
+        return created
+    }
+
     suspend fun cleanupFoldersNotIn(folders: List<String>): Int {
         val before = photoDao.count()
         photoDao.deleteNotInFolders(folders)

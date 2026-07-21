@@ -36,13 +36,15 @@ data class PersonsUiState(
 }
 
 /**
- * Raised when a suggestion is named to match an existing person who is
- * currently hidden by the folder filter, so the merge would be invisible.
+ * Raised when a suggestion is named, or a person renamed, to a name already
+ * used by one or more VISIBLE persons. The user must pick one to merge into,
+ * or cancel. Hidden namesakes are not included and not considered.
  */
 data class NamesakeConflict(
-    val suggestionId: String,
-    val existingPersonId: String,
+    val subjectId: String,
+    val subjectIsSuggestion: Boolean,
     val name: String,
+    val candidates: List<PersonEntity>,
 )
 
 class PersonsViewModel(
@@ -154,59 +156,42 @@ class PersonsViewModel(
         name: String,
     ) {
         viewModelScope.launch {
-            val existing = personDao.findByName(name)
-            if (existing != null && existing.id != personId) {
-                // A person with this name already exists. If that person is
-                // currently hidden by the folder filter, the merge would happen
-                // invisibly – ask the user first. If they are visible, the merge
-                // is self-evident and proceeds directly.
-                val folders = settingsRepo.getFolderWhitelist().toList()
-                val visibleFaces = personDao.countFacesInFolders(existing.id, folders)
-                if (visibleFaces == 0) {
-                    _uiState.update {
-                        it.copy(
-                            namesakeConflict =
-                                NamesakeConflict(
-                                    suggestionId = personId,
-                                    existingPersonId = existing.id,
-                                    name = name,
-                                ),
-                        )
-                    }
-                    return@launch
+            val folders = settingsRepo.getFolderWhitelist().toList()
+            val namesakes = personDao.findVisibleNamesakes(name, personId, folders)
+            if (namesakes.isNotEmpty()) {
+                // One or more VISIBLE persons already use this name. The user
+                // must pick which one to merge into (or cancel). Hidden persons
+                // with the same name are intentionally ignored – a new visible
+                // person with a duplicate name may result, which is tolerated.
+                _uiState.update {
+                    it.copy(
+                        namesakeConflict =
+                            NamesakeConflict(
+                                subjectId = personId,
+                                subjectIsSuggestion = true,
+                                name = name,
+                                candidates = namesakes,
+                            ),
+                    )
                 }
-                val confirm = settingsRepo.getConfirmOnMergeSuggestion()
-                repo.mergePersons(listOf(personId, existing.id), existing.id, confirmFaces = confirm)
-            } else {
-                val confirm = settingsRepo.getConfirmOnNameSuggestion()
-                repo.nameSuggestion(personId, name, confirm = confirm)
+                return@launch
             }
+            val confirm = settingsRepo.getConfirmOnNameSuggestion()
+            repo.nameSuggestion(personId, name, confirm = confirm)
         }
     }
 
-    /** User chose to merge the suggestion into the hidden namesake person. */
-    fun confirmNamesakeMerge() {
+    /** User picked a namesake to merge the subject (suggestion/person) into. */
+    fun mergeIntoNamesake(targetPersonId: String) {
         val conflict = _uiState.value.namesakeConflict ?: return
         _uiState.update { it.copy(namesakeConflict = null) }
         viewModelScope.launch {
             val confirm = settingsRepo.getConfirmOnMergeSuggestion()
             repo.mergePersons(
-                listOf(conflict.suggestionId, conflict.existingPersonId),
-                conflict.existingPersonId,
+                listOf(conflict.subjectId, targetPersonId),
+                targetPersonId,
                 confirmFaces = confirm,
             )
-        }
-    }
-
-    /** User chose to keep the suggestion as a separate, new person. */
-    fun keepNamesakeSeparate() {
-        val conflict = _uiState.value.namesakeConflict ?: return
-        _uiState.update { it.copy(namesakeConflict = null) }
-        viewModelScope.launch {
-            // Name the suggestion without merging. The name index is non-unique,
-            // so two people may legitimately share a name.
-            val confirm = settingsRepo.getConfirmOnNameSuggestion()
-            repo.nameSuggestion(conflict.suggestionId, conflict.name, confirm = confirm)
         }
     }
 

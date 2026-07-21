@@ -110,7 +110,16 @@ class SettingsViewModel(
     }
 
     fun setFolderWhitelist(folders: Set<String>) {
-        viewModelScope.launch { repo.setFolderWhitelist(folders) }
+        viewModelScope.launch {
+            repo.setFolderWhitelist(folders)
+            // Keep persons homogeneous: split any that now mix visible and
+            // hidden faces, recomputing centroids for the affected persons.
+            try {
+                faceRepo.splitPersonsByVisibility(folders.toList())
+            } catch (t: Throwable) {
+                // best-effort; UI stays consistent via folder-filtered queries
+            }
+        }
     }
 
     fun loadAvailableFolders(context: android.content.Context) {
