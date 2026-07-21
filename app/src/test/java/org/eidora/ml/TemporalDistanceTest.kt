@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Sebastian (Eidora contributors)
+
 package org.eidora.ml
 
 import org.junit.jupiter.api.Assertions.assertEquals

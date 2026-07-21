@@ -1,0 +1,13 @@
+Eidora finds and groups faces in your photos — entirely on your device. No cloud, no accounts, no tracking. Your photos never leave your phone.
+
+Features:
+* On-device face detection and recognition
+* Groups photos of the same person automatically
+* Writes recognised names back into your photo files as XMP metadata, compatible with DigiKam and Aves
+* You choose which folders are analysed
+* Battery- and temperature-aware background processing you can pause and resume
+* Fully offline
+
+The machine learning models are downloaded once from the project's releases after you confirm — they are provided under a non-commercial research license (see the repository for details).
+
+Eidora is free software (GPLv3).

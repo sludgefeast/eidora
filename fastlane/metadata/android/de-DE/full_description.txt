@@ -1,0 +1,13 @@
+Eidora erkennt und gruppiert Gesichter in deinen Fotos — vollständig auf deinem Gerät. Keine Cloud, keine Konten, kein Tracking. Deine Fotos verlassen dein Handy nie.
+
+Funktionen:
+* Gesichtserkennung und -wiedererkennung lokal auf dem Gerät
+* Gruppiert Fotos derselben Person automatisch
+* Schreibt erkannte Namen als XMP-Metadaten in deine Fotodateien zurück, kompatibel mit DigiKam und Aves
+* Du wählst selbst, welche Ordner analysiert werden
+* Akku- und temperaturbewusste Hintergrundverarbeitung, pausierbar und fortsetzbar
+* Vollständig offline
+
+Die Machine-Learning-Modelle werden nach deiner Bestätigung einmalig aus den Projekt-Releases geladen — sie stehen unter einer nicht-kommerziellen Forschungslizenz (Details im Repository).
+
+Eidora ist freie Software (GPLv3).

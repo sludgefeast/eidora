@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Sebastian (Eidora contributors)
+
 package org.eidora.ui.settings
 
 import androidx.compose.foundation.clickable

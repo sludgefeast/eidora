@@ -1,0 +1,25 @@
+Categories:
+  - Multimedia
+  - Graphics
+License: GPL-3.0-or-later
+AuthorName: Sebastian
+SourceCode: https://github.com/sludgefeast/eidora
+IssueTracker: https://github.com/sludgefeast/eidora/issues
+
+AutoName: Eidora
+
+RepoType: git
+Repo: https://github.com/sludgefeast/eidora.git
+
+Builds:
+  - versionName: "1.0"
+    versionCode: 1
+    commit: v1.0
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags
+CurrentVersion: "1.0"
+CurrentVersionCode: 1
