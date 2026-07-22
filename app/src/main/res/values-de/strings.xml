@@ -178,4 +178,8 @@
     <string name="namesake_merge_into">Mit %1$s zusammenführen</string>
     <string name="unit_celsius">°C</string>
     <string name="unit_fahrenheit">°F</string>
+    <string name="setting_resume_battery_percent">Fortsetzen ab Akkustand (%)</string>
+    <string name="setting_resume_battery_percent_description">Die Verarbeitung läuft erst weiter, wenn der Akku wieder auf diesen Stand geladen ist. Halte den Wert über dem Pausenwert, damit das Laden spürbar vorankommt.</string>
+    <string name="setting_resume_battery_temp">Fortsetzen ab Akkutemperatur (%1$s)</string>
+    <string name="setting_resume_battery_temp_description">Die Verarbeitung läuft erst weiter, wenn der Akku auf diesen Wert abgekühlt ist. Halte den Wert unter dem Pausenwert, damit das Gerät wirklich abkühlt statt sofort wieder zu pausieren.</string>
 </resources>

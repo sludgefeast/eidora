@@ -259,8 +259,10 @@ class PhotoSyncWorker(
                     .getPowerConfig()
             } catch (t: Throwable) {
                 org.eidora.data.settings.PowerConfig(
-                    minBatteryPercent = 20,
-                    maxBatteryTempCelsius = 40.0f,
+                    minBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
+                    maxBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
+                    resumeBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
+                    resumeBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
                 )
             }
 
@@ -268,10 +270,7 @@ class PhotoSyncWorker(
         flow { jpegFiles.forEach { emit(it) } }
             .flatMapMerge(concurrency = SYNC_PARALLELISM) { entry ->
                 flow {
-                    powerGate.awaitOk(
-                        powerConfig.minBatteryPercent,
-                        powerConfig.maxBatteryTempCelsius,
-                    ) { reason ->
+                    powerGate.awaitOk(powerConfig) { reason ->
                         gateBlocked.set(true)
                         currentFile.set(reason)
                     }

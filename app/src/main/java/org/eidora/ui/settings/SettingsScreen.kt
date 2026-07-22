@@ -310,6 +310,30 @@ fun SettingsScreen(
                     viewModel.setPowerConfig(pwr.copy(maxBatteryTempCelsius = celsius))
                 },
             )
+            IntSetting(
+                label = stringResource(R.string.setting_resume_battery_percent),
+                description = stringResource(R.string.setting_resume_battery_percent_description),
+                value = pwr.resumeBatteryPercent,
+                default = SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
+                onValueChange = { viewModel.setPowerConfig(pwr.copy(resumeBatteryPercent = it)) },
+            )
+            FloatSetting(
+                label = stringResource(R.string.setting_resume_battery_temp, tempUnitLabel),
+                description = stringResource(R.string.setting_resume_battery_temp_description),
+                value =
+                    org.eidora.util.TemperatureUnit
+                        .forDisplay(pwr.resumeBatteryTempCelsius, tempInFahrenheit),
+                default =
+                    org.eidora.util.TemperatureUnit
+                        .forDisplay(SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP, tempInFahrenheit),
+                decimals = if (tempInFahrenheit) 0 else 1,
+                onValueChange = { entered ->
+                    val celsius =
+                        org.eidora.util.TemperatureUnit
+                            .fromInput(entered, tempInFahrenheit)
+                    viewModel.setPowerConfig(pwr.copy(resumeBatteryTempCelsius = celsius))
+                },
+            )
 
             Spacer(Modifier.height(32.dp))
         }

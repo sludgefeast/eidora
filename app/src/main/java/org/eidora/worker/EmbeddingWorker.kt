@@ -72,8 +72,10 @@ class EmbeddingWorker(
                         .getPowerConfig()
                 } catch (t: Throwable) {
                     org.eidora.data.settings.PowerConfig(
-                        minBatteryPercent = 20,
-                        maxBatteryTempCelsius = 40.0f,
+                    minBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
+                    maxBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
+                    resumeBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
+                    resumeBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
                     )
                 }
 
@@ -151,8 +153,7 @@ class EmbeddingWorker(
                 .flatMapMerge(concurrency = PARALLELISM) { face ->
                     flow {
                         powerGate.awaitOk(
-                            powerConfig.minBatteryPercent,
-                            powerConfig.maxBatteryTempCelsius,
+                            powerConfig,
                             isStopped = { isStopped },
                         ) { reason ->
                             // Only update the shared status – the notifier handles display

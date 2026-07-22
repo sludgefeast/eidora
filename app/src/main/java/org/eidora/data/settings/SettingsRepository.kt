@@ -22,6 +22,8 @@ private val KEY_MIN_CLUSTER_SIZE = intPreferencesKey("min_cluster_size")
 private val KEY_TIME_WEIGHT = floatPreferencesKey("clustering_time_weight")
 private val KEY_MIN_BATTERY_PERCENT = intPreferencesKey("min_battery_percent")
 private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius")
+private val KEY_RESUME_BATTERY_PERCENT = intPreferencesKey("resume_battery_percent")
+private val KEY_RESUME_BATTERY_TEMP = floatPreferencesKey("resume_battery_temp_celsius")
 private val KEY_FOLDER_WHITELIST = stringPreferencesKey("folder_whitelist")
 private val KEY_FOLDER_WIZARD_DONE =
     androidx.datastore.preferences.core.booleanPreferencesKey("folder_wizard_done")
@@ -40,9 +42,22 @@ data class ClusteringConfig(
     val timeWeight: Float,
 )
 
+/**
+ * Power thresholds with hysteresis.
+ *
+ * Processing pauses once the battery drops below [minBatteryPercent] or the
+ * battery temperature rises above [maxBatteryTempCelsius]. It only resumes once
+ * the battery is back at [resumeBatteryPercent] or the temperature has fallen
+ * to [resumeBatteryTempCelsius].
+ *
+ * The gap matters: without it the device would resume the moment it crosses
+ * back over the pause threshold, heat up again within seconds, and oscillate.
+ */
 data class PowerConfig(
     val minBatteryPercent: Int,
     val maxBatteryTempCelsius: Float,
+    val resumeBatteryPercent: Int = minBatteryPercent,
+    val resumeBatteryTempCelsius: Float = maxBatteryTempCelsius,
 )
 
 enum class FolderCategory { CAMERA, COMMON, APPS, OTHER }
@@ -84,6 +99,8 @@ class SettingsRepository(
             PowerConfig(
                 minBatteryPercent = prefs[KEY_MIN_BATTERY_PERCENT] ?: DEFAULT_MIN_BATTERY_PERCENT,
                 maxBatteryTempCelsius = prefs[KEY_MAX_BATTERY_TEMP] ?: DEFAULT_MAX_BATTERY_TEMP,
+                resumeBatteryPercent = prefs[KEY_RESUME_BATTERY_PERCENT] ?: DEFAULT_RESUME_BATTERY_PERCENT,
+                resumeBatteryTempCelsius = prefs[KEY_RESUME_BATTERY_TEMP] ?: DEFAULT_RESUME_BATTERY_TEMP,
             )
         }
 
@@ -93,6 +110,11 @@ class SettingsRepository(
         context.dataStore.edit { prefs ->
             prefs[KEY_MIN_BATTERY_PERCENT] = config.minBatteryPercent
             prefs[KEY_MAX_BATTERY_TEMP] = config.maxBatteryTempCelsius
+            // Keep the hysteresis meaningful: resume must be no worse than pause.
+            prefs[KEY_RESUME_BATTERY_PERCENT] =
+                config.resumeBatteryPercent.coerceAtLeast(config.minBatteryPercent)
+            prefs[KEY_RESUME_BATTERY_TEMP] =
+                config.resumeBatteryTempCelsius.coerceAtMost(config.maxBatteryTempCelsius)
         }
     }
 
@@ -192,5 +214,10 @@ class SettingsRepository(
 
         const val DEFAULT_MIN_BATTERY_PERCENT = 20
         const val DEFAULT_MAX_BATTERY_TEMP = 40.0f
+
+        // Resume thresholds: 5 % above / 5 K below the pause thresholds, so the
+        // device recovers noticeably before work continues.
+        const val DEFAULT_RESUME_BATTERY_PERCENT = 25
+        const val DEFAULT_RESUME_BATTERY_TEMP = 35.0f
     }
 }

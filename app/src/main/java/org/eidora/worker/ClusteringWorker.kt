@@ -104,7 +104,7 @@ class ClusteringWorker(
                     }
                     if (index % 50 == 0 && index > 0) {
                         powerGate
-                            .awaitOk(powerConfig.minBatteryPercent, powerConfig.maxBatteryTempCelsius, isStopped = {
+                            .awaitOk(powerConfig, isStopped = {
                                 isStopped
                             }) { reason ->
                                 try {
@@ -467,7 +467,12 @@ class ClusteringWorker(
         try {
             org.eidora.data.settings.SettingsProvider.get(applicationContext).getPowerConfig()
         } catch (t: Throwable) {
-            org.eidora.data.settings.PowerConfig(minBatteryPercent = 20, maxBatteryTempCelsius = 40.0f)
+            org.eidora.data.settings.PowerConfig(
+                minBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
+                maxBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
+                resumeBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
+                resumeBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
+            )
         }
 
     /** Suspends until battery/thermal conditions allow work, updating the notification. */
@@ -476,8 +481,7 @@ class ClusteringWorker(
         powerConfig: org.eidora.data.settings.PowerConfig,
     ) {
         powerGate.awaitOk(
-            powerConfig.minBatteryPercent,
-            powerConfig.maxBatteryTempCelsius,
+            powerConfig,
             isStopped = { isStopped },
         ) { reason ->
             try {

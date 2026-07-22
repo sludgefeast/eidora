@@ -56,23 +56,35 @@ class PowerGate(
         return PowerStatus(percent, tempC, thermal)
     }
 
+    /**
+     * Evaluates the power conditions with hysteresis.
+     *
+     * [currentlyBlocked] selects which thresholds apply: while running, the
+     * pause thresholds decide when to stop; while already blocked, the stricter
+     * resume thresholds decide when to continue. Using one threshold for both
+     * makes the gate oscillate — it would resume the instant the value crosses
+     * back, then trip again moments later.
+     */
     fun evaluate(
         status: PowerStatus,
-        minBatteryPercent: Int,
-        maxBatteryTempCelsius: Float,
+        config: org.eidora.data.settings.PowerConfig,
+        currentlyBlocked: Boolean,
     ): PowerGateResult {
-        if (status.batteryPercent in 0 until minBatteryPercent) {
+        val batteryLimit = batteryLimitFor(config, currentlyBlocked)
+        val tempLimit = tempLimitFor(config, currentlyBlocked)
+
+        if (status.batteryPercent in 0 until batteryLimit) {
             return PowerGateResult.Blocked(
-                context.getString(org.eidora.R.string.powergate_battery_low, minBatteryPercent, status.batteryPercent),
+                context.getString(org.eidora.R.string.powergate_battery_low, batteryLimit, status.batteryPercent),
             )
         }
-        if (status.batteryTempCelsius > 0f && status.batteryTempCelsius > maxBatteryTempCelsius) {
+        if (status.batteryTempCelsius > 0f && status.batteryTempCelsius > tempLimit) {
             val fahrenheit = org.eidora.util.TemperatureUnit.useFahrenheit(context)
             return PowerGateResult.Blocked(
                 context.getString(
                     org.eidora.R.string.powergate_battery_hot,
                     org.eidora.util.TemperatureUnit.format(status.batteryTempCelsius, fahrenheit),
-                    org.eidora.util.TemperatureUnit.format(maxBatteryTempCelsius, fahrenheit),
+                    org.eidora.util.TemperatureUnit.format(tempLimit, fahrenheit),
                 ),
             )
         }
@@ -82,16 +94,49 @@ class PowerGate(
         return PowerGateResult.Ok
     }
 
+    companion object {
+        /**
+         * Battery threshold that applies right now: the pause level while
+         * running, the (higher) resume level while blocked. Clamped so a
+         * misconfigured resume value can never be stricter than the pause one.
+         */
+        internal fun batteryLimitFor(
+            config: org.eidora.data.settings.PowerConfig,
+            currentlyBlocked: Boolean,
+        ): Int =
+            if (currentlyBlocked) {
+                config.resumeBatteryPercent.coerceAtLeast(config.minBatteryPercent)
+            } else {
+                config.minBatteryPercent
+            }
+
+        /**
+         * Temperature threshold that applies right now: the pause level while
+         * running, the (lower) resume level while blocked.
+         */
+        internal fun tempLimitFor(
+            config: org.eidora.data.settings.PowerConfig,
+            currentlyBlocked: Boolean,
+        ): Float =
+            if (currentlyBlocked) {
+                config.resumeBatteryTempCelsius.coerceAtMost(config.maxBatteryTempCelsius)
+            } else {
+                config.maxBatteryTempCelsius
+            }
+    }
+
     /**
      * Suspends until the gate is open again. Calls [onWait] each check
      * with the block reason so the caller can update its notification.
      */
     suspend fun awaitOk(
-        minBatteryPercent: Int,
-        maxBatteryTempCelsius: Float,
+        config: org.eidora.data.settings.PowerConfig,
         isStopped: () -> Boolean = { false },
         onWait: suspend (String) -> Unit,
     ) {
+        // Once this call has blocked at least once, the stricter resume
+        // thresholds apply until the gate opens again.
+        var blocked = false
         while (true) {
             if (isStopped()) return
             // Manual pause takes precedence over power conditions
@@ -101,8 +146,9 @@ class PowerGate(
                 continue
             }
             val status = currentStatus()
-            val result = evaluate(status, minBatteryPercent, maxBatteryTempCelsius)
+            val result = evaluate(status, config, currentlyBlocked = blocked)
             if (result is PowerGateResult.Ok) return
+            blocked = true
             val reason = (result as PowerGateResult.Blocked).reason
             Log.i(TAG, reason)
             onWait(reason)

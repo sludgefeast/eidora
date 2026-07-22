@@ -26,6 +26,8 @@ data class SettingsUiState(
         PowerConfig(
             minBatteryPercent = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
             maxBatteryTempCelsius = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
+            resumeBatteryPercent = SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
+            resumeBatteryTempCelsius = SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
         ),
     val availableFolders: List<String> = emptyList(),
     val folderWhitelist: Set<String> = SettingsRepository.DEFAULT_FOLDER_WHITELIST,
