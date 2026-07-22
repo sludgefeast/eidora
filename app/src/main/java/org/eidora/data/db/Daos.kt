@@ -38,7 +38,7 @@ interface PhotoDao {
         modifiedAt: Long,
     )
 
-    @Query("SELECT path, modifiedAt, analyzed FROM photos")
+    @Query("SELECT path, folder, modifiedAt, analyzed FROM photos")
     suspend fun getAllPathsWithModified(): List<PathModified>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -435,6 +435,7 @@ data class FaceRegionWithPhoto(
 
 data class PathModified(
     val path: String,
+    val folder: String,
     val modifiedAt: Long,
     val analyzed: Boolean,
 )

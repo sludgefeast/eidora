@@ -25,6 +25,7 @@ object NotificationHelper {
         context: Context,
         progress: Int,
         status: String,
+        gateBlocked: Boolean = false,
     ): ForegroundInfo {
         val notification =
             buildNotification(
@@ -32,6 +33,7 @@ object NotificationHelper {
                 context.getString(R.string.notification_sync_title),
                 status,
                 progress,
+                gateBlocked = gateBlocked,
             )
         return makeForegroundInfo(NOTIFICATION_ID_SYNC, notification)
     }
@@ -52,6 +54,7 @@ object NotificationHelper {
         progress: Int = -1,
         message: String? = null,
         cancelIntent: android.app.PendingIntent? = null,
+        gateBlocked: Boolean = false,
     ): ForegroundInfo {
         val notification =
             buildNotification(
@@ -60,6 +63,7 @@ object NotificationHelper {
                 message ?: context.getString(R.string.notif_running),
                 progress,
                 cancelIntent = cancelIntent,
+                gateBlocked = gateBlocked,
             )
         return makeForegroundInfo(NOTIFICATION_ID_CLUSTERING, notification)
     }

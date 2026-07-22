@@ -193,7 +193,7 @@ class PhotoSyncWorker(
                 photoDao
                     .getAllPathsWithModified()
                     .filter { !it.analyzed }
-                    .map { MediaEntry(java.io.File(it.path), it.modifiedAt / 1000) }
+                    .map { MediaEntry(java.io.File(it.path), it.modifiedAt / 1000, it.folder) }
             } catch (t: Throwable) {
                 emptyList()
             }

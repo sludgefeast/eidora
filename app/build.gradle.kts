@@ -52,6 +52,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     // Keep TFLite model uncompressed
