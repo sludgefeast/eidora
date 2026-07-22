@@ -28,6 +28,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "EmbeddingWorker"
 private const val PARALLELISM = 3
+private const val ACTIVE_NOTIFIER_INTERVAL_MS = 500L
+private const val IDLE_NOTIFIER_INTERVAL_MS = 10_000L
 
 class EmbeddingWorker(
     context: Context,
@@ -98,6 +100,7 @@ class EmbeddingWorker(
                         java.util.concurrent.atomic
                             .AtomicLong(0L)
                     var lastTick = System.currentTimeMillis()
+                    var lastPosted: Pair<Int, String>? = null
                     while (isActive) {
                         val current = done.get()
                         val progress = if (total == 0) 0 else (current * 100) / total
@@ -128,19 +131,26 @@ class EmbeddingWorker(
                                 eta.isNotEmpty() -> "$progress% – $eta"
                                 else -> "$progress%"
                             }
-                        try {
-                            setForeground(
-                                NotificationHelper.embeddingForegroundInfoWithMessage(
-                                    applicationContext,
-                                    progress,
-                                    message,
-                                    gateBlocked = blocked,
-                                ),
-                            )
-                        } catch (t: Throwable) {
-                            // ignore
+                        val posted = progress to message
+                        if (posted != lastPosted) {
+                            try {
+                                setForeground(
+                                    NotificationHelper.embeddingForegroundInfoWithMessage(
+                                        applicationContext,
+                                        progress,
+                                        message,
+                                        gateBlocked = blocked,
+                                    ),
+                                )
+                                lastPosted = posted
+                            } catch (t: Throwable) {
+                                // ignore
+                            }
                         }
-                        kotlinx.coroutines.delay(500)
+                        // Back off while blocked - see PhotoSyncWorker for why.
+                        kotlinx.coroutines.delay(
+                            if (blocked) IDLE_NOTIFIER_INTERVAL_MS else ACTIVE_NOTIFIER_INTERVAL_MS,
+                        )
                     }
                 }
 

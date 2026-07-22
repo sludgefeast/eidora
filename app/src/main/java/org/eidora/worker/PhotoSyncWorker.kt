@@ -26,6 +26,14 @@ import java.util.UUID
 private const val TAG = "PhotoSyncWorker"
 private const val SYNC_PARALLELISM = 3
 
+// Notification refresh rate while processing. Fast enough to feel live.
+private const val ACTIVE_NOTIFIER_INTERVAL_MS = 500L
+
+// Refresh rate while blocked by the PowerGate. Nothing changes during a pause
+// apart from the reason text, so polling fast would burn battery and keep the
+// CPU from idling - which delays the very cool-down we are waiting for.
+private const val IDLE_NOTIFIER_INTERVAL_MS = 10_000L
+
 class PhotoSyncWorker(
     context: Context,
     params: WorkerParameters,
@@ -127,6 +135,9 @@ class PhotoSyncWorker(
             )
         notifierScope.launch {
                 var lastTick = System.currentTimeMillis()
+                // Remember what was last posted: while nothing changes there is
+                // no reason to hand another notification to the system server.
+                var lastPosted: Pair<Int, String>? = null
                 while (isActive) {
                     val now = System.currentTimeMillis()
                     val total = totalCount.get()
@@ -149,14 +160,26 @@ class PhotoSyncWorker(
                             formatEta(applicationContext, startedAt, current, total, pausedMs.get())
                         }
                     val message = if (eta.isNotEmpty()) "$file – $eta" else file
-                    try {
-                        setForeground(
-                            NotificationHelper.syncForegroundInfo(applicationContext, progress, message, gateBlocked = blocked),
-                        )
-                    } catch (t: Throwable) {
-                        // ignore
+                    val posted = progress to message
+                    if (posted != lastPosted) {
+                        try {
+                            setForeground(
+                                NotificationHelper.syncForegroundInfo(
+                                    applicationContext,
+                                    progress,
+                                    message,
+                                    gateBlocked = blocked,
+                                ),
+                            )
+                            lastPosted = posted
+                        } catch (t: Throwable) {
+                            // ignore
+                        }
                     }
-                    kotlinx.coroutines.delay(500)
+                    // Poll slowly while the gate blocks us: nothing is being
+                    // processed, so a fast tick would only keep the CPU awake
+                    // and heat the device we are waiting to cool down.
+                    kotlinx.coroutines.delay(if (blocked) IDLE_NOTIFIER_INTERVAL_MS else ACTIVE_NOTIFIER_INTERVAL_MS)
                 }
             }
 

@@ -102,6 +102,50 @@ class PowerGateHysteresisTest {
         }
     }
 
+    @Nested
+    @DisplayName("polling backoff while blocked")
+    inner class Backoff {
+        @Test
+        fun `first wait uses the base interval`() {
+            assertEquals(5_000L, PowerGate.backoffDelayMs(1))
+        }
+
+        @Test
+        fun `interval doubles with consecutive waits`() {
+            assertEquals(5_000L, PowerGate.backoffDelayMs(1))
+            assertEquals(10_000L, PowerGate.backoffDelayMs(2))
+            assertEquals(20_000L, PowerGate.backoffDelayMs(3))
+            assertEquals(40_000L, PowerGate.backoffDelayMs(4))
+        }
+
+        @Test
+        fun `interval is capped at one minute`() {
+            assertEquals(60_000L, PowerGate.backoffDelayMs(5))
+            assertEquals(60_000L, PowerGate.backoffDelayMs(50))
+            assertEquals(60_000L, PowerGate.backoffDelayMs(1000))
+        }
+
+        @Test
+        fun `never returns a non-positive delay`() {
+            (0..30).forEach { n ->
+                assertTrue(PowerGate.backoffDelayMs(n) > 0, "delay for n=$n must be positive")
+            }
+        }
+
+        @Test
+        fun `a five minute pause costs far fewer polls than fixed polling`() {
+            // Sum delays until five minutes of waiting have elapsed.
+            var elapsed = 0L
+            var polls = 0
+            while (elapsed < 5 * 60_000L) {
+                polls++
+                elapsed += PowerGate.backoffDelayMs(polls)
+            }
+            // Fixed 5 s polling would need 60 wake-ups for the same period.
+            assertTrue(polls < 20, "backoff should need well under 20 polls, was $polls")
+        }
+    }
+
     @Test
     @DisplayName("defaults with no gap behave like a single threshold")
     fun defaultsWithoutGap() {

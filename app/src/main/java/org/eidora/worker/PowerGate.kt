@@ -14,6 +14,10 @@ import kotlinx.coroutines.delay
 private const val TAG = "PowerGate"
 private const val CHECK_INTERVAL_MS = 5000L
 
+// Upper bound for the backoff while waiting for the gate to open. One minute
+// is well within the time it takes a phone to cool by a few degrees.
+private const val MAX_CHECK_INTERVAL_MS = 60_000L
+
 data class PowerStatus(
     val batteryPercent: Int,
     val batteryTempCelsius: Float,
@@ -96,6 +100,24 @@ class PowerGate(
 
     companion object {
         /**
+         * Polling delay while the gate is closed.
+         *
+         * Checking every few seconds during a long pause is wasteful: nothing
+         * is being processed, yet each wake-up keeps the CPU out of deep sleep
+         * and — with several workers polling in parallel — measurably drains
+         * the battery and warms the device we are waiting to cool down.
+         *
+         * The interval therefore grows from [CHECK_INTERVAL_MS] up to
+         * [MAX_CHECK_INTERVAL_MS] the longer the wait lasts, which keeps the
+         * gate responsive right after it closes while costing almost nothing
+         * during a long cool-down.
+         */
+        internal fun backoffDelayMs(consecutiveWaits: Int): Long {
+            val factor = 1L shl ((consecutiveWaits - 1).coerceIn(0, 5))
+            return (CHECK_INTERVAL_MS * factor).coerceAtMost(MAX_CHECK_INTERVAL_MS)
+        }
+
+        /**
          * Battery threshold that applies right now: the pause level while
          * running, the (higher) resume level while blocked. Clamped so a
          * misconfigured resume value can never be stricter than the pause one.
@@ -137,12 +159,15 @@ class PowerGate(
         // Once this call has blocked at least once, the stricter resume
         // thresholds apply until the gate opens again.
         var blocked = false
+        // Consecutive blocked checks, used to back off the polling rate.
+        var waits = 0
         while (true) {
             if (isStopped()) return
             // Manual pause takes precedence over power conditions
             if (PauseState.isPaused(context)) {
                 onWait(context.getString(org.eidora.R.string.powergate_paused))
-                delay(CHECK_INTERVAL_MS)
+                waits++
+                delay(backoffDelayMs(waits))
                 continue
             }
             val status = currentStatus()
@@ -150,9 +175,12 @@ class PowerGate(
             if (result is PowerGateResult.Ok) return
             blocked = true
             val reason = (result as PowerGateResult.Blocked).reason
-            Log.i(TAG, reason)
+            // Log only the first block and then occasionally - a pause can last
+            // for many minutes and would otherwise flood the log.
+            if (waits == 0 || waits % 20 == 0) Log.i(TAG, reason)
             onWait(reason)
-            delay(CHECK_INTERVAL_MS)
+            waits++
+            delay(backoffDelayMs(waits))
         }
     }
 }
