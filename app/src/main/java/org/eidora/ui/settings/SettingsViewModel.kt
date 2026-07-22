@@ -111,6 +111,9 @@ class SettingsViewModel(
 
     fun setFolderWhitelist(folders: Set<String>) {
         viewModelScope.launch {
+            val previous = repo.getFolderWhitelist()
+            if (previous == folders) return@launch // no real change
+
             repo.setFolderWhitelist(folders)
             // Keep persons homogeneous: split any that now mix visible and
             // hidden faces, recomputing centroids for the affected persons.
@@ -119,6 +122,11 @@ class SettingsViewModel(
             } catch (t: Throwable) {
                 // best-effort; UI stays consistent via folder-filtered queries
             }
+            // A running sync/clustering pass is working on the old folder set –
+            // stop it and start over. XMP writing is a separate chain and keeps
+            // running so confirmed names still reach the photo files.
+            org.eidora.worker.SyncPipeline
+                .restartAfterFolderChange(getApplication())
         }
     }
 

@@ -93,6 +93,27 @@ object SyncPipeline {
     }
 
     /** User-initiated model download (after the consent dialog). */
+    /**
+     * Cancels the running sync and clustering chains and restarts the pipeline
+     * from the beginning. Used after the folder whitelist changed: the current
+     * run is scanning/analysing a set of folders that is no longer correct.
+     *
+     * The XMP write chain ([XmpWriteWorker], unique name "eidora-xmp-write") is
+     * deliberately NOT cancelled — it is an independent chain that persists
+     * user-confirmed names into photo files, and interrupting it could leave
+     * files without their metadata.
+     */
+    fun restartAfterFolderChange(context: Context) {
+        val wm = WorkManager.getInstance(context)
+        wm.cancelUniqueWork(UNIQUE_SYNC_NAME)
+        wm.cancelUniqueWork(UNIQUE_CLUSTERING_NAME)
+        // Clear any pause state so the new run isn't stuck paused from before.
+        PauseState.setPaused(context, false)
+        // REPLACE (via enqueueForce) supersedes whatever is left of the old
+        // chain, and a force run rescans every photo in the new folder set.
+        enqueueForce(context)
+    }
+
     fun enqueueModelDownload(context: Context) {
         WorkManager
             .getInstance(context)

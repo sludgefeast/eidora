@@ -75,7 +75,10 @@ class PhotosViewModel(
         viewModelScope.launch {
             val person = db.personDao().findById(personId)
             _uiState.update { it.copy(personName = person?.name ?: "") }
-            db.faceRegionDao().observeConfirmedPhotosForPerson(personId).collect { photos ->
+            settingsRepo.folderWhitelist
+                .flatMapLatest { folders ->
+                    db.faceRegionDao().observeConfirmedPhotosForPerson(personId, folders.toList())
+                }.collect { photos ->
                 val faceMap =
                     db
                         .faceRegionDao()

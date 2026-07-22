@@ -250,16 +250,20 @@ interface FaceRegionDao {
 
     @Query(
         """
-        SELECT DISTINCT ph.id, ph.path, ph.modifiedAt, ph.takenAt, ph.analyzed, ph.pending_xmp_write
+        SELECT DISTINCT ph.id, ph.path, ph.folder, ph.modifiedAt, ph.takenAt, ph.analyzed, ph.pending_xmp_write
         FROM photos ph
         JOIN face_regions f ON f.photoId = ph.id
         WHERE f.personId = :personId
           AND f.name IS NOT NULL
           AND f.ignored = 0
+          AND ph.folder IN (:folders)
         ORDER BY CASE WHEN ph.takenAt IS NULL THEN 1 ELSE 0 END, ph.takenAt DESC
     """,
     )
-    fun observeConfirmedPhotosForPerson(personId: String): Flow<List<PhotoEntity>>
+    fun observeConfirmedPhotosForPerson(
+        personId: String,
+        folders: List<String>,
+    ): Flow<List<PhotoEntity>>
 
     @Query("SELECT * FROM face_regions WHERE personId = :personId")
     suspend fun findByPersonId(personId: String): List<FaceRegionEntity>
