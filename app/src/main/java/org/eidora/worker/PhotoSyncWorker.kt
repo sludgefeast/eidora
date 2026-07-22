@@ -114,24 +114,39 @@ class PhotoSyncWorker(
         val startedAnalysisAt =
             java.util.concurrent.atomic
                 .AtomicLong(0L)
+        // Milliseconds spent blocked by the PowerGate during the analysis
+        // phase. Subtracted from the elapsed time so the ETA reflects actual
+        // processing speed rather than wall-clock time including pauses.
+        val pausedMs =
+            java.util.concurrent.atomic
+                .AtomicLong(0L)
 
         val notifierScope =
             kotlinx.coroutines.CoroutineScope(
                 kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob(),
             )
         notifierScope.launch {
+                var lastTick = System.currentTimeMillis()
                 while (isActive) {
+                    val now = System.currentTimeMillis()
                     val total = totalCount.get()
                     val current = doneCount.get()
                     val progress = if (total == 0) 0 else (current * 100) / total
                     val file = currentFile.get()
                     val blocked = gateBlocked.get()
                     val startedAt = startedAnalysisAt.get()
+                    // While the gate blocks processing, add the elapsed tick to
+                    // the paused accumulator instead of letting it inflate the
+                    // per-item average.
+                    if (blocked && startedAt != 0L) {
+                        pausedMs.addAndGet(now - lastTick)
+                    }
+                    lastTick = now
                     val eta =
                         if (blocked || total == 0 || startedAt == 0L) {
                             ""
                         } else {
-                            formatEta(applicationContext, startedAt, current, total)
+                            formatEta(applicationContext, startedAt, current, total, pausedMs.get())
                         }
                     val message = if (eta.isNotEmpty()) "$file – $eta" else file
                     try {
@@ -691,18 +706,53 @@ class PhotoSyncWorker(
          * Estimates remaining time from throughput so far.
          * Returns empty string when not enough data (< 5 items done).
          */
+        /**
+         * Estimates the remaining time from the average processing time per
+         * item so far.
+         *
+         * [pausedMs] is the time spent blocked by the PowerGate (low battery or
+         * high temperature). It is subtracted from the elapsed wall-clock time,
+         * because no items are processed while blocked — counting it would
+         * inflate the per-item average and keep the ETA high even though
+         * progress was made before the pause.
+         */
         internal fun formatEta(
             context: android.content.Context,
             startedAt: Long,
             done: Int,
             total: Int,
+            pausedMs: Long = 0L,
         ): String {
-            if (done < 5 || done >= total) return ""
-            val elapsed = System.currentTimeMillis() - startedAt
-            if (elapsed <= 0) return ""
-            val perItem = elapsed.toDouble() / done
-            val remainingMs = ((total - done) * perItem).toLong()
+            val remainingMs =
+                remainingMillis(
+                    elapsedMs = System.currentTimeMillis() - startedAt,
+                    pausedMs = pausedMs,
+                    done = done,
+                    total = total,
+                ) ?: return ""
             return context.getString(org.eidora.R.string.notif_eta_left, formatDuration(remainingMs))
+        }
+
+        /**
+         * Remaining milliseconds based on the average time per processed item,
+         * or null when no meaningful estimate is possible yet.
+         *
+         * [pausedMs] (time blocked by the PowerGate) is subtracted from
+         * [elapsedMs]: no items are processed while blocked, so including it
+         * would inflate the per-item average and keep the estimate high even
+         * after substantial progress.
+         */
+        internal fun remainingMillis(
+            elapsedMs: Long,
+            pausedMs: Long,
+            done: Int,
+            total: Int,
+        ): Long? {
+            if (done < 5 || done >= total) return null
+            val working = elapsedMs - pausedMs
+            if (working <= 0) return null
+            val perItem = working.toDouble() / done
+            return ((total - done) * perItem).toLong()
         }
 
         private fun formatDuration(ms: Long): String {

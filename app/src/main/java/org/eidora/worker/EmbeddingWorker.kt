@@ -88,19 +88,38 @@ class EmbeddingWorker(
                 kotlinx.coroutines.CoroutineScope(
                     kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob(),
                 )
+            @Suppress("UNUSED_VARIABLE")
             val notifierJob =
                 notifierScope.launch {
+                    // Time spent blocked by the PowerGate, excluded from the ETA.
+                    val pausedMs =
+                        java.util.concurrent.atomic
+                            .AtomicLong(0L)
+                    var lastTick = System.currentTimeMillis()
                     while (isActive) {
                         val current = done.get()
                         val progress = if (total == 0) 0 else (current * 100) / total
                         // A non-empty status is a PowerGate/pause reason: show it
-                        // without an ETA (elapsed time keeps growing while paused,
-                        // which would inflate the estimate) and without the
-                        // Pause action.
+                        // without an ETA and without the Pause action. The time
+                        // spent blocked is accumulated and excluded from the ETA
+                        // so the estimate reflects actual processing speed.
                         val status = currentStatus.get()
                         val blocked = status.isNotEmpty()
+                        val nowTick = System.currentTimeMillis()
+                        if (blocked) pausedMs.addAndGet(nowTick - lastTick)
+                        lastTick = nowTick
                         val eta =
-                            if (blocked) "" else PhotoSyncWorker.formatEta(applicationContext, startedAt, current, total)
+                            if (blocked) {
+                                ""
+                            } else {
+                                PhotoSyncWorker.formatEta(
+                                    applicationContext,
+                                    startedAt,
+                                    current,
+                                    total,
+                                    pausedMs.get(),
+                                )
+                            }
                         val message =
                             when {
                                 blocked -> status
