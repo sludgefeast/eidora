@@ -67,11 +67,12 @@ class PowerGate(
             )
         }
         if (status.batteryTempCelsius > 0f && status.batteryTempCelsius > maxBatteryTempCelsius) {
+            val fahrenheit = org.eidora.util.TemperatureUnit.useFahrenheit(context)
             return PowerGateResult.Blocked(
                 context.getString(
                     org.eidora.R.string.powergate_battery_hot,
-                    "%.1f".format(status.batteryTempCelsius),
-                    "%.1f".format(maxBatteryTempCelsius),
+                    org.eidora.util.TemperatureUnit.format(status.batteryTempCelsius, fahrenheit),
+                    org.eidora.util.TemperatureUnit.format(maxBatteryTempCelsius, fahrenheit),
                 ),
             )
         }

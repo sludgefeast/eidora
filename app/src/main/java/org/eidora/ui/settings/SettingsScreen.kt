@@ -286,12 +286,29 @@ fun SettingsScreen(
                 default = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
                 onValueChange = { viewModel.setPowerConfig(pwr.copy(minBatteryPercent = it)) },
             )
+            val tempInFahrenheit =
+                org.eidora.util.TemperatureUnit
+                    .useFahrenheit(androidx.compose.ui.platform.LocalContext.current)
+            val tempUnitLabel =
+                stringResource(
+                    if (tempInFahrenheit) R.string.unit_fahrenheit else R.string.unit_celsius,
+                )
             FloatSetting(
-                label = stringResource(R.string.setting_max_battery_temp),
+                label = stringResource(R.string.setting_max_battery_temp, tempUnitLabel),
                 description = stringResource(R.string.setting_max_battery_temp_description),
-                value = pwr.maxBatteryTempCelsius,
-                default = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
-                onValueChange = { viewModel.setPowerConfig(pwr.copy(maxBatteryTempCelsius = it)) },
+                value =
+                    org.eidora.util.TemperatureUnit
+                        .forDisplay(pwr.maxBatteryTempCelsius, tempInFahrenheit),
+                default =
+                    org.eidora.util.TemperatureUnit
+                        .forDisplay(SettingsRepository.DEFAULT_MAX_BATTERY_TEMP, tempInFahrenheit),
+                decimals = if (tempInFahrenheit) 0 else 1,
+                onValueChange = { entered ->
+                    val celsius =
+                        org.eidora.util.TemperatureUnit
+                            .fromInput(entered, tempInFahrenheit)
+                    viewModel.setPowerConfig(pwr.copy(maxBatteryTempCelsius = celsius))
+                },
             )
 
             Spacer(Modifier.height(32.dp))
@@ -343,9 +360,11 @@ private fun FloatSetting(
     value: Float,
     default: Float,
     hint: String? = null,
+    decimals: Int = 2,
     onValueChange: (Float) -> Unit,
 ) {
-    var text by remember(value) { mutableStateOf("%.2f".format(value)) }
+    val fmt = "%.${decimals}f"
+    var text by remember(value) { mutableStateOf(fmt.format(value)) }
     Column(modifier = Modifier.padding(vertical = 6.dp)) {
         Text(label, style = MaterialTheme.typography.bodyLarge)
         Text(
@@ -375,7 +394,7 @@ private fun FloatSetting(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = stringResource(R.string.setting_default_hint, "%.2f".format(default)),
+                text = stringResource(R.string.setting_default_hint, fmt.format(default)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 8.dp),
