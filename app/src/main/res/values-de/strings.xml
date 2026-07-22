@@ -182,4 +182,14 @@
     <string name="setting_resume_battery_percent_description">Die Verarbeitung läuft erst weiter, wenn der Akku wieder auf diesen Stand geladen ist. Halte den Wert über dem Pausenwert, damit das Laden spürbar vorankommt.</string>
     <string name="setting_resume_battery_temp">Fortsetzen ab Akkutemperatur (%1$s)</string>
     <string name="setting_resume_battery_temp_description">Die Verarbeitung läuft erst weiter, wenn der Akku auf diesen Wert abgekühlt ist. Halte den Wert unter dem Pausenwert, damit das Gerät wirklich abkühlt statt sofort wieder zu pausieren.</string>
+    <string name="about_source_code">Quellcode</string>
+    <string name="about_no_browser">Keine Browser-App gefunden</string>
+    <string name="about_export_logs">Logs exportieren</string>
+    <string name="about_export_logs_description">Protokolldatei für Fehlerberichte speichern</string>
+    <string name="about_logs_range_message">Wie weit soll das Protokoll zurückreichen? Android hält nur einen begrenzten Puffer vor, ältere Einträge sind eventuell nicht mehr verfügbar. Exportiert werden nur Eidoras eigene Einträge.</string>
+    <string name="about_logs_range_hour">Letzte Stunde</string>
+    <string name="about_logs_range_day">Letzte 24 Stunden</string>
+    <string name="about_logs_range_all">Alles Verfügbare</string>
+    <string name="about_logs_saved">Protokoll gespeichert</string>
+    <string name="about_logs_failed">Protokoll konnte nicht gespeichert werden</string>
 </resources>

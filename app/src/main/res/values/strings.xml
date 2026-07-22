@@ -182,4 +182,14 @@
     <string name="setting_resume_battery_percent_description">Processing only continues once the battery has charged back to this level. Keep it above the pause value so charging makes real progress before work resumes.</string>
     <string name="setting_resume_battery_temp">Resume at battery temperature (%1$s)</string>
     <string name="setting_resume_battery_temp_description">Processing only continues once the battery has cooled to this value. Keep it below the pause value so the device cools down properly instead of pausing again immediately.</string>
+    <string name="about_source_code">Source code</string>
+    <string name="about_no_browser">No browser app found</string>
+    <string name="about_export_logs">Export logs</string>
+    <string name="about_export_logs_description">Save a diagnostic log file for bug reports</string>
+    <string name="about_logs_range_message">How far back should the log go? Android keeps only a limited buffer, so older entries may no longer be available. Only Eidora\'s own log entries are exported.</string>
+    <string name="about_logs_range_hour">Last hour</string>
+    <string name="about_logs_range_day">Last 24 hours</string>
+    <string name="about_logs_range_all">Everything available</string>
+    <string name="about_logs_saved">Log saved</string>
+    <string name="about_logs_failed">Could not save the log</string>
 </resources>
