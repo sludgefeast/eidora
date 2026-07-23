@@ -276,6 +276,7 @@ class PhotoSyncWorker(
         totalCount.set(jpegFiles.size)
         startedAnalysisAt.set(System.currentTimeMillis())
         val total = jpegFiles.size
+        Log.i(TAG, "Starting face detection for $total photos")
 
         val powerGate = PowerGate(applicationContext)
         val powerConfig =
@@ -311,8 +312,12 @@ class PhotoSyncWorker(
                 }
             }.collect { _ ->
                 val current = doneCount.incrementAndGet()
+                if (current % 500 == 0) {
+                    Log.i(TAG, "Detection progress: $current / $total")
+                }
                 setProgress(workDataOf(KEY_PROGRESS to (current * 100) / total))
             }
+        Log.i(TAG, "Face detection finished: ${doneCount.get()} / $total")
 
         try {
             personDao.deleteOrphaned()

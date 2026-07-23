@@ -65,6 +65,7 @@ class EmbeddingWorker(
             val pending: List<FaceRegionEntity> = faceDao.findWithoutEmbedding()
             val total = pending.size
             if (total == 0) return Result.success()
+            Log.i(TAG, "Starting embedding run for $total faces")
 
             val powerGate = PowerGate(applicationContext)
             val powerConfig =
@@ -226,6 +227,12 @@ class EmbeddingWorker(
                         bitmap.recycle()
                     }
                     val current = done.incrementAndGet()
+                    // Periodic heartbeat so a running worker is visible in the
+                    // log (every item would flood the ring buffer; every 500
+                    // keeps a readable trail across a long run).
+                    if (current % 500 == 0) {
+                        Log.i(TAG, "Embeddings progress: $current / $total")
+                    }
                     setProgress(
                         workDataOf(
                             PhotoSyncWorker.KEY_PROGRESS to (current * 100) / total,
@@ -241,6 +248,7 @@ class EmbeddingWorker(
                 notifierScope.cancel()
             }
 
+            Log.i(TAG, "Embedding run finished: ${done.get()} / $total processed")
             Result.success()
         } catch (t: Throwable) {
             t.rethrowIfCancellation()
