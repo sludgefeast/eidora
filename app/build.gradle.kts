@@ -73,11 +73,9 @@ dependencies {
     implementation(composeBom)
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
     implementation("androidx.compose.foundation:foundation")
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
-    debugImplementation(libs.androidx.ui.tooling)
 
     // Activity + ViewModel + Navigation
     implementation(libs.androidx.activity.compose)
@@ -98,9 +96,14 @@ dependencies {
 
 
     // TFLite for FaceNet
-    implementation(libs.tensorflow.lite)
-    implementation(libs.tensorflow.lite.support)
-    implementation(libs.tensorflow.lite.gpu)
+    implementation(libs.tensorflow.lite) {
+        // Defensive: keep the proprietary ODML image helper (Android SDK
+        // License) out of the graph so the build stays fully FOSS for F-Droid.
+        exclude(group = "com.google.android.odml", module = "image")
+    }
+    implementation(libs.tensorflow.lite.gpu) {
+        exclude(group = "com.google.android.odml", module = "image")
+    }
 
     // ExifInterface for XMP
     implementation(libs.androidx.exifinterface)
