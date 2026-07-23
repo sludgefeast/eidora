@@ -111,98 +111,99 @@ fun AboutScreen(onBack: () -> Unit) {
             )
         },
     ) { padding ->
-        Column(
+        // The whole screen is one scrollable list: the header, the actions and
+        // the library list share a single LazyColumn (via LibrariesContainer's
+        // header slot), so everything scrolls together instead of only the
+        // library list moving under a fixed header.
+        LibrariesContainer(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .padding(padding),
-        ) {
-            // Header: app icon, name, version, tagline
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.ic_eidora_logo),
-                    contentDescription = null,
-                    modifier =
-                        Modifier
-                            .size(88.dp)
-                            .clip(RoundedCornerShape(20.dp)),
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.headlineSmall,
-                )
-                Text(
-                    stringResource(R.string.about_version, BuildConfig.VERSION_NAME),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.about_tagline),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.about_license_line),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.about_models_line),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            }
-
-            HorizontalDivider()
-
-            AboutAction(
-                icon = Icons.Default.Code,
-                title = stringResource(R.string.about_source_code),
-                subtitle = REPO_URL.removePrefix("https://"),
-                onClick = {
-                    try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)))
-                    } catch (t: Throwable) {
-                        Toast
-                            .makeText(context, R.string.about_no_browser, Toast.LENGTH_SHORT)
-                            .show()
+            header = {
+                item {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_eidora_logo),
+                            contentDescription = null,
+                            modifier =
+                                Modifier
+                                    .size(88.dp)
+                                    .clip(RoundedCornerShape(20.dp)),
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            stringResource(R.string.app_name),
+                            style = MaterialTheme.typography.headlineSmall,
+                        )
+                        Text(
+                            stringResource(R.string.about_version, BuildConfig.VERSION_NAME),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(R.string.about_tagline),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(R.string.about_license_line),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            stringResource(R.string.about_models_line),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
                     }
-                },
-            )
 
-            AboutAction(
-                icon = Icons.Default.BugReport,
-                title = stringResource(R.string.about_export_logs),
-                subtitle = stringResource(R.string.about_export_logs_description),
-                onClick = { showRangeDialog = true },
-            )
+                    HorizontalDivider()
 
-            HorizontalDivider()
+                    AboutAction(
+                        icon = Icons.Default.Code,
+                        title = stringResource(R.string.about_source_code),
+                        subtitle = REPO_URL.removePrefix("https://"),
+                        onClick = {
+                            try {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)))
+                            } catch (t: Throwable) {
+                                Toast
+                                    .makeText(context, R.string.about_no_browser, Toast.LENGTH_SHORT)
+                                    .show()
+                            }
+                        },
+                    )
 
-            Text(
-                stringResource(R.string.about_libraries_header),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(16.dp),
-            )
+                    AboutAction(
+                        icon = Icons.Default.BugReport,
+                        title = stringResource(R.string.about_export_logs),
+                        subtitle = stringResource(R.string.about_export_logs_description),
+                        onClick = { showRangeDialog = true },
+                    )
 
-            // Auto-generated list of dependencies + licenses (from build step).
-            LibrariesContainer(
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+                    HorizontalDivider()
+
+                    Text(
+                        stringResource(R.string.about_libraries_header),
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            },
+        )
     }
 
     if (showRangeDialog) {

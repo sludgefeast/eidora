@@ -32,6 +32,7 @@ jobs:
       - name: Install svg2vectordrawable
         run: npm install -g svg2vectordrawable
 
+
       - name: Render mipmap PNGs
         run: |
           python - << 'PYEOF'
@@ -138,42 +139,21 @@ jobs:
 
       - name: Render in-app vector drawable
         run: |
-          # Vector drawable for in-app display (About screen). Scales without
-          # loss and stays a few hundred bytes, unlike the PNG family above.
-          # svg2vectordrawable cannot express clip-path, so flatten the SVG
-          # first: replace the clipped overlap circle with the explicit
-          # lens-shaped intersection path.
-          python - << 'PYEOF'
-          import re
-
-          with open("eidora_icon.svg") as f:
-              svg = f.read()
-
-          # Drop the <defs> block (only holds the clipPath)
-          svg = re.sub(r"<defs>.*?</defs>", "", svg, flags=re.DOTALL)
-
-          # Replace the clip-path'd circle with the intersection of both
-          # circles (centres 28 apart, r=22 -> half-chord sqrt(22^2-14^2)).
-          lens = (
-              '<path d="M54,27.0294 A22,22 0 0 1 54,60.9706 '
-              'A22,22 0 0 1 54,27.0294 Z" fill="#FBBF24" opacity="0.6"/>'
-          )
-          svg = re.sub(
-              r'<circle[^>]*clip-path="url\(#leftClipFinal\)"[^>]*/>',
-              lens,
-              svg,
-          )
-
-          with open("/tmp/eidora_icon_flat.svg", "w") as f:
-              f.write(svg)
-          print("flattened SVG written")
-          PYEOF
-
+          # The SVG is authored to be conversion-friendly: no clip-path, no
+          # opacity attribute (fill-opacity instead), all shapes as explicit
+          # paths. svg2vectordrawable therefore reproduces it faithfully.
           mkdir -p app/src/main/res/drawable
-          svg2vectordrawable -i /tmp/eidora_icon_flat.svg \
+          svg2vectordrawable -i eidora_icon.svg \
                              -o app/src/main/res/drawable/ic_eidora_logo.xml
           echo "--- generated vector drawable ---"
           cat app/src/main/res/drawable/ic_eidora_logo.xml
+          # Fail loudly if the converter dropped shapes: the icon has 6 paths.
+          count=$(grep -c "<path" app/src/main/res/drawable/ic_eidora_logo.xml)
+          echo "path count: $count"
+          if [ "$count" -ne 6 ]; then
+            echo "::error::Expected 6 paths in generated drawable, got $count - conversion dropped shapes"
+            exit 1
+          fi
 
       - name: Commit updated icons
         run: |

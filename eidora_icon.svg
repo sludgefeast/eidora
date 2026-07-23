@@ -1,13 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
-  <defs>
-    <clipPath id="leftClipFinal">
-      <circle cx="40" cy="44" r="22"/>
-    </clipPath>
-  </defs>
-  <rect width="108" height="108" rx="24" fill="#1A0A2E"/>
-  <circle cx="40" cy="44" r="22" fill="#F97316" opacity="0.7"/>
-  <circle cx="68" cy="44" r="22" fill="#EC4899" opacity="0.7"/>
-  <circle cx="68" cy="44" r="22" fill="#FBBF24" opacity="0.6" clip-path="url(#leftClipFinal)"/>
-  <rect x="20" y="76" width="68" height="5" rx="2.5" fill="#FBBF24" opacity="0.95"/>
-  <rect x="30" y="86" width="48" height="5" rx="2.5" fill="#FBBF24" opacity="0.4"/>
+  <!-- Rounded background -->
+  <path fill="#1A0A2E"
+        d="M24,0 L84,0 A24,24 0 0 1 108,24 L108,84 A24,24 0 0 1 84,108 L24,108 A24,24 0 0 1 0,84 L0,24 A24,24 0 0 1 24,0 Z"/>
+  <!-- Left face circle (orange), centre (40,44) r=22 -->
+  <path fill="#F97316" fill-opacity="0.7"
+        d="M18,44 A22,22 0 0 1 62,44 A22,22 0 0 1 18,44 Z"/>
+  <!-- Right face circle (pink), centre (68,44) r=22 -->
+  <path fill="#EC4899" fill-opacity="0.7"
+        d="M46,44 A22,22 0 0 1 90,44 A22,22 0 0 1 46,44 Z"/>
+  <!-- Overlap lens: intersection of both circles (chord x=54, y 27.03..60.97) -->
+  <path fill="#FBBF24" fill-opacity="0.6"
+        d="M54,27.03 A22,22 0 0 1 54,60.97 A22,22 0 0 1 54,27.03 Z"/>
+  <!-- Upper name bar -->
+  <path fill="#FBBF24" fill-opacity="0.95"
+        d="M22.5,76 L85.5,76 A2.5,2.5 0 0 1 85.5,81 L22.5,81 A2.5,2.5 0 0 1 22.5,76 Z"/>
+  <!-- Lower name bar -->
+  <path fill="#FBBF24" fill-opacity="0.4"
+        d="M32.5,86 L75.5,86 A2.5,2.5 0 0 1 75.5,91 L32.5,91 A2.5,2.5 0 0 1 32.5,86 Z"/>
 </svg>
