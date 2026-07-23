@@ -100,25 +100,33 @@ more restrictive licence than Eidora's own code. See
 
 ## Performance
 
-Rough figures for a library of **10,000 photos** on a modern mid-range phone
-(8-core ARM SoC, 8 GB RAM, Android 16), with the screen off and the device on
-mains power:
+Measured on a library of **24,000 photos containing ~29,600 faces**, on a modern
+mid-range phone (8-core ARM SoC, 8 GB RAM, Android 16), screen off and on mains
+power:
 
 | Step | Time | Notes |
 |---|---|---|
-| Media scan | TODO | Enumerating the selected folders via MediaStore |
-| Face detection | TODO | SCRFD, 3 photos in parallel |
-| Face embeddings | TODO | ArcFace, one face at a time on the GPU delegate |
-| Clustering | TODO | Chinese Whispers over all embeddings, single pass |
+| Media scan | a few seconds | Enumerating the selected folders via MediaStore |
+| Face detection | ~1.5 h | SCRFD, 3 photos in parallel |
+| Face embeddings | ~30 min | ArcFace, one face at a time on the GPU delegate |
+| Clustering | not yet measured | Chinese Whispers over all embeddings, single pass |
 
-Detection and embedding dominate: they scale with the number of photos and the
-number of faces found, respectively. Clustering runs over embeddings only and is
-comparatively quick, but it is re-run on demand rather than automatically.
+On top of these come any **pauses from the PowerGate**: when the battery runs low
+or the device gets warm, processing waits until it has recovered, so a run on an
+unplugged phone in your pocket takes longer than the figures above.
 
-Actual times vary considerably with image resolution, how many faces each photo
-contains, and whether the GPU delegate is available. Processing pauses on low
-battery or high device temperature, so a run in your pocket takes longer than
-the figures above.
+Detection and embedding dominate, and they scale with the number of photos and
+faces. Actual times vary with image resolution, how many faces each photo
+contains, and whether the GPU delegate is available.
+
+**This is the one-time initial run.** It only takes this long because it
+processes your whole library at once. Afterwards Eidora only looks at what has
+changed, so new photos — a handful at a time — are analysed in seconds.
+
+Still, keep in mind this is **a phone** doing work that desktop software does far
+faster. If you have a very large library and a computer available, running
+[digiKam](https://www.digikam.org/) on a desktop is the quicker route; Eidora
+writes the same standard XMP face metadata, so the two interoperate cleanly.
 
 ## License
 

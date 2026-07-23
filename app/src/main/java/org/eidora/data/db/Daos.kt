@@ -300,8 +300,11 @@ interface FaceRegionDao {
         newPersonId: String,
     )
 
-    @Query("SELECT * FROM face_regions WHERE embedding IS NULL AND ignored = 0")
+    @Query("SELECT * FROM face_regions WHERE embedding IS NULL AND ignored = 0 AND embedding_failed = 0")
     suspend fun findWithoutEmbedding(): List<FaceRegionEntity>
+
+    @Query("UPDATE face_regions SET embedding_failed = 1 WHERE id = :id")
+    suspend fun markEmbeddingFailed(id: String)
 
     @Query("UPDATE face_regions SET quality_score = :score WHERE id = :id")
     suspend fun updateQualityScore(
@@ -376,7 +379,7 @@ interface FaceRegionDao {
         SELECT f.*, ph.takenAt as photoTakenAt
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
-        WHERE f.personId IS NULL AND f.ignored = 0 AND ph.folder IN (:folders)
+        WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding_failed = 0 AND ph.folder IN (:folders)
         ORDER BY ph.takenAt DESC
     """,
     )
@@ -409,7 +412,7 @@ interface FaceRegionDao {
         """
         SELECT COUNT(*) FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
-        WHERE f.personId IS NULL AND f.ignored = 0 AND ph.folder IN (:folders)
+        WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding_failed = 0 AND ph.folder IN (:folders)
     """,
     )
     fun observeUnknownCount(folders: List<String>): Flow<Int>

@@ -179,7 +179,14 @@ class EmbeddingWorker(
                                 val coords = face.regionJson.toFaceRegionCoords()
                                 ThumbnailHelper.cropForEmbedding(photoFile, coords)
                             } catch (t: Throwable) {
-                                Log.e(TAG, "Failed to prepare face ${face.id}, skipping", t)
+                                Log.e(TAG, "Failed to prepare face ${face.id}, marking failed", t)
+                                // Permanent failure: mark it so clustering stops
+                                // waiting for this face's embedding.
+                                try {
+                                    faceDao.markEmbeddingFailed(face.id)
+                                } catch (inner: Throwable) {
+                                    Log.w(TAG, "Could not mark face ${face.id} failed", inner)
+                                }
                                 null
                             }
                         if (bitmap != null) emit(face to bitmap)
@@ -208,7 +215,12 @@ class EmbeddingWorker(
                             Log.w(TAG, "Quality score refinement failed for ${face.id}", t)
                         }
                     } catch (t: Throwable) {
-                        Log.e(TAG, "Failed embedding for face ${face.id}, skipping", t)
+                        Log.e(TAG, "Failed embedding for face ${face.id}, marking failed", t)
+                        try {
+                            faceDao.markEmbeddingFailed(face.id)
+                        } catch (inner: Throwable) {
+                            Log.w(TAG, "Could not mark face ${face.id} failed", inner)
+                        }
                     } finally {
                         bitmap.recycle()
                     }

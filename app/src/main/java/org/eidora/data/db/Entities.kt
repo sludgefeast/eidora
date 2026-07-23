@@ -63,6 +63,10 @@ data class FaceRegionEntity(
     val embedding: ByteArray? = null,
     val ignored: Boolean = false,
     @ColumnInfo(name = "quality_score") val qualityScore: Float? = null,
+    // True when embedding computation failed permanently (e.g. the face crop
+    // could not be prepared). Such faces are excluded from the "missing
+    // embedding" set so clustering does not wait for them forever.
+    @ColumnInfo(name = "embedding_failed") val embeddingFailed: Boolean = false,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

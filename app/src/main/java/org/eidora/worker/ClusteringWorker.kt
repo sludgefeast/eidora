@@ -16,6 +16,11 @@ import java.util.UUID
 
 private const val TAG = "ClusteringWorker"
 
+// How many times clustering retries while embeddings are still pending before
+// proceeding anyway. With WorkManager's default backoff this spans several
+// minutes, enough for the embedding phase to finish on a large library.
+private const val MAX_EMBEDDING_WAIT_ATTEMPTS = 10
+
 class ClusteringWorker(
     context: Context,
     params: WorkerParameters,
@@ -45,8 +50,18 @@ class ClusteringWorker(
 
             val pendingEmbeddings = faceDao.findWithoutEmbedding()
             if (pendingEmbeddings.isNotEmpty()) {
-                Log.w(TAG, "${pendingEmbeddings.size} faces still missing embeddings – retrying later")
-                return Result.retry()
+                // Faces that can still get an embedding are outstanding. Make
+                // sure the embedding worker is actually running, then retry –
+                // but only a bounded number of times, so a genuinely stuck
+                // embedding phase can't make clustering retry forever. Faces
+                // whose embedding failed permanently are already excluded by
+                // findWithoutEmbedding (embedding_failed = 1).
+                Log.w(TAG, "${pendingEmbeddings.size} faces still missing embeddings (attempt $runAttemptCount)")
+                if (runAttemptCount < MAX_EMBEDDING_WAIT_ATTEMPTS) {
+                    SyncPipeline.enqueue(applicationContext)
+                    return Result.retry()
+                }
+                Log.w(TAG, "Proceeding with clustering despite ${pendingEmbeddings.size} missing embeddings")
             }
 
             val timeWeight = config.timeWeight
