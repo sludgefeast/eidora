@@ -73,6 +73,7 @@ class EmbeddingWorker(
                         .get(applicationContext)
                         .getPowerConfig()
                 } catch (t: Throwable) {
+                    t.rethrowIfCancellation()
                     org.eidora.data.settings.PowerConfig(
                     minBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
                     maxBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
@@ -242,6 +243,7 @@ class EmbeddingWorker(
 
             Result.success()
         } catch (t: Throwable) {
+            t.rethrowIfCancellation()
             Log.e(TAG, "Unhandled error in EmbeddingWorker", t)
             Result.failure()
         } finally {

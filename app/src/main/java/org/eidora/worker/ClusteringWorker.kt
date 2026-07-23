@@ -395,6 +395,7 @@ class ClusteringWorker(
             reportProgress(100, applicationContext.getString(org.eidora.R.string.notif_done))
             return Result.success()
         } catch (t: Throwable) {
+            t.rethrowIfCancellation()
             Log.e(TAG, "Unhandled error in ClusteringWorker", t)
             return Result.failure()
         } finally {
@@ -468,6 +469,7 @@ class ClusteringWorker(
         try {
             org.eidora.data.settings.SettingsProvider.get(applicationContext).getClusteringConfig()
         } catch (t: Throwable) {
+            t.rethrowIfCancellation()
             Log.w(TAG, "Failed to load clustering config, using defaults", t)
             org.eidora.data.settings.ClusteringConfig(
                 edgeThreshold = 0.30f,
@@ -482,6 +484,7 @@ class ClusteringWorker(
         try {
             org.eidora.data.settings.SettingsProvider.get(applicationContext).getPowerConfig()
         } catch (t: Throwable) {
+            t.rethrowIfCancellation()
             org.eidora.data.settings.PowerConfig(
                 minBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
                 maxBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,

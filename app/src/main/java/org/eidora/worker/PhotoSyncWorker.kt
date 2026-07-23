@@ -65,6 +65,7 @@ class PhotoSyncWorker(
                 doFullSync()
             }
         } catch (t: Throwable) {
+            t.rethrowIfCancellation()
             Log.e(TAG, "Unhandled error in doWork", t)
             Result.failure()
         } finally {
@@ -189,6 +190,8 @@ class PhotoSyncWorker(
                 org.eidora.data.settings.SettingsProvider
                     .get(applicationContext)
                     .getFolderWhitelist()
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c // never swallow cancellation – let the coroutine stop
             } catch (t: Throwable) {
                 Log.w(TAG, "Failed to load folder whitelist, using defaults", t)
                 org.eidora.data.settings.SettingsRepository.DEFAULT_FOLDER_WHITELIST
