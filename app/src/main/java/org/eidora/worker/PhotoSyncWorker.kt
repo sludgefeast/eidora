@@ -325,6 +325,17 @@ class PhotoSyncWorker(
             Log.e(TAG, "Failed to delete orphaned persons", t)
         }
 
+        // Remove thumbnail files left behind by cascade deletes or interrupted
+        // runs. Cheap: one query plus a directory listing.
+        try {
+            val validIds = faceDao.allIds().toSet()
+            val removed = org.eidora.util.ThumbnailHelper.sweepOrphans(applicationContext, validIds)
+            if (removed > 0) Log.i(TAG, "Swept $removed orphan thumbnail(s)")
+        } catch (t: Throwable) {
+            t.rethrowIfCancellation()
+            Log.w(TAG, "Thumbnail sweep failed", t)
+        }
+
         // Persist sync timestamp so next run only fetches newer entries
         prefs.edit().putLong("last_sync_timestamp_sec", nowSec).apply()
 

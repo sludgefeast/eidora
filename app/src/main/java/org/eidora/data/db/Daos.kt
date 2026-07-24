@@ -235,6 +235,18 @@ interface FaceRegionDao {
     @Query("SELECT * FROM face_regions WHERE id = :id")
     suspend fun findById(id: String): FaceRegionEntity?
 
+    @Query(
+        """
+        SELECT f.id FROM face_regions f
+        JOIN photos ph ON ph.id = f.photoId
+        WHERE ph.folder NOT IN (:folders)
+    """,
+    )
+    suspend fun faceIdsInPhotosNotInFolders(folders: List<String>): List<String>
+
+    @Query("SELECT id FROM face_regions")
+    suspend fun allIds(): List<String>
+
     @Query("SELECT * FROM face_regions WHERE photoId = :photoId")
     suspend fun findByPhotoId(photoId: String): List<FaceRegionEntity>
 

@@ -359,6 +359,16 @@ class FaceRepository(
 
     suspend fun cleanupFoldersNotIn(folders: List<String>): Int {
         val before = photoDao.count()
+        // Delete the thumbnail files first: the DB removes face rows via
+        // ON DELETE CASCADE, but that only touches the database — the thumbnail
+        // JPEGs on disk would otherwise be orphaned and accumulate.
+        faceDao.faceIdsInPhotosNotInFolders(folders).forEach { faceId ->
+            try {
+                ThumbnailHelper.deleteThumbnail(context, faceId)
+            } catch (t: Throwable) {
+                // best-effort; a missing file is fine
+            }
+        }
         photoDao.deleteNotInFolders(folders)
         personDao.deleteOrphaned()
         val after = photoDao.count()

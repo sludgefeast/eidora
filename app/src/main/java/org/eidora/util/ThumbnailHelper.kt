@@ -159,6 +159,30 @@ object ThumbnailHelper {
     }
 
     /**
+     * Removes thumbnail files that have no corresponding face row. Guards
+     * against leaks from paths that delete faces without deleting their
+     * thumbnail (e.g. an ON DELETE CASCADE removes the DB row only). Returns
+     * the number of files deleted.
+     *
+     * [validFaceIds] is the set of all face ids currently in the database.
+     */
+    fun sweepOrphans(
+        context: Context,
+        validFaceIds: Set<String>,
+    ): Int {
+        val dir = File(context.filesDir, "thumbnails")
+        val files = dir.listFiles() ?: return 0
+        var removed = 0
+        for (file in files) {
+            val id = file.nameWithoutExtension
+            if (id !in validFaceIds) {
+                if (file.delete()) removed++
+            }
+        }
+        return removed
+    }
+
+    /**
      * Crops the face region WITHOUT padding, scaled square crop for the embedding model input.
      * Coords are in the rotated (visually correct) image space.
      */
