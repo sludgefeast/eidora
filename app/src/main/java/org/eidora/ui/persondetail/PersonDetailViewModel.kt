@@ -90,6 +90,14 @@ class PersonDetailViewModel(
 
             val folders = settingsRepo.getFolderWhitelist().toList()
             faceDao.observeByPersonId(personId, folders).collect { faces: List<FaceRegionWithPhoto> ->
+                // Diagnostic: report how many faces carry a photoTakenAt so we
+                // can tell a null-date data problem from a rendering problem.
+                val withDate = faces.count { it.photoTakenAt != null && it.photoTakenAt!! > 0L }
+                android.util.Log.i(
+                    "PersonDetailVM",
+                    "person=$personId faces=${faces.size} withDate=$withDate " +
+                        "sample=${faces.take(3).map { it.photoTakenAt }}",
+                )
                 _uiState.update {
                     it.copy(
                         unconfirmedFaces =
