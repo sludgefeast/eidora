@@ -310,7 +310,17 @@ fun EidoraApp() {
     }
 
     // ---- Model gate: block the main UI until ML models are downloaded ----
-    var modelsReady by remember { mutableStateOf(org.eidora.ml.ModelDownloader.allModelsReady(context)) }
+    val embeddingSpec by produceState(org.eidora.ml.EmbeddingModelSpec.DEFAULT) {
+        value =
+            org.eidora.ml.EmbeddingModelSpec.byId(
+                org.eidora.data.settings.SettingsProvider
+                    .get(context)
+                    .getEmbeddingModelId(),
+            )
+    }
+    var modelsReady by remember(embeddingSpec) {
+        mutableStateOf(org.eidora.ml.ModelDownloader.allModelsReady(context, embeddingSpec))
+    }
     if (!modelsReady) {
         org.eidora.ui.common.ModelDownloadScreen(onModelsReady = { modelsReady = true })
         return

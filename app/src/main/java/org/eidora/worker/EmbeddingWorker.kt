@@ -45,16 +45,23 @@ class EmbeddingWorker(
         val faceDao = db.faceRegionDao()
         val photoDao = db.photoDao()
 
+        val spec =
+            org.eidora.ml.EmbeddingModelSpec.byId(
+                org.eidora.data.settings.SettingsProvider
+                    .get(applicationContext)
+                    .getEmbeddingModelId(),
+            )
+
         // Models are downloaded only after explicit user consent. If they are
         // not present yet, end quietly – the UI prompts the user to download.
-        if (!org.eidora.ml.ModelDownloader.allModelsReady(applicationContext)) {
+        if (!org.eidora.ml.ModelDownloader.allModelsReady(applicationContext, spec)) {
             Log.i(TAG, "ML models not downloaded yet – skipping embedding run")
             return Result.success()
         }
 
         val model =
             try {
-                EmbeddingModel(applicationContext)
+                EmbeddingModel(applicationContext, spec)
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to initialize embedding model", t)
                 return Result.failure()

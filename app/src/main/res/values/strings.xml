@@ -67,6 +67,15 @@
     <string name="setting_default_hint">Default: %1$s</string>
     <string name="setting_reset_to_default">Reset to default</string>
     <string name="settings_power_title">Power</string>
+    <string name="settings_model_title">Face recognition model</string>
+    <string name="setting_model_label">Embedding model</string>
+    <string name="model_arcface_name">ArcFace (higher accuracy)</string>
+    <string name="model_arcface_desc">Research-only license. Not included in F-Droid builds.</string>
+    <string name="model_sface_name">SFace (open license)</string>
+    <string name="model_sface_desc">Apache-2.0 licensed, works with YuNet. Slightly lower accuracy.</string>
+    <string name="model_switch_warning_title">Recompute all faces?</string>
+    <string name="model_switch_warning_body">Switching the model recomputes every face embedding from scratch. Your confirmed names are kept, but grouping is rebuilt and this takes a while. The new model may need to be downloaded first.</string>
+    <string name="model_switch_confirm">Switch and recompute</string>
     <string name="settings_power_description">Pause processing when the device gets too hot or the battery gets too low.</string>
     <string name="setting_min_battery_percent">Minimum battery level (%)</string>
     <string name="setting_min_battery_percent_description">Processing pauses when battery is below this level.</string>

@@ -20,7 +20,14 @@ class ModelDownloadWorker(
     override suspend fun doWork(): Result {
         Log.i(TAG, "ModelDownloadWorker started")
 
-        if (ModelDownloader.allModelsReady(applicationContext)) {
+        val spec =
+            org.eidora.ml.EmbeddingModelSpec.byId(
+                org.eidora.data.settings.SettingsProvider
+                    .get(applicationContext)
+                    .getEmbeddingModelId(),
+            )
+
+        if (ModelDownloader.allModelsReady(applicationContext, spec)) {
             Log.i(TAG, "All models already downloaded, skipping")
             return Result.success()
         }
@@ -34,7 +41,7 @@ class ModelDownloadWorker(
 
             Log.i(TAG, "Starting model download (attempt ${runAttemptCount + 1})")
             val outcome =
-                ModelDownloader.download(applicationContext) { progress ->
+                ModelDownloader.download(applicationContext, spec) { progress ->
                     if (progress % 10 == 0) Log.d(TAG, "Download progress: $progress%")
                 }
 

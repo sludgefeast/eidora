@@ -170,12 +170,14 @@ object ChineseWhispers {
     ) {
         val n = embeddings.size
         val random = Random(LSH_SEED)
+        // Dimension comes from the data, so LSH works for any embedding model.
+        val dim = if (embeddings.isNotEmpty()) embeddings[0].size else EMBEDDING_DIM
 
         // Generate L * K random hyperplanes (unit vectors).
         val hyperplanes =
             Array(LSH_L) {
                 Array(LSH_K) {
-                    FloatArray(EMBEDDING_DIM) { random.nextFloat() * 2f - 1f }
+                    FloatArray(dim) { random.nextFloat() * 2f - 1f }
                 }
             }
 

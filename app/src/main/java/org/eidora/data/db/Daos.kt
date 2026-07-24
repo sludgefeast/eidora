@@ -345,6 +345,14 @@ interface FaceRegionDao {
         embedding: ByteArray,
     )
 
+    /**
+     * Clears every stored embedding and the permanent-failure flag, so the
+     * embedding worker recomputes all of them. Used when the embedding model
+     * changes: vectors from different models are not comparable.
+     */
+    @Query("UPDATE face_regions SET embedding = NULL, embedding_failed = 0")
+    suspend fun clearAllEmbeddings()
+
     @Query("UPDATE face_regions SET personId = :personId WHERE id = :id")
     suspend fun updatePersonId(
         id: String,

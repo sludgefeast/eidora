@@ -25,23 +25,55 @@ object ModelDownloader {
 
     private const val RELEASE_BASE = "https://github.com/sludgefeast/eidora/releases/download"
 
-    val ALL_MODELS =
-        listOf(
-            ModelInfo(
-                filename = "scrfd_2.5g_kps_640_float32.tflite",
-                url = "$RELEASE_BASE/models-v2/scrfd_2.5g_kps_640_float32.tflite",
-                sha256 = "e3663e23b85a9412bf0b57b3855e3f9350fcd1f188ea4753685f862ae87ffcb3",
-                purposeRes = org.eidora.R.string.model_purpose_detection,
-                license = "InsightFace SCRFD – non-commercial research",
-            ),
-            ModelInfo(
-                filename = "arcface_w600k_mbf_float32.tflite",
-                url = "$RELEASE_BASE/models-v3/arcface_w600k_mbf_float32.tflite",
-                sha256 = "9ba9c5bd395e20d7f464d98978c22a8d1cdb4c27543ef19b85917099b7dfef30",
-                purposeRes = org.eidora.R.string.model_purpose_embedding,
-                license = "InsightFace ArcFace (WebFace600K) – non-commercial research",
-            ),
+    /** The face detection model – fixed, independent of the embedding choice. */
+    val DETECTION =
+        ModelInfo(
+            filename = "scrfd_2.5g_kps_640_float32.tflite",
+            url = "$RELEASE_BASE/models-v2/scrfd_2.5g_kps_640_float32.tflite",
+            sha256 = "e3663e23b85a9412bf0b57b3855e3f9350fcd1f188ea4753685f862ae87ffcb3",
+            purposeRes = org.eidora.R.string.model_purpose_detection,
+            license = "InsightFace SCRFD – non-commercial research",
         )
+
+    /**
+     * Download info per embedding model, keyed by [EmbeddingModelSpec.id].
+     * The free MobileFaceNet entry's url/sha256 are placeholders until a model
+     * with verified free-license weights is chosen; everything else (pipeline,
+     * settings, re-embed) is already wired so enabling it is a one-spot edit.
+     */
+    private val EMBEDDING_MODELS: Map<String, ModelInfo> =
+        mapOf(
+            EmbeddingModelSpec.ARCFACE.id to
+                ModelInfo(
+                    filename = EmbeddingModelSpec.ARCFACE.filename,
+                    url = "$RELEASE_BASE/models-v3/arcface_w600k_mbf_float32.tflite",
+                    sha256 = "9ba9c5bd395e20d7f464d98978c22a8d1cdb4c27543ef19b85917099b7dfef30",
+                    purposeRes = org.eidora.R.string.model_purpose_embedding,
+                    license = "InsightFace ArcFace (WebFace600K) – non-commercial research",
+                ),
+            EmbeddingModelSpec.SFACE_FREE.id to
+                ModelInfo(
+                    filename = EmbeddingModelSpec.SFACE_FREE.filename,
+                    // TODO: host the OpenCV SFace TFLite export on a release and
+                    // fill in url + sha256. Source (Apache-2.0):
+                    // https://huggingface.co/opencv/face_recognition_sface
+                    url = "$RELEASE_BASE/models-free-v1/sface_opencv_float32.tflite",
+                    sha256 = null,
+                    purposeRes = org.eidora.R.string.model_purpose_embedding,
+                    license = "OpenCV SFace (MobileFaceNet) – Apache-2.0",
+                ),
+        )
+
+    fun embeddingInfo(spec: EmbeddingModelSpec): ModelInfo =
+        EMBEDDING_MODELS[spec.id]
+            ?: error("No download info for embedding model '${spec.id}'")
+
+    /**
+     * The models required for the pipeline given the chosen embedding model:
+     * the fixed detector plus the selected embedder.
+     */
+    fun requiredModels(spec: EmbeddingModelSpec): List<ModelInfo> =
+        listOf(DETECTION, embeddingInfo(spec))
 
     fun modelFile(
         context: Context,
@@ -59,7 +91,10 @@ object ModelDownloader {
     /**
      * True when all models required for the pipeline are present.
      */
-    fun allModelsReady(context: Context): Boolean = ALL_MODELS.all { isDownloaded(context, it) }
+    fun allModelsReady(
+        context: Context,
+        spec: EmbeddingModelSpec,
+    ): Boolean = requiredModels(spec).all { isDownloaded(context, it) }
 
     // ---- Availability check (HTTP HEAD) ------------------------------------
 
@@ -76,8 +111,11 @@ object ModelDownloader {
      * usually meaning this app version is outdated and a newer release
      * bundles different models.
      */
-    fun checkAvailability(context: Context): List<ModelAvailability> =
-        ALL_MODELS
+    fun checkAvailability(
+        context: Context,
+        spec: EmbeddingModelSpec,
+    ): List<ModelAvailability> =
+        requiredModels(spec)
             .filter { !isDownloaded(context, it) }
             .map { info ->
                 try {
@@ -147,9 +185,10 @@ object ModelDownloader {
      */
     fun download(
         context: Context,
+        spec: EmbeddingModelSpec,
         onProgress: ((Int) -> Unit)? = null,
     ): DownloadOutcome {
-        val pending = ALL_MODELS.filter { !isDownloaded(context, it) }
+        val pending = requiredModels(spec).filter { !isDownloaded(context, it) }
         if (pending.isEmpty()) return DownloadOutcome.SUCCESS
 
         pending.forEachIndexed { index, info ->

@@ -340,6 +340,12 @@ fun SettingsScreen(
                 },
             )
 
+            SectionHeader(stringResource(R.string.settings_model_title))
+            ModelSetting(
+                currentId = state.embeddingModelId,
+                onSelect = { spec -> viewModel.switchEmbeddingModel(spec) },
+            )
+
             Spacer(Modifier.height(32.dp))
         }
     }
@@ -483,5 +489,86 @@ private fun IntSetting(
                 Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.setting_reset_to_default))
             }
         }
+    }
+}
+
+/**
+ * Embedding-model picker. Selecting a different model shows a confirmation
+ * dialog first, because switching recomputes every face embedding. The choice
+ * is applied only after the user confirms.
+ */
+@Composable
+private fun ModelSetting(
+    currentId: String,
+    onSelect: (org.eidora.ml.EmbeddingModelSpec) -> Unit,
+) {
+    val specs = org.eidora.ml.EmbeddingModelSpec.ALL
+
+    fun nameFor(spec: org.eidora.ml.EmbeddingModelSpec): String =
+        when (spec.id) {
+            org.eidora.ml.EmbeddingModelSpec.ARCFACE.id -> stringResource(R.string.model_arcface_name)
+            else -> stringResource(R.string.model_sface_name)
+        }
+
+    fun descFor(spec: org.eidora.ml.EmbeddingModelSpec): String =
+        when (spec.id) {
+            org.eidora.ml.EmbeddingModelSpec.ARCFACE.id -> stringResource(R.string.model_arcface_desc)
+            else -> stringResource(R.string.model_sface_desc)
+        }
+
+    // The model the user tapped but hasn't confirmed yet.
+    var pending by remember { mutableStateOf<org.eidora.ml.EmbeddingModelSpec?>(null) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        specs.forEach { spec ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (spec.id != currentId) pending = spec
+                        }
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(
+                    selected = spec.id == currentId,
+                    onClick = {
+                        if (spec.id != currentId) pending = spec
+                    },
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(nameFor(spec), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        descFor(spec),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+
+    val target = pending
+    if (target != null) {
+        AlertDialog(
+            onDismissRequest = { pending = null },
+            title = { Text(stringResource(R.string.model_switch_warning_title)) },
+            text = { Text(stringResource(R.string.model_switch_warning_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pending = null
+                    onSelect(target)
+                }) {
+                    Text(stringResource(R.string.model_switch_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pending = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
     }
 }

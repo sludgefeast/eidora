@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -55,11 +56,20 @@ fun ModelDownloadScreen(onModelsReady: () -> Unit) {
     var downloading by remember { mutableStateOf(false) }
     var checkTrigger by remember { mutableStateOf(0) }
 
-    LaunchedEffect(checkTrigger) {
+    val spec by produceState(org.eidora.ml.EmbeddingModelSpec.DEFAULT) {
+        value =
+            org.eidora.ml.EmbeddingModelSpec.byId(
+                org.eidora.data.settings.SettingsProvider
+                    .get(context)
+                    .getEmbeddingModelId(),
+            )
+    }
+
+    LaunchedEffect(checkTrigger, spec) {
         availability = null
         availability =
             withContext(Dispatchers.IO) {
-                ModelDownloader.checkAvailability(context)
+                ModelDownloader.checkAvailability(context, spec)
             }
     }
 
@@ -69,7 +79,7 @@ fun ModelDownloadScreen(onModelsReady: () -> Unit) {
         while (true) {
             val ready =
                 withContext(Dispatchers.IO) {
-                    ModelDownloader.allModelsReady(context)
+                    ModelDownloader.allModelsReady(context, spec)
                 }
             if (ready) {
                 onModelsReady()

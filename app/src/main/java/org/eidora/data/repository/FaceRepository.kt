@@ -375,6 +375,22 @@ class FaceRepository(
         return (before - after).coerceAtLeast(0)
     }
 
+    /**
+     * Discards all embeddings and clustered persons so the pipeline recomputes
+     * them with a newly chosen embedding model. Confirmed names survive: they
+     * live on the face rows (and in photo XMP) and are re-imported, so the user
+     * does not lose their labelling — only the machine-generated grouping is
+     * rebuilt. Detection results (face crops/thumbnails) are kept; only the
+     * embedding step and everything downstream of it is redone.
+     */
+    suspend fun resetForEmbeddingModelChange() {
+        // Drop clustered persons (centroids are in the old vector space).
+        personDao.deleteAll()
+        // Null out every embedding and clear the permanent-failure flag so the
+        // embedding worker recomputes all of them with the new model.
+        faceDao.clearAllEmbeddings()
+    }
+
     fun observePersonsWithCount(folders: List<String>): Flow<List<PersonWithCount>> = personDao.observeAllWithConfirmedCount(folders)
 
     fun observeUnknownFaces(folders: List<String>): Flow<List<FaceRegionWithPhoto>> = faceDao.observeUnknown(folders)

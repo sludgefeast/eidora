@@ -67,6 +67,15 @@
     <string name="setting_default_hint">Standard: %1$s</string>
     <string name="setting_reset_to_default">Auf Standard zurücksetzen</string>
     <string name="settings_power_title">Energie</string>
+    <string name="settings_model_title">Gesichtserkennungs-Modell</string>
+    <string name="setting_model_label">Embedding-Modell</string>
+    <string name="model_arcface_name">ArcFace (höhere Genauigkeit)</string>
+    <string name="model_arcface_desc">Nur Forschungslizenz. Nicht in F-Droid-Builds enthalten.</string>
+    <string name="model_sface_name">SFace (freie Lizenz)</string>
+    <string name="model_sface_desc">Apache-2.0-lizenziert, passt zu YuNet. Etwas geringere Genauigkeit.</string>
+    <string name="model_switch_warning_title">Alle Gesichter neu berechnen?</string>
+    <string name="model_switch_warning_body">Ein Modellwechsel berechnet alle Gesichts-Embeddings neu. Deine bestätigten Namen bleiben erhalten, aber die Gruppierung wird neu aufgebaut und das dauert eine Weile. Das neue Modell muss eventuell erst heruntergeladen werden.</string>
+    <string name="model_switch_confirm">Wechseln und neu berechnen</string>
     <string name="settings_power_description">Verarbeitung pausieren, wenn das Gerät zu heiß wird oder der Akkustand zu niedrig ist.</string>
     <string name="setting_min_battery_percent">Minimaler Akkustand (%)</string>
     <string name="setting_min_battery_percent_description">Verarbeitung pausiert unter diesem Akkustand.</string>

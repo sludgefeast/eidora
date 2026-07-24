@@ -25,6 +25,7 @@ private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius
 private val KEY_RESUME_BATTERY_PERCENT = intPreferencesKey("resume_battery_percent")
 private val KEY_RESUME_BATTERY_TEMP = floatPreferencesKey("resume_battery_temp_celsius")
 private val KEY_FOLDER_WHITELIST = stringPreferencesKey("folder_whitelist")
+private val KEY_EMBEDDING_MODEL_ID = stringPreferencesKey("embedding_model_id")
 private val KEY_FOLDER_WIZARD_DONE =
     androidx.datastore.preferences.core.booleanPreferencesKey("folder_wizard_done")
 private val KEY_CONFIRM_ON_ASSIGN =
@@ -147,6 +148,21 @@ class SettingsRepository(
 
     suspend fun setFolderWizardDone(done: Boolean) {
         context.dataStore.edit { it[KEY_FOLDER_WIZARD_DONE] = done }
+    }
+
+    // ---- Embedding model choice ---------------------------------------------
+
+    /**
+     * The chosen embedding model's id (see EmbeddingModelSpec). Null until the
+     * user picks one, in which case the caller uses EmbeddingModelSpec.DEFAULT.
+     */
+    val embeddingModelId: Flow<String?> =
+        context.dataStore.data.map { it[KEY_EMBEDDING_MODEL_ID] }
+
+    suspend fun getEmbeddingModelId(): String? = embeddingModelId.first()
+
+    suspend fun setEmbeddingModelId(id: String) {
+        context.dataStore.edit { it[KEY_EMBEDDING_MODEL_ID] = id }
     }
 
     // ---- Model download over mobile network ---------------------------------

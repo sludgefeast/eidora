@@ -34,6 +34,7 @@ data class SettingsUiState(
     val confirmOnAssign: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_ASSIGN,
     val confirmOnNameSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_NAME_SUGGESTION,
     val confirmOnMergeSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_MERGE_SUGGESTION,
+    val embeddingModelId: String = org.eidora.ml.EmbeddingModelSpec.DEFAULT.id,
 )
 
 class SettingsViewModel(
@@ -81,6 +82,13 @@ class SettingsViewModel(
             }
         }
         viewModelScope.launch {
+            repo.embeddingModelId.collect { id ->
+                _uiState.update {
+                    it.copy(embeddingModelId = id ?: org.eidora.ml.EmbeddingModelSpec.DEFAULT.id)
+                }
+            }
+        }
+        viewModelScope.launch {
             repo.confirmOnAssign.collect { v -> _uiState.update { it.copy(confirmOnAssign = v) } }
         }
         viewModelScope.launch {
@@ -109,6 +117,32 @@ class SettingsViewModel(
 
     fun setPowerConfig(config: PowerConfig) {
         viewModelScope.launch { repo.setPowerConfig(config) }
+    }
+
+    /**
+     * Switches the embedding model. Because embeddings from different models
+     * are not comparable, this clears all embeddings and clustered persons and
+     * restarts the pipeline so everything is recomputed with the new model.
+     * Confirmed names are preserved (they re-import from XMP). No-op if the
+     * chosen model is already active.
+     */
+    fun switchEmbeddingModel(spec: org.eidora.ml.EmbeddingModelSpec) {
+        viewModelScope.launch {
+            val currentId = repo.getEmbeddingModelId() ?: org.eidora.ml.EmbeddingModelSpec.DEFAULT.id
+            if (currentId == spec.id) return@launch // already active
+
+            repo.setEmbeddingModelId(spec.id)
+            try {
+                faceRepo.resetForEmbeddingModelChange()
+            } catch (t: Throwable) {
+                // best-effort; the pipeline still re-runs below
+            }
+            // The new model may not be downloaded yet; the model gate/download
+            // screen handles that. Restart sync so detection→embedding→cluster
+            // re-runs from scratch with the new model.
+            org.eidora.worker.SyncPipeline
+                .restartAfterFolderChange(getApplication())
+        }
     }
 
     fun setFolderWhitelist(folders: Set<String>) {

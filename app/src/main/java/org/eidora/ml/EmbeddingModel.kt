@@ -18,30 +18,34 @@ import java.nio.channels.FileChannel
 import kotlin.math.sqrt
 
 private const val TAG = "EmbeddingModel"
-private const val INPUT_SIZE = 112
-private const val EMBEDDING_DIM = 512
 
 /**
- * Face embedding using ArcFace w600k_mbf (MobileFaceNet backbone,
- * InsightFace) converted to TFLite. Bundled as an APK asset at build time
- * (downloaded from the models-v3 release by the build workflow).
+ * Face embedding using a pluggable 112x112 TFLite model described by an
+ * [EmbeddingModelSpec]. The spec supplies the filename, input size, embedding
+ * dimension and pixel normalization, so different models (research-grade
+ * ArcFace or a freely-licensed MobileFaceNet) share this one inference path.
  *
- * Input: NHWC float32 112x112, RGB, normalized as (pixel - 127.5) / 127.5.
- * Output: 512-dim embedding (unnormalized; cosineDistance normalizes).
+ * Input: NHWC float32, RGB, normalized per [EmbeddingModelSpec.normalization].
+ * Output: [EmbeddingModelSpec.embeddingDim]-dim embedding (unnormalized;
+ * cosineDistance normalizes).
  * Thread-safe: the TFLite interpreter is guarded by a mutex.
  */
 class EmbeddingModel(
     context: Context,
+    private val spec: EmbeddingModelSpec = EmbeddingModelSpec.DEFAULT,
 ) : Closeable {
     private val interpreter: Interpreter
     private val gpuDelegate: GpuDelegate?
     private val mutex = Mutex()
 
+    private val inputSize = spec.inputSize
+    private val embeddingDim = spec.embeddingDim
+
     val backend: String
 
     init {
         // Loaded from filesDir – downloaded at runtime after user consent.
-        val modelFile = java.io.File(context.filesDir, "arcface_w600k_mbf_float32.tflite")
+        val modelFile = java.io.File(context.filesDir, spec.filename)
         val buffer =
             java.io.FileInputStream(modelFile).channel.use { channel ->
                 channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size())
@@ -57,7 +61,7 @@ class EmbeddingModel(
             gpuDelegate = null
             backend = "CPU"
         }
-        Log.i(TAG, "ArcFace embedding model initialized on $backend")
+        Log.i(TAG, "Embedding model '${spec.id}' initialized on $backend")
     }
 
     private fun tryCreateGpu(buffer: java.nio.MappedByteBuffer): Pair<Interpreter, GpuDelegate>? {
@@ -74,16 +78,17 @@ class EmbeddingModel(
     }
 
     /**
-     * Computes a 512-dimensional embedding for the given face bitmap.
+     * Computes the face embedding for the given bitmap (dimension depends on
+     * the model spec).
      * Preprocessing runs concurrently across coroutines; only the ML
      * inference is serialized.
      */
     suspend fun computeEmbedding(faceBitmap: Bitmap): FloatArray {
-        val resized = Bitmap.createScaledBitmap(faceBitmap, INPUT_SIZE, INPUT_SIZE, true)
+        val resized = Bitmap.createScaledBitmap(faceBitmap, inputSize, inputSize, true)
         val input = bitmapToBuffer(resized)
         if (resized !== faceBitmap) resized.recycle()
 
-        val outputBuffer = Array(1) { FloatArray(EMBEDDING_DIM) }
+        val outputBuffer = Array(1) { FloatArray(embeddingDim) }
         mutex.withLock {
             interpreter.run(input, outputBuffer)
         }
@@ -91,17 +96,25 @@ class EmbeddingModel(
     }
 
     private fun bitmapToBuffer(bitmap: Bitmap): ByteBuffer {
-        val buffer = ByteBuffer.allocateDirect(INPUT_SIZE * INPUT_SIZE * 3 * 4).order(ByteOrder.nativeOrder())
-        val pixels = IntArray(INPUT_SIZE * INPUT_SIZE)
-        bitmap.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
+        val buffer = ByteBuffer.allocateDirect(inputSize * inputSize * 3 * 4).order(ByteOrder.nativeOrder())
+        val pixels = IntArray(inputSize * inputSize)
+        bitmap.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
+        val signed = spec.normalization == EmbeddingModelSpec.Normalization.SIGNED_UNIT
         for (px in pixels) {
-            // ArcFace expects RGB, normalized as (x - 127.5) / 127.5
-            val r = ((px shr 16 and 0xFF) - 127.5f) / 127.5f
-            val g = ((px shr 8 and 0xFF) - 127.5f) / 127.5f
-            val b = ((px and 0xFF) - 127.5f) / 127.5f
-            buffer.putFloat(r)
-            buffer.putFloat(g)
-            buffer.putFloat(b)
+            val rRaw = (px shr 16 and 0xFF)
+            val gRaw = (px shr 8 and 0xFF)
+            val bRaw = (px and 0xFF)
+            if (signed) {
+                // (x - 127.5) / 127.5 → [-1, 1]
+                buffer.putFloat((rRaw - 127.5f) / 127.5f)
+                buffer.putFloat((gRaw - 127.5f) / 127.5f)
+                buffer.putFloat((bRaw - 127.5f) / 127.5f)
+            } else {
+                // x / 255 → [0, 1]
+                buffer.putFloat(rRaw / 255f)
+                buffer.putFloat(gRaw / 255f)
+                buffer.putFloat(bRaw / 255f)
+            }
         }
         buffer.rewind()
         return buffer
@@ -157,16 +170,19 @@ class EmbeddingModel(
         /**
          * Weighted centroid: each embedding is weighted by its quality score.
          * Falls back to equal weights if all weights are zero or the list is empty.
+         * The dimension is taken from the embeddings themselves, so this works
+         * for any model.
          *
          * @param embeddingsWithWeights list of (embedding, qualityScore) pairs
          */
         fun weightedCentroid(embeddingsWithWeights: List<Pair<FloatArray, Float>>): FloatArray {
-            if (embeddingsWithWeights.isEmpty()) return FloatArray(EMBEDDING_DIM)
+            if (embeddingsWithWeights.isEmpty()) return FloatArray(0)
+            val dim = embeddingsWithWeights.first().first.size
 
             val totalWeight = embeddingsWithWeights.sumOf { it.second.toDouble() }.toFloat()
             val norm = if (totalWeight > 1e-6f) totalWeight else embeddingsWithWeights.size.toFloat()
 
-            val result = FloatArray(EMBEDDING_DIM)
+            val result = FloatArray(dim)
             embeddingsWithWeights.forEach { (emb, weight) ->
                 val w = if (totalWeight > 1e-6f) weight else 1f
                 for (i in emb.indices) result[i] += emb[i] * w
