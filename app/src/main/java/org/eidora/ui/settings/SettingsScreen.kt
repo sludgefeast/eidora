@@ -279,13 +279,6 @@ fun SettingsScreen(
             )
 
             val pwr = state.powerConfig
-            IntSetting(
-                label = stringResource(R.string.setting_min_battery_percent),
-                description = stringResource(R.string.setting_min_battery_percent_description),
-                value = pwr.minBatteryPercent,
-                default = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
-                onValueChange = { viewModel.setPowerConfig(pwr.copy(minBatteryPercent = it)) },
-            )
             val tempInFahrenheit =
                 org.eidora.util.TemperatureUnit
                     .useFahrenheit(androidx.compose.ui.platform.LocalContext.current)
@@ -293,6 +286,25 @@ fun SettingsScreen(
                 stringResource(
                     if (tempInFahrenheit) R.string.unit_fahrenheit else R.string.unit_celsius,
                 )
+
+            // Battery thresholds together (pause, then resume) so the
+            // hysteresis reads at a glance…
+            IntSetting(
+                label = stringResource(R.string.setting_min_battery_percent),
+                description = stringResource(R.string.setting_min_battery_percent_description),
+                value = pwr.minBatteryPercent,
+                default = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
+                onValueChange = { viewModel.setPowerConfig(pwr.copy(minBatteryPercent = it)) },
+            )
+            IntSetting(
+                label = stringResource(R.string.setting_resume_battery_percent),
+                description = stringResource(R.string.setting_resume_battery_percent_description),
+                value = pwr.resumeBatteryPercent,
+                default = SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
+                onValueChange = { viewModel.setPowerConfig(pwr.copy(resumeBatteryPercent = it)) },
+            )
+
+            // …then the temperature thresholds together (pause, then resume).
             FloatSetting(
                 label = stringResource(R.string.setting_max_battery_temp, tempUnitLabel),
                 description = stringResource(R.string.setting_max_battery_temp_description),
@@ -309,13 +321,6 @@ fun SettingsScreen(
                             .fromInput(entered, tempInFahrenheit)
                     viewModel.setPowerConfig(pwr.copy(maxBatteryTempCelsius = celsius))
                 },
-            )
-            IntSetting(
-                label = stringResource(R.string.setting_resume_battery_percent),
-                description = stringResource(R.string.setting_resume_battery_percent_description),
-                value = pwr.resumeBatteryPercent,
-                default = SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
-                onValueChange = { viewModel.setPowerConfig(pwr.copy(resumeBatteryPercent = it)) },
             )
             FloatSetting(
                 label = stringResource(R.string.setting_resume_battery_temp, tempUnitLabel),
