@@ -239,12 +239,12 @@ interface FaceRegionDao {
     suspend fun findByPhotoId(photoId: String): List<FaceRegionEntity>
 
     @Query(
-        "SELECT f.*, ph.takenAt as photoTakenAt FROM face_regions f JOIN photos ph ON f.photoId = ph.id WHERE f.personId = :personId",
+        "SELECT f.id, f.photoId, f.personId, f.name, f.regionJson, f.embedding, f.ignored, f.quality_score, f.embedding_failed, ph.takenAt AS photoTakenAt FROM face_regions f JOIN photos ph ON f.photoId = ph.id WHERE f.personId = :personId",
     )
     suspend fun findByPersonIdWithDate(personId: String): List<FaceRegionWithPhoto>
 
     @Query(
-        "SELECT f.*, ph.takenAt as photoTakenAt FROM face_regions f JOIN photos ph ON f.photoId = ph.id WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding IS NOT NULL",
+        "SELECT f.id, f.photoId, f.personId, f.name, f.regionJson, f.embedding, f.ignored, f.quality_score, f.embedding_failed, ph.takenAt AS photoTakenAt FROM face_regions f JOIN photos ph ON f.photoId = ph.id WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding IS NOT NULL",
     )
     suspend fun findUnclusteredWithDate(): List<FaceRegionWithPhoto>
 
@@ -360,7 +360,9 @@ interface FaceRegionDao {
 
     @Query(
         """
-        SELECT f.*, ph.takenAt as photoTakenAt
+        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson, f.embedding,
+               f.ignored, f.quality_score, f.embedding_failed,
+               ph.takenAt AS photoTakenAt
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
         WHERE f.personId = :personId AND ph.folder IN (:folders)
@@ -376,7 +378,9 @@ interface FaceRegionDao {
 
     @Query(
         """
-        SELECT f.*, ph.takenAt as photoTakenAt
+        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson, f.embedding,
+               f.ignored, f.quality_score, f.embedding_failed,
+               ph.takenAt AS photoTakenAt
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
         WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding_failed = 0 AND ph.folder IN (:folders)
@@ -387,7 +391,9 @@ interface FaceRegionDao {
 
     @Query(
         """
-        SELECT f.*, ph.takenAt as photoTakenAt
+        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson, f.embedding,
+               f.ignored, f.quality_score, f.embedding_failed,
+               ph.takenAt AS photoTakenAt
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
         WHERE f.ignored = 1 AND ph.folder IN (:folders)
