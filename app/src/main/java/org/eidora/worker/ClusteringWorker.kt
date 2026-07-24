@@ -272,7 +272,7 @@ class ClusteringWorker(
                 if (members.isEmpty()) return@forEachIndexed
 
                 if (members.size < config.minClusterSize) {
-                    Log.d(TAG, "Skipping singleton cluster (${members.size} face)")
+                    Log.d(TAG, "Skipping cluster below minimum size: ${members.size} < ${config.minClusterSize}")
                     return@forEachIndexed
                 }
 

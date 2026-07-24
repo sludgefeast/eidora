@@ -186,7 +186,7 @@ class SettingsRepository(
         const val DEFAULT_EDGE_THRESHOLD = 0.50f
         const val DEFAULT_CLUSTER_MATCH_THRESHOLD = 0.55f
         const val DEFAULT_INDIVIDUAL_MATCH_THRESHOLD = 0.50f
-        const val DEFAULT_MIN_CLUSTER_SIZE = 5
+        const val DEFAULT_MIN_CLUSTER_SIZE = 2
         const val DEFAULT_TIME_WEIGHT = 1.0f
 
         // Manual assignment confirms faces by default; naming a suggestion
