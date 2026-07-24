@@ -1,53 +1,24 @@
-<!--
-  SPDX-License-Identifier: GPL-3.0-or-later
-  Copyright (C) 2026 Sebastian (Eidora contributors)
-
-  In-app version of eidora_icon.svg.
-
-  GENERATED from eidora_icon.svg by the generate-icons workflow
-  (svg2vectordrawable). This checked-in copy keeps local builds green
-  before the workflow has run; the workflow regenerates it whenever the
-  SVG changes. eidora_icon.svg is the single source of truth — edit the
-  SVG, not this file.
--->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Rounded background -->
     <path
-        android:fillColor="#1A0A2E"
-        android:pathData="M24,0 L84,0 A24,24 0 0 1 108,24 L108,84 A24,24 0 0 1 84,108 L24,108 A24,24 0 0 1 0,84 L0,24 A24,24 0 0 1 24,0 Z" />
-
-    <!-- Left face circle (orange) -->
+        android:fillColor="#FF1A0A2E"
+        android:pathData="M24 0L84 0A24 24 0 0 1 108 24L108 84A24 24 0 0 1 84 108L24 108A24 24 0 0 1 0 84L0 24A24 24 0 0 1 24 0Z"/>
     <path
-        android:fillColor="#F97316"
-        android:fillAlpha="0.7"
-        android:pathData="M18,44 A22,22 0 0 1 62,44 A22,22 0 0 1 18,44 Z" />
-
-    <!-- Right face circle (pink) -->
+        android:fillColor="#B3F97316"
+        android:pathData="M18 44A22 22 0 0 1 62 44 22 22 0 0 1 18 44Z"/>
     <path
-        android:fillColor="#EC4899"
-        android:fillAlpha="0.7"
-        android:pathData="M46,44 A22,22 0 0 1 90,44 A22,22 0 0 1 46,44 Z" />
-
-    <!-- Overlap lens (amber) -->
+        android:fillColor="#B3EC4899"
+        android:pathData="M46 44A22 22 0 0 1 90 44 22 22 0 0 1 46 44Z"/>
     <path
-        android:fillColor="#FBBF24"
-        android:fillAlpha="0.6"
-        android:pathData="M54,27.03 A22,22 0 0 1 54,60.97 A22,22 0 0 1 54,27.03 Z" />
-
-    <!-- Upper name bar -->
+        android:fillColor="#99FBBF24"
+        android:pathData="M54 27.03A22 22 0 0 1 54 60.97 22 22 0 0 1 54 27.03Z"/>
     <path
-        android:fillColor="#FBBF24"
-        android:fillAlpha="0.95"
-        android:pathData="M22.5,76 L85.5,76 A2.5,2.5 0 0 1 85.5,81 L22.5,81 A2.5,2.5 0 0 1 22.5,76 Z" />
-
-    <!-- Lower name bar -->
+        android:fillColor="#F2FBBF24"
+        android:pathData="M22.5 76L85.5 76A2.5 2.5 0 0 1 85.5 81L22.5 81A2.5 2.5 0 0 1 22.5 76Z"/>
     <path
-        android:fillColor="#FBBF24"
-        android:fillAlpha="0.4"
-        android:pathData="M32.5,86 L75.5,86 A2.5,2.5 0 0 1 75.5,91 L32.5,91 A2.5,2.5 0 0 1 32.5,86 Z" />
+        android:fillColor="#66FBBF24"
+        android:pathData="M32.5 86L75.5 86A2.5 2.5 0 0 1 75.5 91L32.5 91A2.5 2.5 0 0 1 32.5 86Z"/>
 </vector>
