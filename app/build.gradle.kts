@@ -58,6 +58,10 @@ android {
     // Keep TFLite model uncompressed
     androidResources {
         noCompress += "tflite"
+        // Auto-generate res/xml/locales_config.xml from the values-* folders and
+        // wire it into the manifest, so the per-app language picker (Android 13+,
+        // backported below via AppCompat) always matches the shipped locales.
+        generateLocaleConfig = true
     }
 
     testOptions {
