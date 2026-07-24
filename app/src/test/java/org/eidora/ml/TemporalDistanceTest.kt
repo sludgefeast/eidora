@@ -37,9 +37,20 @@ class TemporalDistanceTest {
         }
 
         @Test
-        fun `when either timestamp is zero or negative`() {
-            assertEquals(0f, TemporalDistance.penalty(0L, yearMs, weight = 1f, reference = reference))
-            assertEquals(0f, TemporalDistance.penalty(yearMs, -5L, weight = 1f, reference = reference))
+        fun `zero and negative timestamps are valid dates, not missing`() {
+            // Pre-1970 photos have zero or negative epoch millis. These are
+            // real dates and must produce a normal penalty, not be ignored.
+            // Two dates one year apart, both before the epoch:
+            val a = -20L * yearMs
+            val b = a + yearMs
+            val p = TemporalDistance.penalty(a, b, weight = 1f, reference = reference)
+            assertTrue(p > 0f, "pre-1970 dates should yield a real temporal penalty, was $p")
+        }
+
+        @Test
+        fun `identical pre-1970 timestamps yield no penalty`() {
+            val t = -30L * yearMs
+            assertEquals(0f, TemporalDistance.penalty(t, t, weight = 1f, reference = reference), tolerance)
         }
 
         @Test
@@ -53,7 +64,7 @@ class TemporalDistanceTest {
     @DisplayName("at the half-life the penalty is about half the reference")
     fun halfLifePenalty() {
         // HALF_LIFE_YEARS = 3.0 → at Δt = 3 years, penalty ≈ reference/2
-        val a = 0L + yearMs // avoid the 0 guard
+        val a = yearMs
         val b = a + 3 * yearMs
         val p = TemporalDistance.penalty(a, b, weight = 1f, reference = reference)
         assertEquals(reference / 2f, p, 0.02f)

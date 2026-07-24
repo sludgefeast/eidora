@@ -633,7 +633,7 @@ private fun LazyGridScope.faceItemsWithMonthHeaders(
     faces.forEach { faceWithPhoto ->
         val takenAt = faceWithPhoto.photoTakenAt
         val monthKey =
-            if (takenAt != null && takenAt > 0L) {
+            if (takenAt != null) {
                 val date =
                     java.time.Instant
                         .ofEpochMilli(takenAt)
@@ -647,7 +647,7 @@ private fun LazyGridScope.faceItemsWithMonthHeaders(
         if (monthKey != lastMonthKey) {
             lastMonthKey = monthKey
             val label =
-                if (takenAt != null && takenAt > 0L) {
+                if (takenAt != null) {
                     val date =
                         java.time.Instant
                             .ofEpochMilli(takenAt)

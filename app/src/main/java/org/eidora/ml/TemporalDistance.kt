@@ -31,7 +31,8 @@ object TemporalDistance {
     /**
      * Returns a penalty in [0..1) that increases with temporal distance.
      *
-     * @param takenAtA  epoch-millis of the first photo (0 / null → ignored)
+     * @param takenAtA  epoch-millis of the first photo (null → no signal;
+     *                   zero or negative is a valid pre-1970 date)
      * @param takenAtB  epoch-millis of the second photo
      * @param weight    0 = disable; 1 = default; >1 = stronger time influence
      * @param reference the base cosine threshold (used to scale the penalty so
@@ -43,8 +44,10 @@ object TemporalDistance {
         weight: Float,
         reference: Float,
     ): Float {
+        // A null timestamp means "unknown date" → no temporal signal. A zero
+        // or negative epoch value is a VALID date (1970 or earlier), so it must
+        // not be treated as missing: many historical photos predate the epoch.
         if (weight <= 0f || takenAtA == null || takenAtB == null) return 0f
-        if (takenAtA <= 0L || takenAtB <= 0L) return 0f
 
         val deltaMs = kotlin.math.abs(takenAtA - takenAtB)
         val deltaYears = deltaMs / (365.25 * 24 * 3600 * 1000).toFloat()

@@ -31,7 +31,6 @@ object LogExporter {
             "EmbeddingWorker",
             "ModelDownloadWorker",
             "ModelDownloader",
-            "PersonDetailVM",
             "PhotoSyncWorker",
             "PowerGate",
             "ScrfdDetector",
