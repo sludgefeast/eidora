@@ -59,6 +59,7 @@ jobs:
         run: |
           curl -L -o face_detection_yunet_2023mar.onnx \
             https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+          echo "--- checksum ---"
           sha256sum face_detection_yunet_2023mar.onnx
 
       - name: Convert to TFLite (fixed 640x640)
@@ -70,22 +71,34 @@ jobs:
 
       - name: Collect and rename output
         run: |
-          # onnx2tf writes float32 and float16 tflite files into the output dir
-          cp yunet_saved_model/*_float32.tflite yunet_640_float32.tflite
-          sha256sum yunet_640_float32.tflite > checksums.txt
+          # Name must match DetectionModelSpec.YUNET.filename in the app.
+          cp yunet_saved_model/*_float32.tflite yunet_2023mar_float32.tflite
+          echo "--- final TFLite ---"
+          ls -la yunet_2023mar_float32.tflite
+          sha256sum yunet_2023mar_float32.tflite > checksums.txt
           cat checksums.txt
+          echo ""
+          echo "::notice::Put this SHA-256 into ModelDownloader's YUNET entry (sha256)."
 
       - name: Create release with model
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: models-v1
-          name: "Model assets v1"
+          tag_name: models-free-v1
+          name: "Model assets free-v1 (SFace + YuNet)"
           body: |
             YuNet face detection model converted from the official OpenCV Zoo
             ONNX (face_detection_yunet_2023mar.onnx) to TFLite with fixed
             640x640 input via onnx2tf.
 
-            See checksums.txt for SHA-256.
+            License: Apache-2.0 (weights included) — redistributable, and the
+            F-Droid-friendly default detection model for Eidora. Shares the
+            "models-free-v1" release with SFace.
+
+            After publishing, update ModelDownloader's YUNET entry:
+              - url points at this release's yunet_2023mar_float32.tflite
+              - sha256 from checksums.txt below
+
+            See checksums.txt for the TFLite SHA-256.
           files: |
-            yunet_640_float32.tflite
+            yunet_2023mar_float32.tflite
             checksums.txt
