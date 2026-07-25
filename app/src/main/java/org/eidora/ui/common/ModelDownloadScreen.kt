@@ -236,8 +236,14 @@ fun ModelDownloadScreen(onModelsReady: () -> Unit) {
 
 @Composable
 private fun ModelCard(item: ModelDownloader.ModelAvailability) {
+    // Icon by purpose, not filename: detection → face, embedding → fingerprint.
+    // (Filename-based checks broke when the default detector became YuNet.)
     val icon =
-        if (item.info.filename.startsWith("scrfd")) Icons.Default.Face else Icons.Default.Fingerprint
+        if (item.info.purposeRes == R.string.model_purpose_detection) {
+            Icons.Default.Face
+        } else {
+            Icons.Default.Fingerprint
+        }
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),

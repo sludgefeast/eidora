@@ -55,7 +55,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
 
             // Section: folder filter (top)
-            SectionHeader(stringResource(R.string.settings_folders_title))
+            SectionHeader(stringResource(R.string.settings_folders_title), first = true)
             Text(
                 text = stringResource(R.string.settings_folders_description),
                 style = MaterialTheme.typography.bodyMedium,
@@ -184,8 +184,6 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 4.dp),
             )
 
-            Spacer(Modifier.height(24.dp))
-
             // Section: clustering
             SectionHeader(stringResource(R.string.settings_clustering_title))
             Text(
@@ -244,8 +242,6 @@ fun SettingsScreen(
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(timeWeight = it)) },
             )
 
-            Spacer(Modifier.height(24.dp))
-
             // Section: confirmation behaviour
             SectionHeader(stringResource(R.string.settings_confirm_title))
             Text(
@@ -272,8 +268,6 @@ fun SettingsScreen(
                 checked = state.confirmOnMergeSuggestion,
                 onCheckedChange = { viewModel.setConfirmOnMergeSuggestion(it) },
             )
-
-            Spacer(Modifier.height(24.dp))
 
             // Section: power
             SectionHeader(stringResource(R.string.settings_power_title))
@@ -347,12 +341,14 @@ fun SettingsScreen(
             )
 
             SectionHeader(stringResource(R.string.settings_detection_title))
+            SectionDescription(stringResource(R.string.settings_detection_description))
             DetectionSetting(
                 currentId = state.detectionModelId,
-                onSelect = { spec -> viewModel.switchDetectionModel(spec) },
+                onSelect = { spec, redetect -> viewModel.switchDetectionModel(spec, redetect) },
             )
 
             SectionHeader(stringResource(R.string.settings_model_title))
+            SectionDescription(stringResource(R.string.settings_model_description))
             ModelSetting(
                 currentId = state.embeddingModelId,
                 onSelect = { spec -> viewModel.switchEmbeddingModel(spec) },
@@ -364,12 +360,35 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SectionHeader(text: String) {
+private fun SectionHeader(
+    text: String,
+    first: Boolean = false,
+) {
+    // A divider above each section (except the first) plus generous top space
+    // gives clear visual grouping without boxing everything in cards.
+    if (!first) {
+        HorizontalDivider(
+            modifier = Modifier.padding(top = 28.dp, bottom = 0.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+        )
+    }
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = if (first) 8.dp else 20.dp, bottom = 8.dp),
+    )
+}
+
+/** Explanatory line under a section header. Keeps sections visually consistent. */
+@Composable
+private fun SectionDescription(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 12.dp),
     )
 }
 
@@ -629,7 +648,7 @@ private fun ModelSetting(
 @Composable
 private fun DetectionSetting(
     currentId: String,
-    onSelect: (org.eidora.ml.DetectionModelSpec) -> Unit,
+    onSelect: (org.eidora.ml.DetectionModelSpec, Boolean) -> Unit,
 ) {
     val specs = org.eidora.ml.DetectionModelSpec.ALL
 
@@ -681,14 +700,23 @@ private fun DetectionSetting(
     if (target != null) {
         AlertDialog(
             onDismissRequest = { pending = null },
-            title = { Text(stringResource(R.string.detection_switch_warning_title)) },
-            text = { Text(stringResource(R.string.detection_switch_warning_body)) },
+            title = { Text(stringResource(R.string.detection_switch_title)) },
+            text = { Text(stringResource(R.string.detection_switch_body)) },
+            // Two actions stacked: keep existing faces, or re-scan all photos.
             confirmButton = {
-                TextButton(onClick = {
-                    pending = null
-                    onSelect(target)
-                }) {
-                    Text(stringResource(R.string.detection_switch_confirm))
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = {
+                        pending = null
+                        onSelect(target, false) // keep existing faces
+                    }) {
+                        Text(stringResource(R.string.detection_switch_keep))
+                    }
+                    TextButton(onClick = {
+                        pending = null
+                        onSelect(target, true) // re-detect all photos
+                    }) {
+                        Text(stringResource(R.string.detection_switch_redetect))
+                    }
                 }
             },
             dismissButton = {

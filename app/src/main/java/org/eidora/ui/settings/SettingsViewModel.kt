@@ -125,27 +125,41 @@ class SettingsViewModel(
     }
 
     /**
-     * Switches the detection model. Re-detection changes which faces/crops are
-     * found, so this re-runs the full pipeline. Unlike an embedding switch it
-     * does not clear embeddings up front — but a full re-sync will re-detect and
-     * re-embed anyway. Confirmed names survive via XMP re-import. No-op if the
-     * chosen model is already active.
+     * Switches the detection model.
+     *
+     * Detection only produces face *regions* (bounding boxes). Existing regions
+     * — whether from an earlier run or imported from XMP — are not wrong just
+     * because the model changed, so re-detecting everything is optional:
+     *
+     *  - redetect = false: keep existing faces; the new model is used only for
+     *    photos scanned from now on. Fast, no recompute.
+     *  - redetect = true: re-scan all photos with the new detector, replacing
+     *    existing regions and rebuilding embeddings/clusters.
+     *
+     * Either way confirmed names survive (they live on the faces and in XMP).
+     * No-op if the chosen model is already active.
      */
-    fun switchDetectionModel(spec: org.eidora.ml.DetectionModelSpec) {
+    fun switchDetectionModel(
+        spec: org.eidora.ml.DetectionModelSpec,
+        redetect: Boolean,
+    ) {
         viewModelScope.launch {
             val currentId = repo.getDetectionModelId() ?: org.eidora.ml.DetectionModelSpec.DEFAULT.id
             if (currentId == spec.id) return@launch
 
             repo.setDetectionModelId(spec.id)
-            // A different detector produces different face boxes, so existing
-            // detections/embeddings should be rebuilt. Clear and re-run.
-            try {
-                faceRepo.resetForEmbeddingModelChange()
-            } catch (t: Throwable) {
-                // best-effort; the pipeline still re-runs below
+            if (redetect) {
+                // Re-scan everything with the new detector.
+                try {
+                    faceRepo.resetForEmbeddingModelChange()
+                } catch (t: Throwable) {
+                    // best-effort; the pipeline still re-runs below
+                }
+                org.eidora.worker.SyncPipeline
+                    .restartAfterFolderChange(getApplication())
             }
-            org.eidora.worker.SyncPipeline
-                .restartAfterFolderChange(getApplication())
+            // If not re-detecting, keep existing faces untouched; the new model
+            // applies to future scans only. Nothing else to do.
         }
     }
 

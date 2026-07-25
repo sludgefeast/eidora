@@ -22,13 +22,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
@@ -201,11 +199,10 @@ fun EidoraApp() {
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Default.Face,
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(R.drawable.ic_eidora_logo),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(44.dp),
                 )
             }
 
@@ -703,16 +700,18 @@ private fun PermissionRow(
             if (granted) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.permission_granted),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp),
                 )
             } else {
-                Icon(
-                    imageVector = Icons.Default.RadioButtonUnchecked,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.size(24.dp),
+                // A plain status label, not a checkbox-like circle: the row is
+                // informational (the actual grant happens via the system dialog
+                // after "Weiter"), so an empty circle wrongly invites a tap.
+                Text(
+                    text = stringResource(R.string.permission_required_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
