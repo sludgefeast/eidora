@@ -17,6 +17,7 @@ import java.io.File
 private const val TAG = "XmpHelper"
 
 private const val NS_MWG_RS = "http://www.metadataworkinggroup.com/schemas/regions/"
+private const val NS_ST_AREA = "http://ns.adobe.com/xmp/sType/Area#"
 private const val NS_IPTC_EXT = "http://iptc.org/std/Iptc4xmpExt/2008-02-29/"
 private const val NS_DC = "http://purl.adobe.com/dc/elements/1.1/"
 private const val NS_DIGIKAM = "http://www.digikam.org/ns/1.0/"
@@ -32,6 +33,7 @@ object XmpHelper {
     init {
         try {
             XMPMetaFactory.schemaRegistry.registerNamespace(NS_MWG_RS, "mwg-rs")
+            XMPMetaFactory.schemaRegistry.registerNamespace(NS_ST_AREA, "stArea")
             XMPMetaFactory.schemaRegistry.registerNamespace(NS_IPTC_EXT, "Iptc4xmpExt")
             XMPMetaFactory.schemaRegistry.registerNamespace(NS_DC, "dc")
             XMPMetaFactory.schemaRegistry.registerNamespace(NS_DIGIKAM, "digiKam")
@@ -111,7 +113,17 @@ object XmpHelper {
 
             for (i in 1..count) {
                 try {
-                    val base = "mwg-rs:Regions/mwg-rs:RegionList[$i]/mwg-rs:RegionExtensions"
+                    val item = "mwg-rs:Regions/mwg-rs:RegionList[$i]"
+                    // Correct MWG layout: Type/Name/Area directly in the item.
+                    // Fall back to the old (incorrect) RegionExtensions layout so
+                    // photos written by earlier Eidora versions still read.
+                    val directType = xmp.getPropertyString(NS_MWG_RS, "$item/mwg-rs:Type")
+                    val base =
+                        if (directType != null) {
+                            item
+                        } else {
+                            "$item/mwg-rs:RegionExtensions"
+                        }
                     val type = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Type") ?: continue
                     if (type.lowercase() != "face") continue
                     val x = xmp.getPropertyString(NS_MWG_RS, "$base/mwg-rs:Area/stArea:x")?.toFloatOrNull() ?: continue
@@ -154,7 +166,9 @@ object XmpHelper {
 
             if (regions.isNotEmpty()) {
                 val structOpts = PropertyOptions().setStruct(true)
-                val arrayOpts = PropertyOptions().setArray(true).setArrayOrdered(true)
+                // MWG defines RegionList as an unordered rdf:Bag (all the
+                // real-world digiKam/Picasa/Lightroom samples use Bag, not Seq).
+                val arrayOpts = PropertyOptions().setArray(true)
                 val emptyOpts = PropertyOptions()
 
                 xmp.setProperty(NS_MWG_RS, "mwg-rs:Regions", null, structOpts)
@@ -162,17 +176,19 @@ object XmpHelper {
 
                 regions.forEachIndexed { index, region ->
                     try {
+                        // Correct MWG structure: Type/Name/Area sit directly in
+                        // the RegionList item — there is NO RegionExtensions
+                        // level (that field is only for vendor extensions).
                         val item = "mwg-rs:Regions/mwg-rs:RegionList[${index + 1}]"
-                        val ext = "$item/mwg-rs:RegionExtensions"
                         xmp.setProperty(NS_MWG_RS, item, null, structOpts)
-                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Type", "Face", emptyOpts)
-                        region.name?.let { n -> xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Name", n, emptyOpts) }
-                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area", null, structOpts)
-                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:x", region.coords.x.toString(), emptyOpts)
-                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:y", region.coords.y.toString(), emptyOpts)
-                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:w", region.coords.w.toString(), emptyOpts)
-                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:h", region.coords.h.toString(), emptyOpts)
-                        xmp.setProperty(NS_MWG_RS, "$ext/mwg-rs:Area/stArea:unit", "normalized", emptyOpts)
+                        xmp.setProperty(NS_MWG_RS, "$item/mwg-rs:Type", "Face", emptyOpts)
+                        region.name?.let { n -> xmp.setProperty(NS_MWG_RS, "$item/mwg-rs:Name", n, emptyOpts) }
+                        xmp.setProperty(NS_MWG_RS, "$item/mwg-rs:Area", null, structOpts)
+                        xmp.setProperty(NS_MWG_RS, "$item/mwg-rs:Area/stArea:x", region.coords.x.toString(), emptyOpts)
+                        xmp.setProperty(NS_MWG_RS, "$item/mwg-rs:Area/stArea:y", region.coords.y.toString(), emptyOpts)
+                        xmp.setProperty(NS_MWG_RS, "$item/mwg-rs:Area/stArea:w", region.coords.w.toString(), emptyOpts)
+                        xmp.setProperty(NS_MWG_RS, "$item/mwg-rs:Area/stArea:h", region.coords.h.toString(), emptyOpts)
+                        xmp.setProperty(NS_MWG_RS, "$item/mwg-rs:Area/stArea:unit", "normalized", emptyOpts)
                     } catch (t: Throwable) {
                         Log.w(TAG, "Failed to write region $index, skipping", t)
                     }
