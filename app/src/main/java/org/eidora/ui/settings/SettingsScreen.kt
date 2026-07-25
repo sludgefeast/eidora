@@ -554,23 +554,21 @@ private fun ModelSetting(
 ) {
     val specs = org.eidora.ml.EmbeddingModelSpec.ALL
 
-    fun nameFor(spec: org.eidora.ml.EmbeddingModelSpec): String =
-        when (spec.id) {
-            org.eidora.ml.EmbeddingModelSpec.ARCFACE.id -> stringResource(R.string.model_arcface_name)
-            else -> stringResource(R.string.model_sface_name)
-        }
-
-    fun descFor(spec: org.eidora.ml.EmbeddingModelSpec): String =
-        when (spec.id) {
-            org.eidora.ml.EmbeddingModelSpec.ARCFACE.id -> stringResource(R.string.model_arcface_desc)
-            else -> stringResource(R.string.model_sface_desc)
-        }
-
     // The model the user tapped but hasn't confirmed yet.
     var pending by remember { mutableStateOf<org.eidora.ml.EmbeddingModelSpec?>(null) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         specs.forEach { spec ->
+            val name =
+                when (spec.id) {
+                    org.eidora.ml.EmbeddingModelSpec.ARCFACE.id -> stringResource(R.string.model_arcface_name)
+                    else -> stringResource(R.string.model_sface_name)
+                }
+            val desc =
+                when (spec.id) {
+                    org.eidora.ml.EmbeddingModelSpec.ARCFACE.id -> stringResource(R.string.model_arcface_desc)
+                    else -> stringResource(R.string.model_sface_desc)
+                }
             Row(
                 modifier =
                     Modifier
@@ -589,9 +587,9 @@ private fun ModelSetting(
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(nameFor(spec), style = MaterialTheme.typography.bodyLarge)
+                    Text(name, style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        descFor(spec),
+                        desc,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -635,22 +633,20 @@ private fun DetectionSetting(
 ) {
     val specs = org.eidora.ml.DetectionModelSpec.ALL
 
-    fun nameFor(spec: org.eidora.ml.DetectionModelSpec): String =
-        when (spec.id) {
-            org.eidora.ml.DetectionModelSpec.SCRFD.id -> stringResource(R.string.detection_scrfd_name)
-            else -> stringResource(R.string.detection_yunet_name)
-        }
-
-    fun descFor(spec: org.eidora.ml.DetectionModelSpec): String =
-        when (spec.id) {
-            org.eidora.ml.DetectionModelSpec.SCRFD.id -> stringResource(R.string.detection_scrfd_desc)
-            else -> stringResource(R.string.detection_yunet_desc)
-        }
-
     var pending by remember { mutableStateOf<org.eidora.ml.DetectionModelSpec?>(null) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         specs.forEach { spec ->
+            val name =
+                when (spec.id) {
+                    org.eidora.ml.DetectionModelSpec.SCRFD.id -> stringResource(R.string.detection_scrfd_name)
+                    else -> stringResource(R.string.detection_yunet_name)
+                }
+            val desc =
+                when (spec.id) {
+                    org.eidora.ml.DetectionModelSpec.SCRFD.id -> stringResource(R.string.detection_scrfd_desc)
+                    else -> stringResource(R.string.detection_yunet_desc)
+                }
             Row(
                 modifier =
                     Modifier
@@ -669,9 +665,9 @@ private fun DetectionSetting(
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(nameFor(spec), style = MaterialTheme.typography.bodyLarge)
+                    Text(name, style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        descFor(spec),
+                        desc,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
