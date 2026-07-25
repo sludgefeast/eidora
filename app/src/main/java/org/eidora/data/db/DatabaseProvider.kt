@@ -17,7 +17,7 @@ object DatabaseProvider {
                     context.applicationContext,
                     EidoraDatabase::class.java,
                     "faces.db",
-                ).fallbackToDestructiveMigration()
+                ).fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
                 .also { instance = it }
         }
