@@ -26,6 +26,7 @@ private val KEY_RESUME_BATTERY_PERCENT = intPreferencesKey("resume_battery_perce
 private val KEY_RESUME_BATTERY_TEMP = floatPreferencesKey("resume_battery_temp_celsius")
 private val KEY_FOLDER_WHITELIST = stringPreferencesKey("folder_whitelist")
 private val KEY_EMBEDDING_MODEL_ID = stringPreferencesKey("embedding_model_id")
+private val KEY_DETECTION_MODEL_ID = stringPreferencesKey("detection_model_id")
 private val KEY_FOLDER_WIZARD_DONE =
     androidx.datastore.preferences.core.booleanPreferencesKey("folder_wizard_done")
 private val KEY_CONFIRM_ON_ASSIGN =
@@ -72,10 +73,16 @@ class SettingsRepository(
 
     val clusteringConfig: Flow<ClusteringConfig> =
         context.dataStore.data.map { prefs ->
+            // Fall back to the selected model's tuned thresholds, not fixed
+            // constants: an unset threshold should default to a value that fits
+            // whichever embedding model is active.
+            val spec =
+                org.eidora.ml.EmbeddingModelSpec.byId(prefs[KEY_EMBEDDING_MODEL_ID])
+            val t = spec.defaultThresholds
             ClusteringConfig(
-                edgeThreshold = prefs[KEY_CLUSTER_EDGE_THRESHOLD] ?: DEFAULT_EDGE_THRESHOLD,
-                clusterMatchThreshold = prefs[KEY_CLUSTER_MATCH_THRESHOLD] ?: DEFAULT_CLUSTER_MATCH_THRESHOLD,
-                individualMatchThreshold = prefs[KEY_INDIVIDUAL_MATCH_THRESHOLD] ?: DEFAULT_INDIVIDUAL_MATCH_THRESHOLD,
+                edgeThreshold = prefs[KEY_CLUSTER_EDGE_THRESHOLD] ?: t.edge,
+                clusterMatchThreshold = prefs[KEY_CLUSTER_MATCH_THRESHOLD] ?: t.clusterMatch,
+                individualMatchThreshold = prefs[KEY_INDIVIDUAL_MATCH_THRESHOLD] ?: t.individualMatch,
                 minClusterSize = prefs[KEY_MIN_CLUSTER_SIZE] ?: DEFAULT_MIN_CLUSTER_SIZE,
                 timeWeight = prefs[KEY_TIME_WEIGHT] ?: DEFAULT_TIME_WEIGHT,
             )
@@ -165,6 +172,18 @@ class SettingsRepository(
         context.dataStore.edit { it[KEY_EMBEDDING_MODEL_ID] = id }
     }
 
+    // ---- Detection model choice ---------------------------------------------
+
+    /** The chosen detection model's id (see DetectionModelSpec). */
+    val detectionModelId: Flow<String?> =
+        context.dataStore.data.map { it[KEY_DETECTION_MODEL_ID] }
+
+    suspend fun getDetectionModelId(): String? = detectionModelId.first()
+
+    suspend fun setDetectionModelId(id: String) {
+        context.dataStore.edit { it[KEY_DETECTION_MODEL_ID] = id }
+    }
+
     // ---- Model download over mobile network ---------------------------------
 
     // ---- Confirmation behaviour for manual face assignment ------------------
@@ -199,9 +218,8 @@ class SettingsRepository(
     }
 
     companion object {
-        const val DEFAULT_EDGE_THRESHOLD = 0.50f
-        const val DEFAULT_CLUSTER_MATCH_THRESHOLD = 0.55f
-        const val DEFAULT_INDIVIDUAL_MATCH_THRESHOLD = 0.50f
+        // Clustering threshold defaults are model-dependent and live in
+        // EmbeddingModelSpec.defaultThresholds (see clusteringConfig above).
         const val DEFAULT_MIN_CLUSTER_SIZE = 2
         const val DEFAULT_TIME_WEIGHT = 1.0f
 

@@ -30,7 +30,27 @@ data class EmbeddingModelSpec(
     val embeddingDim: Int,
     val normalization: Normalization,
     val isFree: Boolean,
+    /** Effective license (the restrictive one) plus the reason, for the UI. */
+    val license: ModelLicense,
+    /**
+     * Default clustering thresholds tuned for this model. Embeddings from
+     * different models live in different spaces, so thresholds do not transfer:
+     * ArcFace clusters well around 0.50 cosine distance, while SFace (OpenCV's
+     * cosine-similarity threshold 0.363 → distance ~0.637) needs looser values.
+     * These become the defaults when the model is selected; the user can still
+     * override them in settings.
+     *
+     * All are cosine DISTANCE (1 - similarity); larger = more permissive.
+     */
+    val defaultThresholds: Thresholds,
 ) {
+    /** Per-model default clustering thresholds (cosine distance). */
+    data class Thresholds(
+        val edge: Float,
+        val clusterMatch: Float,
+        val individualMatch: Float,
+    )
+
     /**
      * Pixel-to-float mapping. Different models were trained with different
      * input scaling; using the wrong one silently produces garbage embeddings.
@@ -41,6 +61,13 @@ data class EmbeddingModelSpec(
 
         /** pixel / 255  → range [0, 1]. Several MobileFaceNet exports. */
         ZERO_TO_ONE,
+
+        /**
+         * Raw pixel values [0, 255], no scaling or mean subtraction. OpenCV
+         * SFace: FaceRecognizerSF feeds blobFromImage with scale 1.0 and zero
+         * mean, so the input scaling is baked into the model weights.
+         */
+        RAW_0_255,
     }
 
     companion object {
@@ -56,6 +83,18 @@ data class EmbeddingModelSpec(
                 embeddingDim = 512,
                 normalization = Normalization.SIGNED_UNIT,
                 isFree = false,
+                license =
+                    ModelLicense(
+                        isFree = false,
+                        effectiveNameRes = org.eidora.R.string.license_research_name,
+                        reasonRes = org.eidora.R.string.license_reason_arcface,
+                    ),
+                defaultThresholds =
+                    Thresholds(
+                        edge = 0.50f,
+                        clusterMatch = 0.55f,
+                        individualMatch = 0.50f,
+                    ),
             )
 
         /**
@@ -67,22 +106,16 @@ data class EmbeddingModelSpec(
          * Source: https://huggingface.co/opencv/face_recognition_sface
          * Paper: SFace (arXiv:2205.12010). License: Apache-2.0.
          *
-         * VERIFIED: Apache-2.0 on the weights; MobileFaceNet 112x112; OpenCV's
-         * recommended cosine-similarity threshold is 0.363 (i.e. cosine
-         * DISTANCE ~0.637), useful when tuning the clustering thresholds for
-         * this model.
-         *
-         * TO CONFIRM before release against the actual ONNX→TFLite export:
-         *  - embeddingDim: the convert-sface workflow prints the true value
-         *    ("EMBEDDING_DIM (from ONNX output)") — read it from the run log and
-         *    set it here. 128 is the placeholder.
-         *  - normalization: OpenCV does pixel scaling internally, so it is not
-         *    visible in the Python wrapper. The SFace ONNX graph itself must be
-         *    inspected; ZERO_TO_ONE is the common case but MUST be verified, as
-         *    a wrong choice silently produces garbage embeddings.
-         *  - download url + sha256: the workflow publishes the TFLite as release
-         *    "models-free-v1" and prints its SHA-256; put both into
-         *    ModelDownloader's SFACE_FREE entry.
+         * VERIFIED against OpenCV's reference (opencv/face_recognition_sface):
+         *  - Apache-2.0 weights; ONNX sha256 0ba9fbfa...4e79.
+         *  - input 112x112, ONNX input "data" [1,3,112,112].
+         *  - embeddingDim 128 (ONNX output "fc1" [1,128]).
+         *  - normalization RAW_0_255: raw pixels reproduce OpenCV's
+         *    FaceRecognizerSF embeddings with cosine 1.00000; ZERO_TO_ONE and
+         *    SIGNED_UNIT give ~0.03-0.14 (garbage). Confirmed via
+         *    scripts/verify_sface.py.
+         *  - OpenCV's cosine-similarity threshold is 0.363, useful when tuning
+         *    the clustering thresholds for this model.
          */
         val SFACE_FREE =
             EmbeddingModelSpec(
@@ -90,21 +123,33 @@ data class EmbeddingModelSpec(
                 filename = "sface_opencv_float32.tflite",
                 inputSize = 112,
                 embeddingDim = 128,
-                normalization = Normalization.ZERO_TO_ONE,
+                normalization = Normalization.RAW_0_255,
                 isFree = true,
+                license =
+                    ModelLicense(
+                        isFree = true,
+                        effectiveNameRes = org.eidora.R.string.license_free_name,
+                        reasonRes = org.eidora.R.string.license_reason_sface,
+                    ),
+                defaultThresholds =
+                    Thresholds(
+                        edge = 0.64f,
+                        clusterMatch = 0.68f,
+                        individualMatch = 0.64f,
+                    ),
             )
 
         /** All embedding specs the app knows about. */
         val ALL = listOf(ARCFACE, SFACE_FREE)
 
         /**
-         * The default when the user has not chosen. Kept on ARCFACE for now
-         * because SFACE_FREE still needs its download URL/hash and the two
-         * to-confirm parameters above filled in; switch this to SFACE_FREE once
-         * the free model is published and verified, so F-Droid users get a
-         * fully-free default.
+         * The default when the user has not chosen. SFACE_FREE is
+         * Apache-2.0-licensed and fully verified (dim 128, RAW_0_255
+         * normalization confirmed against OpenCV's reference), so F-Droid users
+         * get a fully-free default. ArcFace remains available as an opt-in
+         * accuracy upgrade for users who accept its research-only license.
          */
-        val DEFAULT = ARCFACE
+        val DEFAULT = SFACE_FREE
 
         fun byId(id: String?): EmbeddingModelSpec = ALL.firstOrNull { it.id == id } ?: DEFAULT
     }

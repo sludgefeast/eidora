@@ -34,6 +34,7 @@ object LogExporter {
             "PhotoSyncWorker",
             "PowerGate",
             "ScrfdDetector",
+            "YuNetDetector",
             "XmpHelper",
             "XmpWriteWorker",
         )

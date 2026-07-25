@@ -67,6 +67,23 @@
     <string name="setting_default_hint">Standard: %1$s</string>
     <string name="setting_reset_to_default">Auf Standard zurücksetzen</string>
     <string name="settings_power_title">Energie</string>
+    <!-- Modell-Lizenznamen (effektiv = die restriktivere von Code/Gewichten) -->
+    <string name="license_free_name">Apache-2.0 (frei, jede Nutzung)</string>
+    <string name="license_research_name">Nicht-kommerziell (nur Forschung)</string>
+    <!-- Warum jedes Modell seine Lizenz hat -->
+    <string name="license_reason_scrfd">Gewichte von InsightFace auf einem reinen Forschungs-Datensatz trainiert. Der Code ist offen, aber die Gewichte schränken die Nutzung ein.</string>
+    <string name="license_reason_yunet">Code und Gewichte sind Apache-2.0 (OpenCV Zoo). Frei für jeden Zweck und in F-Droid-Builds enthalten.</string>
+    <string name="license_reason_arcface">Gewichte von InsightFace auf WebFace600K trainiert, einem reinen Forschungs-Datensatz. Der Code ist offen, aber die Gewichte schränken die Nutzung ein.</string>
+    <string name="license_reason_sface">Code und Gewichte sind Apache-2.0 (OpenCV). Frei für jeden Zweck und in F-Droid-Builds enthalten.</string>
+    <string name="license_restricted_note">Dieses Modell ist nicht Teil der F-Droid-Builds und muss separat heruntergeladen werden. Nutze es nur, wenn die Lizenz zu deinem Zweck passt.</string>
+    <string name="settings_detection_title">Gesichtsfindungs-Modell</string>
+    <string name="detection_scrfd_name">SCRFD (höhere Genauigkeit)</string>
+    <string name="detection_scrfd_desc">Nur Forschungslizenz. Nicht in F-Droid-Builds enthalten.</string>
+    <string name="detection_yunet_name">YuNet (freie Lizenz)</string>
+    <string name="detection_yunet_desc">Apache-2.0-lizenziert, passt zu SFace. Leicht und schnell.</string>
+    <string name="detection_switch_warning_title">Alle Fotos neu durchsuchen?</string>
+    <string name="detection_switch_warning_body">Ein Wechsel des Findungs-Modells durchsucht alle Fotos erneut nach Gesichtern. Deine bestätigten Namen bleiben erhalten, aber das dauert eine Weile und das neue Modell muss eventuell erst heruntergeladen werden.</string>
+    <string name="detection_switch_confirm">Wechseln und neu durchsuchen</string>
     <string name="settings_model_title">Gesichtserkennungs-Modell</string>
     <string name="setting_model_label">Embedding-Modell</string>
     <string name="model_arcface_name">ArcFace (höhere Genauigkeit)</string>

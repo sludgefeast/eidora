@@ -99,21 +99,29 @@ class EmbeddingModel(
         val buffer = ByteBuffer.allocateDirect(inputSize * inputSize * 3 * 4).order(ByteOrder.nativeOrder())
         val pixels = IntArray(inputSize * inputSize)
         bitmap.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
-        val signed = spec.normalization == EmbeddingModelSpec.Normalization.SIGNED_UNIT
         for (px in pixels) {
             val rRaw = (px shr 16 and 0xFF)
             val gRaw = (px shr 8 and 0xFF)
             val bRaw = (px and 0xFF)
-            if (signed) {
-                // (x - 127.5) / 127.5 → [-1, 1]
-                buffer.putFloat((rRaw - 127.5f) / 127.5f)
-                buffer.putFloat((gRaw - 127.5f) / 127.5f)
-                buffer.putFloat((bRaw - 127.5f) / 127.5f)
-            } else {
-                // x / 255 → [0, 1]
-                buffer.putFloat(rRaw / 255f)
-                buffer.putFloat(gRaw / 255f)
-                buffer.putFloat(bRaw / 255f)
+            when (spec.normalization) {
+                EmbeddingModelSpec.Normalization.SIGNED_UNIT -> {
+                    // (x - 127.5) / 127.5 → [-1, 1]
+                    buffer.putFloat((rRaw - 127.5f) / 127.5f)
+                    buffer.putFloat((gRaw - 127.5f) / 127.5f)
+                    buffer.putFloat((bRaw - 127.5f) / 127.5f)
+                }
+                EmbeddingModelSpec.Normalization.ZERO_TO_ONE -> {
+                    // x / 255 → [0, 1]
+                    buffer.putFloat(rRaw / 255f)
+                    buffer.putFloat(gRaw / 255f)
+                    buffer.putFloat(bRaw / 255f)
+                }
+                EmbeddingModelSpec.Normalization.RAW_0_255 -> {
+                    // raw pixel values, no scaling (OpenCV SFace)
+                    buffer.putFloat(rRaw.toFloat())
+                    buffer.putFloat(gRaw.toFloat())
+                    buffer.putFloat(bRaw.toFloat())
+                }
             }
         }
         buffer.rewind()

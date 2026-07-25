@@ -52,9 +52,16 @@ class EmbeddingWorker(
                     .getEmbeddingModelId(),
             )
 
+        val detectionSpec =
+            org.eidora.ml.DetectionModelSpec.byId(
+                org.eidora.data.settings.SettingsProvider
+                    .get(applicationContext)
+                    .getDetectionModelId(),
+            )
+
         // Models are downloaded only after explicit user consent. If they are
         // not present yet, end quietly – the UI prompts the user to download.
-        if (!org.eidora.ml.ModelDownloader.allModelsReady(applicationContext, spec)) {
+        if (!org.eidora.ml.ModelDownloader.allModelsReady(applicationContext, detectionSpec, spec)) {
             Log.i(TAG, "ML models not downloaded yet – skipping embedding run")
             return Result.success()
         }

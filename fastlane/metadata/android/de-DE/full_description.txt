@@ -8,6 +8,6 @@ Funktionen:
 * Akku- und temperaturbewusste Hintergrundverarbeitung, pausierbar und fortsetzbar
 * Vollständig offline
 
-Die Machine-Learning-Modelle werden nach deiner Bestätigung einmalig aus den Projekt-Releases geladen — sie stehen unter einer nicht-kommerziellen Forschungslizenz (Details im Repository).
+Die Machine-Learning-Modelle werden nach deiner Bestätigung einmalig aus den Projekt-Releases geladen. Die Standard-Modelle (YuNet und SFace) sind frei unter Apache-2.0 lizenziert. Optionale, genauere Modelle stehen für nicht-kommerzielle Forschung zur Verfügung; du wählst in den Einstellungen, wo die Lizenz jedes Modells angezeigt wird (Details im Repository).
 
 Eidora ist freie Software (GPLv3).

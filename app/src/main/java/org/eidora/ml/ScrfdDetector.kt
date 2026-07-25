@@ -11,7 +11,6 @@ import kotlinx.coroutines.sync.withLock
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
-import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
@@ -39,21 +38,13 @@ private const val NMS_IOU_THRESHOLD = 0.4f
  */
 class ScrfdDetector(
     context: Context,
-) : Closeable {
-    data class DetectedFace(
-        val xMin: Float,
-        val yMin: Float,
-        val width: Float,
-        val height: Float,
-        val rotationRadians: Float,
-        val score: Float,
-    )
+) : FaceDetector {
 
     private val interpreter: Interpreter
     private val gpuDelegate: GpuDelegate?
     private val mutex = Mutex()
 
-    val backend: String
+    override val backend: String
 
     private data class ScaleOutputs(
         val score: Int,
@@ -161,7 +152,7 @@ class ScrfdDetector(
             else -> buffer as Array<FloatArray>
         }
 
-    suspend fun detect(source: Bitmap): List<DetectedFace> {
+    override suspend fun detect(source: Bitmap): List<DetectedFace> {
         val resized = Bitmap.createScaledBitmap(source, INPUT_SIZE, INPUT_SIZE, true)
         val input = bitmapToBuffer(resized)
         if (resized !== source) resized.recycle()

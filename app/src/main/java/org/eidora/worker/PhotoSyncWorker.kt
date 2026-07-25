@@ -18,7 +18,9 @@ import org.eidora.data.db.FaceRegionEntity
 import org.eidora.data.db.PersonEntity
 import org.eidora.data.db.PhotoEntity
 import org.eidora.domain.model.FaceRegionCoords
+import org.eidora.ml.FaceDetector
 import org.eidora.ml.ScrfdDetector
+import org.eidora.ml.YuNetDetector
 import org.eidora.util.*
 import java.io.File
 import java.util.UUID
@@ -43,11 +45,28 @@ class PhotoSyncWorker(
     private val personDao by lazy { db.personDao() }
     private val faceDao by lazy { db.faceRegionDao() }
 
-    private val detector by lazy {
-        try {
-            ScrfdDetector(applicationContext)
+    // Set once at the start of a sync run, based on the chosen detection model.
+    private var detector: FaceDetector? = null
+
+    private suspend fun ensureDetector(): FaceDetector? {
+        detector?.let { return it }
+        val spec =
+            org.eidora.ml.DetectionModelSpec.byId(
+                org.eidora.data.settings.SettingsProvider
+                    .get(applicationContext)
+                    .getDetectionModelId(),
+            )
+        return try {
+            val d: FaceDetector =
+                when (spec.id) {
+                    org.eidora.ml.DetectionModelSpec.YUNET.id -> YuNetDetector(applicationContext)
+                    else -> ScrfdDetector(applicationContext)
+                }
+            detector = d
+            Log.i(TAG, "Detector initialized: ${spec.id}")
+            d
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to initialize SCRFD detector", t)
+            Log.e(TAG, "Failed to initialize detector '${spec.id}'", t)
             null
         }
     }
@@ -609,11 +628,11 @@ class PhotoSyncWorker(
         file: File,
         photoId: String,
     ) {
-        val det = detector
+        val det = ensureDetector()
         if (det == null) {
             // Models not downloaded yet (or init failed). Do NOT mark the photo
             // as analyzed – it will be picked up again once models are present.
-            Log.w(TAG, "SCRFD detector not available, deferring ${file.name}")
+            Log.w(TAG, "Detector not available, deferring ${file.name}")
             return
         }
 

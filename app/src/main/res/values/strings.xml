@@ -67,6 +67,23 @@
     <string name="setting_default_hint">Default: %1$s</string>
     <string name="setting_reset_to_default">Reset to default</string>
     <string name="settings_power_title">Power</string>
+    <!-- Model license names (effective = the more restrictive of code/weights) -->
+    <string name="license_free_name">Apache-2.0 (free, any use)</string>
+    <string name="license_research_name">Non-commercial (research only)</string>
+    <!-- Why each model has the license it has -->
+    <string name="license_reason_scrfd">Weights trained by InsightFace on a research-only dataset. The code is open, but the weights restrict use.</string>
+    <string name="license_reason_yunet">Both code and weights are Apache-2.0 (OpenCV Zoo). Free for any purpose and included in F-Droid builds.</string>
+    <string name="license_reason_arcface">Weights trained by InsightFace on WebFace600K, a research-only dataset. The code is open, but the weights restrict use.</string>
+    <string name="license_reason_sface">Both code and weights are Apache-2.0 (OpenCV). Free for any purpose and included in F-Droid builds.</string>
+    <string name="license_restricted_note">This model is not part of F-Droid builds and must be downloaded separately. Only use it if its license fits your purpose.</string>
+    <string name="settings_detection_title">Face detection model</string>
+    <string name="detection_scrfd_name">SCRFD (higher accuracy)</string>
+    <string name="detection_scrfd_desc">Research-only license. Not included in F-Droid builds.</string>
+    <string name="detection_yunet_name">YuNet (open license)</string>
+    <string name="detection_yunet_desc">Apache-2.0 licensed, pairs with SFace. Lighter and fast.</string>
+    <string name="detection_switch_warning_title">Re-detect all photos?</string>
+    <string name="detection_switch_warning_body">Switching the detection model re-scans every photo for faces from scratch. Your confirmed names are kept, but this takes a while and the new model may need to be downloaded first.</string>
+    <string name="detection_switch_confirm">Switch and re-detect</string>
     <string name="settings_model_title">Face recognition model</string>
     <string name="setting_model_label">Embedding model</string>
     <string name="model_arcface_name">ArcFace (higher accuracy)</string>

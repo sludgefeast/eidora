@@ -26,8 +26,14 @@ class ModelDownloadWorker(
                     .get(applicationContext)
                     .getEmbeddingModelId(),
             )
+        val detectionSpec =
+            org.eidora.ml.DetectionModelSpec.byId(
+                org.eidora.data.settings.SettingsProvider
+                    .get(applicationContext)
+                    .getDetectionModelId(),
+            )
 
-        if (ModelDownloader.allModelsReady(applicationContext, spec)) {
+        if (ModelDownloader.allModelsReady(applicationContext, detectionSpec, spec)) {
             Log.i(TAG, "All models already downloaded, skipping")
             return Result.success()
         }
@@ -41,7 +47,7 @@ class ModelDownloadWorker(
 
             Log.i(TAG, "Starting model download (attempt ${runAttemptCount + 1})")
             val outcome =
-                ModelDownloader.download(applicationContext, spec) { progress ->
+                ModelDownloader.download(applicationContext, detectionSpec, spec) { progress ->
                     if (progress % 10 == 0) Log.d(TAG, "Download progress: $progress%")
                 }
 

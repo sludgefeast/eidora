@@ -51,10 +51,12 @@ control. You can pause and resume it from the notification at any time.
 
 ## How it works
 
-1. **Detection** — [SCRFD](https://github.com/deepinsight/insightface) locates
-   faces and their landmarks in each photo.
-2. **Embedding** — [ArcFace](https://github.com/deepinsight/insightface)
-   converts every face into a compact numeric signature.
+1. **Detection** — a face detector locates faces and their landmarks in each
+   photo. The default is [YuNet](https://github.com/opencv/opencv_zoo)
+   (Apache-2.0).
+2. **Embedding** — a recognition model converts every face into a compact
+   numeric signature. The default is
+   [SFace](https://huggingface.co/opencv/face_recognition_sface) (Apache-2.0).
 3. **Clustering** — a Chinese Whispers graph algorithm groups similar faces into
    suggested persons. Photos taken closer together in time are nudged towards
    the same cluster, which helps when someone's appearance changes over the
@@ -70,6 +72,8 @@ control. You can pause and resume it from the notification at any time.
 - Choose exactly which folders are analysed; everything else stays untouched
 - Battery- and temperature-aware processing, pausable from the notification
 - Review unknown and ignored faces, merge or split persons
+- Choose your detection and embedding models independently — free Apache-2.0
+  defaults, with optional higher-accuracy research models
 - Material 3 interface, English and German
 
 ## Privacy
@@ -82,21 +86,33 @@ Eidora requests three things and uses them for nothing else:
 | All files access | Write names back into your photo files as XMP metadata |
 | Notifications *(optional)* | Show analysis progress; the app works without it |
 
-The only network request Eidora ever makes is downloading the two ML models,
-and only after you tap the download button. There is no analytics SDK, no crash
+The only network request Eidora ever makes is downloading the ML models, and
+only after you tap the download button. There is no analytics SDK, no crash
 reporter, and no advertising library in the build.
 
 ## Machine learning models
 
 The models are **not** bundled in the APK. On first run Eidora asks whether to
-download them (roughly 20 MB) from this repository's releases, showing each
-model's purpose, size and licence beforehand. Downloads are verified against a
-known SHA-256 hash.
+download them from this repository's releases, showing each model's purpose,
+size and licence beforehand. Downloads are verified against a known SHA-256 hash.
 
-The models come from the [InsightFace](https://github.com/deepinsight/insightface)
-project and are licensed for **non-commercial research use only** — a different,
-more restrictive licence than Eidora's own code. See
-[`MODELS-LICENSE.md`](MODELS-LICENSE.md) for what that means in practice.
+Eidora lets you choose the **detection** and **embedding** models separately in
+Settings. Each task has a free default and an optional research-only alternative:
+
+| Task | Default (free) | Optional (research only) |
+|---|---|---|
+| Detection | **YuNet** — Apache-2.0 | SCRFD (InsightFace) |
+| Embedding | **SFace** — Apache-2.0 | ArcFace (InsightFace) |
+
+The defaults (YuNet + SFace) are **Apache-2.0**, free for any purpose, and are
+what ships with the F-Droid build. The optional InsightFace models are
+**non-commercial research use only** and are downloaded only if you explicitly
+select them, after reading the licence shown in Settings.
+
+Each model actually has two licences — for its code and its trained weights —
+and the more restrictive one governs. See
+[`MODELS-LICENSE.md`](MODELS-LICENSE.md) for the full breakdown and what it means
+in practice.
 
 ## Performance
 
@@ -107,8 +123,8 @@ power:
 | Step | Time | Notes |
 |---|---|---|
 | Media scan | a few seconds | Enumerating the selected folders via MediaStore |
-| Face detection | ~1.5 h | SCRFD, 3 photos in parallel |
-| Face embeddings | ~30 min | ArcFace, one face at a time on the GPU delegate |
+| Face detection | ~1.5 h | 3 photos in parallel (measured with SCRFD) |
+| Face embeddings | ~30 min | one face at a time on the GPU delegate (measured with ArcFace) |
 | Clustering | not yet measured | Chinese Whispers over all embeddings, single pass |
 
 On top of these come any **pauses from the PowerGate**: when the battery runs low
@@ -136,4 +152,6 @@ remain under the same licence and their source is made available. See
 [`LICENSE`](LICENSE) for the full terms.
 
 The GPL covers Eidora's own source code. The ML models it downloads have their
-own, non-commercial licence — see above.
+own licences: the default models (YuNet + SFace) are Apache-2.0 and free for any
+use, while the optional InsightFace models (SCRFD, ArcFace) are non-commercial
+research only. See [`MODELS-LICENSE.md`](MODELS-LICENSE.md) for details.

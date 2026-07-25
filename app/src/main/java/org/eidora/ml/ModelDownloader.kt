@@ -25,15 +25,36 @@ object ModelDownloader {
 
     private const val RELEASE_BASE = "https://github.com/sludgefeast/eidora/releases/download"
 
-    /** The face detection model – fixed, independent of the embedding choice. */
-    val DETECTION =
-        ModelInfo(
-            filename = "scrfd_2.5g_kps_640_float32.tflite",
-            url = "$RELEASE_BASE/models-v2/scrfd_2.5g_kps_640_float32.tflite",
-            sha256 = "e3663e23b85a9412bf0b57b3855e3f9350fcd1f188ea4753685f862ae87ffcb3",
-            purposeRes = org.eidora.R.string.model_purpose_detection,
-            license = "InsightFace SCRFD – non-commercial research",
+    /**
+     * Download info per detection model, keyed by [DetectionModelSpec.id].
+     * The YuNet entry's url/sha256 are filled in once its TFLite is published
+     * by the convert-yunet workflow.
+     */
+    private val DETECTION_MODELS: Map<String, ModelInfo> =
+        mapOf(
+            DetectionModelSpec.SCRFD.id to
+                ModelInfo(
+                    filename = DetectionModelSpec.SCRFD.filename,
+                    url = "$RELEASE_BASE/models-v2/scrfd_2.5g_kps_640_float32.tflite",
+                    sha256 = "e3663e23b85a9412bf0b57b3855e3f9350fcd1f188ea4753685f862ae87ffcb3",
+                    purposeRes = org.eidora.R.string.model_purpose_detection,
+                    license = "InsightFace SCRFD – non-commercial research",
+                ),
+            DetectionModelSpec.YUNET.id to
+                ModelInfo(
+                    filename = DetectionModelSpec.YUNET.filename,
+                    // OpenCV YuNet TFLite, published by the convert-yunet workflow.
+                    // Source (Apache-2.0): OpenCV Zoo face_detection_yunet.
+                    url = "$RELEASE_BASE/models-free-v1/yunet_2023mar_float32.tflite",
+                    sha256 = "08df74f9881ab90c5fe53fd37dc17f29601cd8aff390ce842221443b9f444ed7",
+                    purposeRes = org.eidora.R.string.model_purpose_detection,
+                    license = "OpenCV YuNet – Apache-2.0",
+                ),
         )
+
+    fun detectionInfo(spec: DetectionModelSpec): ModelInfo =
+        DETECTION_MODELS[spec.id]
+            ?: error("No download info for detection model '${spec.id}'")
 
     /**
      * Download info per embedding model, keyed by [EmbeddingModelSpec.id].
@@ -54,11 +75,10 @@ object ModelDownloader {
             EmbeddingModelSpec.SFACE_FREE.id to
                 ModelInfo(
                     filename = EmbeddingModelSpec.SFACE_FREE.filename,
-                    // TODO: host the OpenCV SFace TFLite export on a release and
-                    // fill in url + sha256. Source (Apache-2.0):
-                    // https://huggingface.co/opencv/face_recognition_sface
+                    // OpenCV SFace TFLite, published by the convert-sface workflow.
+                    // Source (Apache-2.0): https://huggingface.co/opencv/face_recognition_sface
                     url = "$RELEASE_BASE/models-free-v1/sface_opencv_float32.tflite",
-                    sha256 = null,
+                    sha256 = "e8d3071471016d5259dafba10bce9ee17f252d8babb68e1b4219de4987b67410",
                     purposeRes = org.eidora.R.string.model_purpose_embedding,
                     license = "OpenCV SFace (MobileFaceNet) – Apache-2.0",
                 ),
@@ -69,11 +89,13 @@ object ModelDownloader {
             ?: error("No download info for embedding model '${spec.id}'")
 
     /**
-     * The models required for the pipeline given the chosen embedding model:
-     * the fixed detector plus the selected embedder.
+     * The models required for the pipeline given the chosen detection and
+     * embedding models: the selected detector plus the selected embedder.
      */
-    fun requiredModels(spec: EmbeddingModelSpec): List<ModelInfo> =
-        listOf(DETECTION, embeddingInfo(spec))
+    fun requiredModels(
+        detection: DetectionModelSpec,
+        embedding: EmbeddingModelSpec,
+    ): List<ModelInfo> = listOf(detectionInfo(detection), embeddingInfo(embedding))
 
     fun modelFile(
         context: Context,
@@ -93,8 +115,9 @@ object ModelDownloader {
      */
     fun allModelsReady(
         context: Context,
-        spec: EmbeddingModelSpec,
-    ): Boolean = requiredModels(spec).all { isDownloaded(context, it) }
+        detection: DetectionModelSpec,
+        embedding: EmbeddingModelSpec,
+    ): Boolean = requiredModels(detection, embedding).all { isDownloaded(context, it) }
 
     // ---- Availability check (HTTP HEAD) ------------------------------------
 
@@ -113,9 +136,10 @@ object ModelDownloader {
      */
     fun checkAvailability(
         context: Context,
-        spec: EmbeddingModelSpec,
+        detection: DetectionModelSpec,
+        embedding: EmbeddingModelSpec,
     ): List<ModelAvailability> =
-        requiredModels(spec)
+        requiredModels(detection, embedding)
             .filter { !isDownloaded(context, it) }
             .map { info ->
                 try {
@@ -185,10 +209,11 @@ object ModelDownloader {
      */
     fun download(
         context: Context,
-        spec: EmbeddingModelSpec,
+        detection: DetectionModelSpec,
+        embedding: EmbeddingModelSpec,
         onProgress: ((Int) -> Unit)? = null,
     ): DownloadOutcome {
-        val pending = requiredModels(spec).filter { !isDownloaded(context, it) }
+        val pending = requiredModels(detection, embedding).filter { !isDownloaded(context, it) }
         if (pending.isEmpty()) return DownloadOutcome.SUCCESS
 
         pending.forEachIndexed { index, info ->

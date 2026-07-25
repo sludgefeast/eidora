@@ -24,21 +24,28 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ```
 
-### Machine learning models — separate, more restrictive terms
+### Machine learning models — separate terms
 
 The GPL above covers **Eidora's own source code only**. The app itself ships
-**without** any ML model. The face-detection and face-recognition models
-(InsightFace SCRFD and ArcFace) are downloaded at runtime, after explicit user
+**without** any ML model; models are downloaded at runtime, after explicit user
 consent, from the project's GitHub releases.
 
-**These models are NOT under the GPL.** They originate from the
-[InsightFace](https://github.com/deepinsight/insightface) project and are
-licensed for **non-commercial research use only**. This means:
+Eidora offers a free default and an optional research-only model for each of the
+two tasks:
 
-- You may use Eidora with these models for personal, non-commercial purposes.
-- You may **not** use the models in a commercial product or service.
-- The models' license applies independently of Eidora's GPL license.
+- **Detection:** YuNet (Apache-2.0, default) or SCRFD (InsightFace, research
+  only).
+- **Embedding:** SFace (Apache-2.0, default) or ArcFace (InsightFace, research
+  only).
 
-See [`MODELS-LICENSE.md`](MODELS-LICENSE.md) for details. If you need a
-commercially usable build, you must replace the models with ones whose license
-permits your use case.
+**The default models (YuNet + SFace) are Apache-2.0** — free for any use,
+including commercial, and these are what the F-Droid build uses.
+
+**The optional InsightFace models (SCRFD, ArcFace) are non-commercial research
+use only.** They are never bundled and are downloaded only if you explicitly
+select them in Settings, where the license is shown. If you build a commercial
+product, stay on the Apache-2.0 defaults or supply your own suitably licensed
+models; do not use the InsightFace models commercially.
+
+Each model carries two licenses (code and weights); the more restrictive
+governs. See [`MODELS-LICENSE.md`](MODELS-LICENSE.md) for the full breakdown.

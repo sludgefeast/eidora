@@ -318,8 +318,18 @@ fun EidoraApp() {
                     .getEmbeddingModelId(),
             )
     }
-    var modelsReady by remember(embeddingSpec) {
-        mutableStateOf(org.eidora.ml.ModelDownloader.allModelsReady(context, embeddingSpec))
+    val detectionSpec by produceState(org.eidora.ml.DetectionModelSpec.DEFAULT) {
+        value =
+            org.eidora.ml.DetectionModelSpec.byId(
+                org.eidora.data.settings.SettingsProvider
+                    .get(context)
+                    .getDetectionModelId(),
+            )
+    }
+    var modelsReady by remember(embeddingSpec, detectionSpec) {
+        mutableStateOf(
+            org.eidora.ml.ModelDownloader.allModelsReady(context, detectionSpec, embeddingSpec),
+        )
     }
     if (!modelsReady) {
         org.eidora.ui.common.ModelDownloadScreen(onModelsReady = { modelsReady = true })

@@ -16,9 +16,10 @@ import org.eidora.data.settings.SettingsRepository
 data class SettingsUiState(
     val clusteringConfig: ClusteringConfig =
         ClusteringConfig(
-            edgeThreshold = SettingsRepository.DEFAULT_EDGE_THRESHOLD,
-            clusterMatchThreshold = SettingsRepository.DEFAULT_CLUSTER_MATCH_THRESHOLD,
-            individualMatchThreshold = SettingsRepository.DEFAULT_INDIVIDUAL_MATCH_THRESHOLD,
+            // Placeholder until the real (model-dependent) config flow emits.
+            edgeThreshold = org.eidora.ml.EmbeddingModelSpec.DEFAULT.defaultThresholds.edge,
+            clusterMatchThreshold = org.eidora.ml.EmbeddingModelSpec.DEFAULT.defaultThresholds.clusterMatch,
+            individualMatchThreshold = org.eidora.ml.EmbeddingModelSpec.DEFAULT.defaultThresholds.individualMatch,
             minClusterSize = SettingsRepository.DEFAULT_MIN_CLUSTER_SIZE,
             timeWeight = SettingsRepository.DEFAULT_TIME_WEIGHT,
         ),
@@ -35,6 +36,7 @@ data class SettingsUiState(
     val confirmOnNameSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_NAME_SUGGESTION,
     val confirmOnMergeSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_MERGE_SUGGESTION,
     val embeddingModelId: String = org.eidora.ml.EmbeddingModelSpec.DEFAULT.id,
+    val detectionModelId: String = org.eidora.ml.DetectionModelSpec.DEFAULT.id,
 )
 
 class SettingsViewModel(
@@ -89,6 +91,13 @@ class SettingsViewModel(
             }
         }
         viewModelScope.launch {
+            repo.detectionModelId.collect { id ->
+                _uiState.update {
+                    it.copy(detectionModelId = id ?: org.eidora.ml.DetectionModelSpec.DEFAULT.id)
+                }
+            }
+        }
+        viewModelScope.launch {
             repo.confirmOnAssign.collect { v -> _uiState.update { it.copy(confirmOnAssign = v) } }
         }
         viewModelScope.launch {
@@ -115,6 +124,31 @@ class SettingsViewModel(
         viewModelScope.launch { repo.setClusteringConfig(config) }
     }
 
+    /**
+     * Switches the detection model. Re-detection changes which faces/crops are
+     * found, so this re-runs the full pipeline. Unlike an embedding switch it
+     * does not clear embeddings up front — but a full re-sync will re-detect and
+     * re-embed anyway. Confirmed names survive via XMP re-import. No-op if the
+     * chosen model is already active.
+     */
+    fun switchDetectionModel(spec: org.eidora.ml.DetectionModelSpec) {
+        viewModelScope.launch {
+            val currentId = repo.getDetectionModelId() ?: org.eidora.ml.DetectionModelSpec.DEFAULT.id
+            if (currentId == spec.id) return@launch
+
+            repo.setDetectionModelId(spec.id)
+            // A different detector produces different face boxes, so existing
+            // detections/embeddings should be rebuilt. Clear and re-run.
+            try {
+                faceRepo.resetForEmbeddingModelChange()
+            } catch (t: Throwable) {
+                // best-effort; the pipeline still re-runs below
+            }
+            org.eidora.worker.SyncPipeline
+                .restartAfterFolderChange(getApplication())
+        }
+    }
+
     fun setPowerConfig(config: PowerConfig) {
         viewModelScope.launch { repo.setPowerConfig(config) }
     }
@@ -132,6 +166,19 @@ class SettingsViewModel(
             if (currentId == spec.id) return@launch // already active
 
             repo.setEmbeddingModelId(spec.id)
+
+            // Reset clustering thresholds to this model's defaults: values tuned
+            // for the previous model live in a different embedding space and
+            // would misbehave. The user can re-tune afterwards.
+            val current = repo.clusteringConfig.first()
+            repo.setClusteringConfig(
+                current.copy(
+                    edgeThreshold = spec.defaultThresholds.edge,
+                    clusterMatchThreshold = spec.defaultThresholds.clusterMatch,
+                    individualMatchThreshold = spec.defaultThresholds.individualMatch,
+                ),
+            )
+
             try {
                 faceRepo.resetForEmbeddingModelChange()
             } catch (t: Throwable) {

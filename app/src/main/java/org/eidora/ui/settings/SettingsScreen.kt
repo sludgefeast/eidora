@@ -196,13 +196,19 @@ fun SettingsScreen(
             )
 
             val cfg = state.clusteringConfig
+            // Reset-to-default on the sliders should target the active model's
+            // tuned thresholds, not fixed constants.
+            val modelThresholds =
+                org.eidora.ml.EmbeddingModelSpec
+                    .byId(state.embeddingModelId)
+                    .defaultThresholds
 
             FloatSetting(
                 label = stringResource(R.string.setting_edge_threshold),
                 description = stringResource(R.string.setting_edge_threshold_description),
                 hint = stringResource(R.string.setting_edge_threshold_hint),
                 value = cfg.edgeThreshold,
-                default = SettingsRepository.DEFAULT_EDGE_THRESHOLD,
+                default = modelThresholds.edge,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(edgeThreshold = it)) },
             )
             FloatSetting(
@@ -210,7 +216,7 @@ fun SettingsScreen(
                 description = stringResource(R.string.setting_cluster_match_threshold_description),
                 hint = stringResource(R.string.setting_cluster_match_threshold_hint),
                 value = cfg.clusterMatchThreshold,
-                default = SettingsRepository.DEFAULT_CLUSTER_MATCH_THRESHOLD,
+                default = modelThresholds.clusterMatch,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(clusterMatchThreshold = it)) },
             )
             FloatSetting(
@@ -218,7 +224,7 @@ fun SettingsScreen(
                 description = stringResource(R.string.setting_individual_match_threshold_description),
                 hint = stringResource(R.string.setting_individual_match_threshold_hint),
                 value = cfg.individualMatchThreshold,
-                default = SettingsRepository.DEFAULT_INDIVIDUAL_MATCH_THRESHOLD,
+                default = modelThresholds.individualMatch,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(individualMatchThreshold = it)) },
             )
             IntSetting(
@@ -338,6 +344,12 @@ fun SettingsScreen(
                             .fromInput(entered, tempInFahrenheit)
                     viewModel.setPowerConfig(pwr.copy(resumeBatteryTempCelsius = celsius))
                 },
+            )
+
+            SectionHeader(stringResource(R.string.settings_detection_title))
+            DetectionSetting(
+                currentId = state.detectionModelId,
+                onSelect = { spec -> viewModel.switchDetectionModel(spec) },
             )
 
             SectionHeader(stringResource(R.string.settings_model_title))
@@ -497,6 +509,44 @@ private fun IntSetting(
  * dialog first, because switching recomputes every face embedding. The choice
  * is applied only after the user confirms.
  */
+/**
+ * Shows a model's effective license clearly: the license name, and one line on
+ * why. Restricted (non-free) models are visually flagged and carry an extra
+ * note that they are not in F-Droid builds. This is the single place the app
+ * explains licensing, so the user decides with full information.
+ */
+@Composable
+private fun ModelLicenseRow(license: org.eidora.ml.ModelLicense) {
+    val accent =
+        if (license.isFree) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.error
+        }
+    Column(modifier = Modifier.padding(top = 2.dp)) {
+        Text(
+            text =
+                stringResource(R.string.model_license_label) +
+                    ": " + stringResource(license.effectiveNameRes),
+            style = MaterialTheme.typography.bodySmall,
+            color = accent,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            text = stringResource(license.reasonRes),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!license.isFree) {
+            Text(
+                text = stringResource(R.string.license_restricted_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = accent,
+            )
+        }
+    }
+}
+
 @Composable
 private fun ModelSetting(
     currentId: String,
@@ -545,6 +595,7 @@ private fun ModelSetting(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    ModelLicenseRow(spec.license)
                 }
             }
         }
@@ -562,6 +613,86 @@ private fun ModelSetting(
                     onSelect(target)
                 }) {
                     Text(stringResource(R.string.model_switch_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pending = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+/**
+ * Detection-model picker. Mirrors [ModelSetting]: selecting a different model
+ * shows a confirmation dialog, because switching re-detects all photos.
+ */
+@Composable
+private fun DetectionSetting(
+    currentId: String,
+    onSelect: (org.eidora.ml.DetectionModelSpec) -> Unit,
+) {
+    val specs = org.eidora.ml.DetectionModelSpec.ALL
+
+    fun nameFor(spec: org.eidora.ml.DetectionModelSpec): String =
+        when (spec.id) {
+            org.eidora.ml.DetectionModelSpec.SCRFD.id -> stringResource(R.string.detection_scrfd_name)
+            else -> stringResource(R.string.detection_yunet_name)
+        }
+
+    fun descFor(spec: org.eidora.ml.DetectionModelSpec): String =
+        when (spec.id) {
+            org.eidora.ml.DetectionModelSpec.SCRFD.id -> stringResource(R.string.detection_scrfd_desc)
+            else -> stringResource(R.string.detection_yunet_desc)
+        }
+
+    var pending by remember { mutableStateOf<org.eidora.ml.DetectionModelSpec?>(null) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        specs.forEach { spec ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (spec.id != currentId) pending = spec
+                        }
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(
+                    selected = spec.id == currentId,
+                    onClick = {
+                        if (spec.id != currentId) pending = spec
+                    },
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(nameFor(spec), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        descFor(spec),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    ModelLicenseRow(spec.license)
+                }
+            }
+        }
+    }
+
+    val target = pending
+    if (target != null) {
+        AlertDialog(
+            onDismissRequest = { pending = null },
+            title = { Text(stringResource(R.string.detection_switch_warning_title)) },
+            text = { Text(stringResource(R.string.detection_switch_warning_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pending = null
+                    onSelect(target)
+                }) {
+                    Text(stringResource(R.string.detection_switch_confirm))
                 }
             },
             dismissButton = {

@@ -64,12 +64,20 @@ fun ModelDownloadScreen(onModelsReady: () -> Unit) {
                     .getEmbeddingModelId(),
             )
     }
+    val detectionSpec by produceState(org.eidora.ml.DetectionModelSpec.DEFAULT) {
+        value =
+            org.eidora.ml.DetectionModelSpec.byId(
+                org.eidora.data.settings.SettingsProvider
+                    .get(context)
+                    .getDetectionModelId(),
+            )
+    }
 
-    LaunchedEffect(checkTrigger, spec) {
+    LaunchedEffect(checkTrigger, spec, detectionSpec) {
         availability = null
         availability =
             withContext(Dispatchers.IO) {
-                ModelDownloader.checkAvailability(context, spec)
+                ModelDownloader.checkAvailability(context, detectionSpec, spec)
             }
     }
 
@@ -79,7 +87,7 @@ fun ModelDownloadScreen(onModelsReady: () -> Unit) {
         while (true) {
             val ready =
                 withContext(Dispatchers.IO) {
-                    ModelDownloader.allModelsReady(context, spec)
+                    ModelDownloader.allModelsReady(context, detectionSpec, spec)
                 }
             if (ready) {
                 onModelsReady()
