@@ -1,0 +1,60 @@
+schema_version: 1
+
+container:
+  id: eidora-free
+  name: Eidora Free Models
+  description: YuNet detector + SFace embedder. Apache-2.0, free for any use.
+  free: true
+
+models:
+  - id: yunet
+    task: detection
+    file: yunet_2023mar_float32.tflite
+    name: YuNet
+    description: Locates faces and 5 landmarks. Light and fast.
+    version: "2023mar"
+    source_url: https://github.com/opencv/opencv_zoo
+    license:
+      name: Apache-2.0
+      free: true
+      reason: >-
+        Both code and weights are Apache-2.0 (OpenCV Zoo). Free for any
+        purpose, including commercial.
+      url: https://github.com/opencv/opencv_zoo/blob/main/LICENSE
+    input:
+      color: RGB
+      normalization: raw_0_255
+      resize: letterbox
+      pad_color: 0
+    output:
+      type: multistride_yunet
+      score_threshold: 0.6
+      nms_iou_threshold: 0.3
+      rotation_from_eyes: false
+      score_is_cls_times_obj: true
+
+  - id: sface_opencv
+    task: embedding
+    file: sface_opencv_float32.tflite
+    name: SFace
+    description: Compact 128-dim embedding. Pairs with YuNet.
+    version: "2021dec"
+    source_url: https://huggingface.co/opencv/face_recognition_sface
+    license:
+      name: Apache-2.0
+      free: true
+      reason: >-
+        Both code and weights are Apache-2.0 (OpenCV). Free for any purpose,
+        including commercial.
+      url: https://github.com/opencv/opencv_zoo/blob/main/LICENSE
+    input:
+      color: RGB
+      normalization: raw_0_255
+    output:
+      type: single_vector
+      distance: cosine
+      l2_normalized: false
+    clustering:
+      edge: 0.64
+      cluster_match: 0.68
+      individual_match: 0.64

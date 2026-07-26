@@ -1,0 +1,63 @@
+schema_version: 1
+
+container:
+  id: eidora-research
+  name: Eidora Research Models
+  description: >-
+    SCRFD detector + ArcFace embedder. Higher accuracy, but NON-COMMERCIAL
+    RESEARCH USE ONLY. Not distributed by Eidora — build this container yourself
+    from models you obtain and are licensed to use.
+  free: false
+
+models:
+  - id: scrfd_2.5g_kps
+    task: detection
+    file: scrfd_2.5g_kps_640_float32.tflite
+    name: SCRFD 2.5G
+    description: Higher accuracy on small/rotated faces.
+    version: "2.5g_kps"
+    source_url: https://github.com/deepinsight/insightface
+    license:
+      name: Non-commercial (research only)
+      free: false
+      reason: >-
+        Weights trained by InsightFace on a research-only dataset. The code is
+        open, but the weights restrict use.
+      url: https://github.com/deepinsight/insightface#license
+    input:
+      color: RGB
+      normalization: signed_127_128
+      resize: stretch
+      pad_color: 0
+    output:
+      type: multistride_scrfd
+      score_threshold: 0.5
+      nms_iou_threshold: 0.4
+      rotation_from_eyes: true
+      score_is_cls_times_obj: false
+
+  - id: arcface_w600k_mbf
+    task: embedding
+    file: arcface_w600k_mbf_float32.tflite
+    name: ArcFace w600k
+    description: 512-dim embedding, higher accuracy.
+    version: "w600k_mbf"
+    source_url: https://github.com/deepinsight/insightface
+    license:
+      name: Non-commercial (research only)
+      free: false
+      reason: >-
+        Weights trained by InsightFace on WebFace600K, a research-only dataset.
+        The code is open, but the weights restrict use.
+      url: https://github.com/deepinsight/insightface#license
+    input:
+      color: RGB
+      normalization: signed_127_127
+    output:
+      type: single_vector
+      distance: cosine
+      l2_normalized: false
+    clustering:
+      edge: 0.50
+      cluster_match: 0.55
+      individual_match: 0.50
