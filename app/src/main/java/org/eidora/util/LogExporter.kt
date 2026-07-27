@@ -27,13 +27,16 @@ object LogExporter {
     private val TAGS =
         listOf(
             "ClusteringWorker",
+            "ContainerDownloader",
+            "ContainerStore",
+            "ContainerValidator",
             "EmbeddingModel",
             "EmbeddingWorker",
-            "ModelDownloadWorker",
-            "ModelDownloader",
             "PhotoSyncWorker",
             "PowerGate",
             "ScrfdDetector",
+            "SelectedModelResolver",
+            "TfliteLoader",
             "YuNetDetector",
             "XmpHelper",
             "XmpWriteWorker",

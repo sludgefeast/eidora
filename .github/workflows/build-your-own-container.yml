@@ -1,0 +1,152 @@
+name: Build your own model container
+
+# Generic "bring your own model" builder. It does NOT reference or fetch any
+# specific model — you supply the models (as a JSON list) and a manifest. The
+# result is uploaded as a workflow *artifact* (downloadable only by you), never
+# published as a release.
+#
+# This exists so you can convert models whose licence doesn't allow us to host
+# them (e.g. research-only face models) without those models or their sources
+# ever appearing in this repository. What you build here, and whether its
+# licence permits your use, is your responsibility.
+#
+# You provide:
+#   - models: a JSON array, one object per model, each with:
+#       url        - URL to an .onnx file you're licensed to use
+#       input_name - ONNX input tensor name (convert_model.py --inspect shows it)
+#       size       - spatial input size, e.g. 640 (detection) or 112 (embedding)
+#       file       - output .tflite filename; MUST match the manifest's `file:`
+#   - manifest_url: URL to your manifest.yml (its `file:` entries must match the
+#       `file` fields above)
+#   - container_name: output filename (without extension)
+#
+# Example `models` value (a container with two models):
+#   [
+#     {"url":"https://.../det.onnx","input_name":"input.1","size":640,
+#      "file":"detector_float32.tflite"},
+#     {"url":"https://.../rec.onnx","input_name":"input.1","size":112,
+#      "file":"embedder_float32.tflite"}
+#   ]
+#
+# GitHub Actions can't take file uploads through workflow_dispatch, only text,
+# so ONNX files and the manifest are given as URLs. Put them somewhere the
+# runner can reach (a gist, your own storage, etc.).
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: "JSON array of models (see workflow header for the shape)"
+        required: true
+      manifest_url:
+        description: "URL to your manifest.yml"
+        required: true
+      container_name:
+        description: "Output container filename (without extension)"
+        required: true
+        default: "my-model"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout (for the conversion + packing scripts)
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.10"
+
+      - name: Install conversion + packing deps
+        run: |
+          pip install \
+            "tensorflow==2.17.0" tf_keras "onnx==1.16.1" \
+            "onnxruntime==1.18.1" "onnx2tf==1.26.3" onnx_graphsurgeon \
+            sng4onnx "onnxsim==0.4.36" psutil ml_dtypes pyyaml \
+            --extra-index-url https://pypi.ngc.nvidia.com
+
+      - name: Provide calibration data (onnx2tf download workaround)
+        run: |
+          python - <<'PY'
+          import os, site
+          import numpy as np
+          name = "calibration_image_sample_data_20x128x128x3_float32.npy"
+          data = (np.random.rand(20, 128, 128, 3) * 255).astype(np.float32)
+          for t in [name,
+                    os.path.join(site.getsitepackages()[0], "onnx2tf", name),
+                    os.path.join(site.getsitepackages()[0], "onnx2tf", "utils", name)]:
+              os.makedirs(os.path.dirname(t) or ".", exist_ok=True)
+              np.save(t, data)
+          PY
+
+      - name: Validate the models JSON
+        run: |
+          python - <<'PY'
+          import json, os, sys
+          raw = os.environ["MODELS_JSON"]
+          try:
+              models = json.loads(raw)
+          except Exception as e:
+              sys.exit(f"models is not valid JSON: {e}")
+          if not isinstance(models, list) or not models:
+              sys.exit("models must be a non-empty JSON array")
+          for i, m in enumerate(models):
+              for key in ("url", "input_name", "size", "file"):
+                  if key not in m:
+                      sys.exit(f"models[{i}] missing '{key}'")
+          print(f"{len(models)} model(s) to build")
+          PY
+        env:
+          MODELS_JSON: ${{ inputs.models }}
+
+      - name: Fetch manifest
+        run: |
+          mkdir -p byo
+          curl -fL -o byo/manifest.yml "${{ inputs.manifest_url }}"
+          echo "--- manifest ---"
+          cat byo/manifest.yml
+
+      - name: Convert each model to TFLite
+        run: |
+          python - <<'PY'
+          import json, os, subprocess, sys
+          models = json.loads(os.environ["MODELS_JSON"])
+          for i, m in enumerate(models):
+              onnx = f"model_{i}.onnx"
+              print(f"=== [{i+1}/{len(models)}] {m['file']} ===")
+              subprocess.run(["curl", "-fL", "-o", onnx, m["url"]], check=True)
+              subprocess.run(["sha256sum", onnx], check=True)
+              subprocess.run(
+                  [
+                      sys.executable, "scripts/convert_model.py",
+                      "--onnx", onnx,
+                      "--input-name", str(m["input_name"]),
+                      "--size", str(m["size"]),
+                      "--out", os.path.join("byo", m["file"]),
+                  ],
+                  check=True,
+              )
+          print("--- container folder ---")
+          for f in sorted(os.listdir("byo")):
+              print(f, os.path.getsize(os.path.join("byo", f)))
+          PY
+        env:
+          MODELS_JSON: ${{ inputs.models }}
+
+      - name: Pack container
+        run: |
+          # Class-1 check + zip. If your manifest declares a sha256 per model,
+          # the packer verifies it against the freshly converted files.
+          python scripts/pack_container.py \
+            --dir byo \
+            --out "${{ inputs.container_name }}.eidoramodel"
+          echo "--- container ---"
+          sha256sum "${{ inputs.container_name }}.eidoramodel"
+
+      - name: Upload container as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.container_name }}
+          path: ${{ inputs.container_name }}.eidoramodel
+          retention-days: 7
+          if-no-files-found: error

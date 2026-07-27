@@ -9,12 +9,10 @@ import android.util.Log
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.channels.FileChannel
 import kotlin.math.sqrt
 
 private const val TAG = "EmbeddingModel"
@@ -30,52 +28,57 @@ private const val TAG = "EmbeddingModel"
  * cosineDistance normalizes).
  * Thread-safe: the TFLite interpreter is guarded by a mutex.
  */
-class EmbeddingModel(
-    context: Context,
-    private val spec: EmbeddingModelSpec = EmbeddingModelSpec.DEFAULT,
+class EmbeddingModel private constructor(
+    private val loaded: org.eidora.ml.TfliteLoader.Loaded,
+    private val normalization: EmbeddingModelSpec.Normalization,
+    private val label: String,
 ) : Closeable {
-    private val interpreter: Interpreter
-    private val gpuDelegate: GpuDelegate?
+    private val interpreter: Interpreter = loaded.interpreter
+    private val gpuDelegate: GpuDelegate? = loaded.gpuDelegate
     private val mutex = Mutex()
 
-    private val inputSize = spec.inputSize
-    private val embeddingDim = spec.embeddingDim
+    // Input size and embedding dimension are DERIVED from the model's tensors,
+    // not restated by any spec/manifest — the tflite is the single source of
+    // truth for these shape values.
+    private val inputSize: Int = interpreter.getInputTensor(0).shape().let { s ->
+        // NHWC [1,S,S,3] or NCHW [1,3,S,S]
+        if (s.size == 4 && s[3] == 3) s[1] else if (s.size == 4) s[2] else 112
+    }
+    private val embeddingDim: Int = interpreter.getOutputTensor(0).shape().let { s ->
+        s[s.size - 1]
+    }
 
-    val backend: String
+    val backend: String = loaded.backend
 
     init {
-        // Loaded from filesDir – downloaded at runtime after user consent.
-        val modelFile = java.io.File(context.filesDir, spec.filename)
-        val buffer =
-            java.io.FileInputStream(modelFile).channel.use { channel ->
-                channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size())
-            }
-
-        val gpu = tryCreateGpu(buffer)
-        if (gpu != null) {
-            interpreter = gpu.first
-            gpuDelegate = gpu.second
-            backend = "GPU"
-        } else {
-            interpreter = Interpreter(buffer, Interpreter.Options().apply { numThreads = 4 })
-            gpuDelegate = null
-            backend = "CPU"
-        }
-        Log.i(TAG, "Embedding model '${spec.id}' initialized on $backend")
+        Log.i(TAG, "Embedding model '$label' initialized on $backend " +
+            "(input $inputSize, dim $embeddingDim)")
     }
 
-    private fun tryCreateGpu(buffer: java.nio.MappedByteBuffer): Pair<Interpreter, GpuDelegate>? {
-        return try {
-            val compat = CompatibilityList()
-            if (!compat.isDelegateSupportedOnThisDevice) return null
-            val delegate = GpuDelegate()
-            val options = Interpreter.Options().addDelegate(delegate)
-            Pair(Interpreter(buffer, options), delegate)
-        } catch (t: Throwable) {
-            Log.w(TAG, "GPU delegate init failed, falling back to CPU", t)
-            null
-        }
-    }
+    /** Legacy spec-based construction (loads from filesDir by spec filename). */
+    constructor(
+        context: Context,
+        spec: EmbeddingModelSpec = EmbeddingModelSpec.DEFAULT,
+    ) : this(
+        org.eidora.ml.TfliteLoader.createInterpreter(
+            org.eidora.ml.TfliteLoader.mapFile(java.io.File(context.filesDir, spec.filename)),
+        ),
+        spec.normalization,
+        spec.id,
+    )
+
+    /** Container-based construction from an explicit model file. */
+    constructor(
+        context: Context,
+        modelFile: java.io.File,
+        normalization: EmbeddingModelSpec.Normalization,
+    ) : this(
+        org.eidora.ml.TfliteLoader.createInterpreter(
+            org.eidora.ml.TfliteLoader.mapFile(modelFile),
+        ),
+        normalization,
+        modelFile.name,
+    )
 
     /**
      * Computes the face embedding for the given bitmap (dimension depends on
@@ -103,7 +106,7 @@ class EmbeddingModel(
             val rRaw = (px shr 16 and 0xFF)
             val gRaw = (px shr 8 and 0xFF)
             val bRaw = (px and 0xFF)
-            when (spec.normalization) {
+            when (normalization) {
                 EmbeddingModelSpec.Normalization.SIGNED_UNIT -> {
                     // (x - 127.5) / 127.5 → [-1, 1]
                     buffer.putFloat((rRaw - 127.5f) / 127.5f)

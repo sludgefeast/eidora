@@ -45,34 +45,20 @@ class EmbeddingWorker(
         val faceDao = db.faceRegionDao()
         val photoDao = db.photoDao()
 
-        val spec =
-            org.eidora.ml.EmbeddingModelSpec.byId(
-                org.eidora.data.settings.SettingsProvider
-                    .get(applicationContext)
-                    .getEmbeddingModelId(),
-            )
-
-        val detectionSpec =
-            org.eidora.ml.DetectionModelSpec.byId(
-                org.eidora.data.settings.SettingsProvider
-                    .get(applicationContext)
-                    .getDetectionModelId(),
-            )
-
-        // Models are downloaded only after explicit user consent. If they are
-        // not present yet, end quietly – the UI prompts the user to download.
-        if (!org.eidora.ml.ModelDownloader.allModelsReady(applicationContext, detectionSpec, spec)) {
-            Log.i(TAG, "ML models not downloaded yet – skipping embedding run")
+        // The free container is downloaded only after explicit user consent. If
+        // it isn't present yet, end quietly – the UI prompts for the download.
+        if (!org.eidora.ml.container.ContainerDownloader.isFreeContainerReady(applicationContext)) {
+            Log.i(TAG, "Model container not ready yet – skipping embedding run")
             return Result.success()
         }
 
-        val model =
-            try {
-                EmbeddingModel(applicationContext, spec)
-            } catch (t: Throwable) {
-                Log.e(TAG, "Failed to initialize embedding model", t)
-                return Result.failure()
-            }
+        val handle =
+            org.eidora.ml.container.SelectedModelResolver.openEmbedder(applicationContext)
+        if (handle == null) {
+            Log.e(TAG, "Failed to initialize embedding model from selected container")
+            return Result.failure()
+        }
+        val model = handle.embedder
         Log.i(TAG, "Embedding model initialized on backend: ${model.backend}")
 
         return try {

@@ -96,10 +96,17 @@ To use different models, update those entries. Models must be TensorFlow Lite
 (`.tflite`) files whose input/output tensors are compatible with the existing
 detection and embedding pipeline.
 
-The conversion from the upstream ONNX models to TFLite is reproducible via the
-GitHub Actions workflows in [`.github/workflows/`](.github/workflows/)
-(`convert-yunet.yml`, `convert-sface.yml`, and the research-only
-`convert-scrfd.yml`, `convert-arcface.yml`).
+The conversion from an upstream ONNX model to TFLite is reproducible via the
+GitHub Actions workflows in [`.github/workflows/`](.github/workflows/): the free
+models are built by `build-free-container.yml`, and any other model you're
+licensed to use can be built with the generic `build-your-own-container.yml`,
+which names no specific model and publishes nothing — you supply the model and
+get the container back as a private artifact.
+
+Research-only models (e.g. SCRFD/ArcFace from InsightFace) are deliberately NOT
+referenced or fetched by any workflow in this repository, to keep its licensing
+clean. If you obtain such a model yourself and its licence permits your use, the
+generic workflow (or the local scripts) will build a container from it.
 
 Please verify the license of any model you bundle or link, and update this file
 accordingly.

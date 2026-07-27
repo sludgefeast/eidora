@@ -27,6 +27,8 @@ private val KEY_RESUME_BATTERY_TEMP = floatPreferencesKey("resume_battery_temp_c
 private val KEY_FOLDER_WHITELIST = stringPreferencesKey("folder_whitelist")
 private val KEY_EMBEDDING_MODEL_ID = stringPreferencesKey("embedding_model_id")
 private val KEY_DETECTION_MODEL_ID = stringPreferencesKey("detection_model_id")
+private val KEY_EMBEDDING_CONTAINER_ID = stringPreferencesKey("embedding_container_id")
+private val KEY_DETECTION_CONTAINER_ID = stringPreferencesKey("detection_container_id")
 private val KEY_FOLDER_WIZARD_DONE =
     androidx.datastore.preferences.core.booleanPreferencesKey("folder_wizard_done")
 private val KEY_CONFIRM_ON_ASSIGN =
@@ -170,6 +172,47 @@ class SettingsRepository(
 
     suspend fun setEmbeddingModelId(id: String) {
         context.dataStore.edit { it[KEY_EMBEDDING_MODEL_ID] = id }
+    }
+
+    // ---- Container-aware selected models ------------------------------------
+    // Identity of a chosen model is the pair (containerId, modelId), since the
+    // same modelId can exist in different containers. These supersede the plain
+    // *_MODEL_ID keys above for the container world; the old keys are kept for
+    // compatibility with the pre-container code paths still in the tree.
+
+    /** A model selected for use, identified within its container. */
+    data class SelectedModel(val containerId: String, val modelId: String)
+
+    val selectedDetection: Flow<SelectedModel?> =
+        context.dataStore.data.map { prefs ->
+            val c = prefs[KEY_DETECTION_CONTAINER_ID]
+            val m = prefs[KEY_DETECTION_MODEL_ID]
+            if (c != null && m != null) SelectedModel(c, m) else null
+        }
+
+    val selectedEmbedding: Flow<SelectedModel?> =
+        context.dataStore.data.map { prefs ->
+            val c = prefs[KEY_EMBEDDING_CONTAINER_ID]
+            val m = prefs[KEY_EMBEDDING_MODEL_ID]
+            if (c != null && m != null) SelectedModel(c, m) else null
+        }
+
+    suspend fun getSelectedDetection(): SelectedModel? = selectedDetection.first()
+
+    suspend fun getSelectedEmbedding(): SelectedModel? = selectedEmbedding.first()
+
+    suspend fun setSelectedDetection(containerId: String, modelId: String) {
+        context.dataStore.edit {
+            it[KEY_DETECTION_CONTAINER_ID] = containerId
+            it[KEY_DETECTION_MODEL_ID] = modelId
+        }
+    }
+
+    suspend fun setSelectedEmbedding(containerId: String, modelId: String) {
+        context.dataStore.edit {
+            it[KEY_EMBEDDING_CONTAINER_ID] = containerId
+            it[KEY_EMBEDDING_MODEL_ID] = modelId
+        }
     }
 
     // ---- Detection model choice ---------------------------------------------

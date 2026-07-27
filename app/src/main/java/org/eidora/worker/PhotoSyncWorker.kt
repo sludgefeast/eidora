@@ -19,8 +19,6 @@ import org.eidora.data.db.PersonEntity
 import org.eidora.data.db.PhotoEntity
 import org.eidora.domain.model.FaceRegionCoords
 import org.eidora.ml.FaceDetector
-import org.eidora.ml.ScrfdDetector
-import org.eidora.ml.YuNetDetector
 import org.eidora.util.*
 import java.io.File
 import java.util.UUID
@@ -50,25 +48,14 @@ class PhotoSyncWorker(
 
     private suspend fun ensureDetector(): FaceDetector? {
         detector?.let { return it }
-        val spec =
-            org.eidora.ml.DetectionModelSpec.byId(
-                org.eidora.data.settings.SettingsProvider
-                    .get(applicationContext)
-                    .getDetectionModelId(),
-            )
-        return try {
-            val d: FaceDetector =
-                when (spec.id) {
-                    org.eidora.ml.DetectionModelSpec.YUNET.id -> YuNetDetector(applicationContext)
-                    else -> ScrfdDetector(applicationContext)
-                }
-            detector = d
-            Log.i(TAG, "Detector initialized: ${spec.id}")
-            d
-        } catch (t: Throwable) {
-            Log.e(TAG, "Failed to initialize detector '${spec.id}'", t)
-            null
+        val d = org.eidora.ml.container.SelectedModelResolver.openDetector(applicationContext)
+        if (d == null) {
+            Log.e(TAG, "Failed to initialize detector from selected container")
+            return null
         }
+        detector = d
+        Log.i(TAG, "Detector initialized on backend: ${d.backend}")
+        return d
     }
 
     override suspend fun doWork(): Result {

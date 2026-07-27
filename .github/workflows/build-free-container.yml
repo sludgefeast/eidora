@@ -95,10 +95,12 @@ jobs:
           echo "--- container folder ---"
           ls -la free-container/
 
-      - name: Pack and validate container
+      - name: Pack container
         run: |
-          # pack_container.py runs Class-1 + Class-2 (tensor) validation, so a
-          # mismatch between manifest and tflite fails the build here.
+          # pack_container.py does a Class-1 check (manifest well-formed, files
+          # present) and zips. Since we build against our own checked-in
+          # manifest, that's enough here; deeper model validation is the app's
+          # job at import time.
           python scripts/pack_container.py \
             --dir free-container \
             --out eidora-free.eidoramodel

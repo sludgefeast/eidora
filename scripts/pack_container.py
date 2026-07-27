@@ -3,7 +3,7 @@
 # Copyright (C) 2026 Sebastian (Eidora contributors)
 """
 Pack a set of models + a manifest into an Eidora model container
-(.eidoramodel), with the same structural checks the app applies on load.
+(.eidoramodel).
 
 An Eidora model container is just a .zip holding:
 
@@ -12,42 +12,33 @@ An Eidora model container is just a .zip holding:
     ...
 
 This script takes a manifest.yml and the .tflite files it references (already in
-one folder), validates them, and writes <name>.eidoramodel.
+one folder) and writes <name>.eidoramodel.
 
-What it checks (mirrors docs/model-validation.md, the statically checkable part):
+Scope: this is a packer, not a validator. It does a Class-1 check — that the
+manifest is well-formed and every referenced file is present — and verifies any
+`sha256` a model entry declares (refusing to pack on a mismatch, but never
+rewriting the manifest). The deeper checks live in the app at import time,
+deliberately not duplicated here (a second copy would drift):
 
-  Class 1 — manifest well-formed:
-    - valid YAML, known schema_version
-    - container.id present; each model has id/task/file/output.type/input
-    - every model.file exists in the source folder
-    - enum values are known (task, output.type, normalization, resize)
+  - Class 2 (does output.type fit the .tflite tensor structure?) — ContainerValidator
+  - per-file SHA-256 verification — ContainerStore.importContainer
+  - Class 3 (on-device self-test on real faces) — the self-test screen
 
-  Class 2 — output.type fits the .tflite structure:
-    - reads each model's tensor shapes and checks they're consistent with the
-      declared output.type (e.g. single_vector => one [1,D] output; the
-      multistride_* families => several outputs whose cell counts match a
-      stride pyramid). Only structure is checked — never a value the .tflite
-      already exposes, since the manifest no longer restates those.
-
-Class 3 (the self-test on real faces) is done in the app, not here — it needs
-the bundled sample images and a human judgement.
+If you want per-file `sha256` in the manifest (the app verifies it on import),
+add it yourself; `sha256sum <file>` gives the value.
 
 Requirements
 ------------
     pip install pyyaml
-    # optional but recommended, to enable the Class-2 tensor checks:
-    pip install "tensorflow==2.17.0"
 
 Usage
 -----
     # folder contains manifest.yml + the referenced .tflite files
     python pack_container.py --dir ./my-models --out my-models.eidoramodel
-
-    # skip the tensor checks (e.g. no tensorflow available):
-    python pack_container.py --dir ./my-models --out my-models.eidoramodel --no-tensor-check
 """
 
 import argparse
+import hashlib
 import os
 import sys
 import zipfile
@@ -57,7 +48,6 @@ KNOWN_TASKS = {"detection", "embedding"}
 KNOWN_TYPES = {"multistride_scrfd", "multistride_yunet", "single_vector"}
 KNOWN_NORM = {"raw_0_255", "signed_127_127", "signed_127_128", "zero_to_one"}
 KNOWN_RESIZE = {"letterbox", "stretch"}
-STRIDES = [8, 16, 32]
 
 
 def log(m=""):
@@ -127,66 +117,6 @@ def check_class1(m, src_dir):
     return models
 
 
-def tflite_io_shapes(path):
-    """Return (input_shapes, output_shapes) or None if tensorflow is absent."""
-    try:
-        import tensorflow as tf
-    except ImportError:
-        return None
-    interp = tf.lite.Interpreter(model_path=path)
-    interp.allocate_tensors()
-    ins = [list(d["shape"]) for d in interp.get_input_details()]
-    outs = [list(d["shape"]) for d in interp.get_output_details()]
-    return ins, outs
-
-
-def check_class2(models, src_dir):
-    """output.type must fit the model's actual output structure."""
-    any_checked = False
-    for mod in models:
-        shapes = tflite_io_shapes(os.path.join(src_dir, mod["file"]))
-        if shapes is None:
-            continue  # tensorflow unavailable; skip quietly
-        any_checked = True
-        ins, outs = shapes
-        otype = mod["output"]["type"]
-        where = f"{mod['id']} ({otype})"
-
-        if otype == "single_vector":
-            if len(outs) != 1 or len(outs[0]) != 2:
-                fail(f"{where}: expected exactly one [1,D] output, got {outs}")
-        else:  # multistride_*
-            # Expect output cell counts consistent with a 640-input stride
-            # pyramid: (640/8)^2, (640/16)^2, (640/32)^2 = 6400,1600,400
-            # times an anchor count (1 or 2). Derive the input size instead of
-            # assuming 640 where possible.
-            size = None
-            if ins and len(ins[0]) == 4:
-                # NHWC [1,S,S,3] or NCHW [1,3,S,S]
-                s = ins[0]
-                size = s[1] if s[3] == 3 else s[2]
-            if not size:
-                log(f"  note: {where}: couldn't read input size; skipping stride check")
-                continue
-            grids = {(size // st) * (size // st) for st in STRIDES}
-            cell_counts = {sh[1] for sh in outs if len(sh) >= 2}
-            # every output's cell count should be grid*anchors for some grid
-            ok = all(
-                any(cc % g == 0 and cc // g in (1, 2) for g in grids)
-                for cc in cell_counts
-            )
-            if not ok:
-                fail(
-                    f"{where}: output cell counts {sorted(cell_counts)} don't match "
-                    f"a stride pyramid for input size {size} "
-                    f"(grids {sorted(grids)}). Wrong output.type?"
-                )
-        log(f"  ok: {where} output structure matches.")
-    if not any_checked:
-        log("  (tensorflow not available — skipped Class-2 tensor checks; "
-            "install tensorflow to enable them)")
-
-
 def pack(src_dir, manifest_name, models, out_path):
     with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(os.path.join(src_dir, manifest_name), "manifest.yml")
@@ -200,32 +130,52 @@ def pack(src_dir, manifest_name, models, out_path):
         f"with {len(seen)} model file(s).")
 
 
+def check_declared_hashes(models, src_dir):
+    """Where a model declares sha256, verify it matches the file. A declared
+    hash that's wrong means the manifest and .tflite are out of sync — fail
+    rather than ship a container the app will reject on import. Models without
+    a sha256 are skipped (the field is optional)."""
+    for mod in models:
+        declared = (mod.get("sha256") or "").strip().lower()
+        if not declared:
+            continue
+        actual = hashlib.sha256(
+            open(os.path.join(src_dir, mod["file"]), "rb").read()
+        ).hexdigest()
+        if actual != declared:
+            fail(f"{mod['file']}: manifest sha256 {declared[:16]}… "
+                 f"but file is {actual[:16]}…")
+        log(f"  ok: {mod['file']} matches declared sha256")
+
+
 def main():
     ap = argparse.ArgumentParser(description="Pack an Eidora .eidoramodel container.")
     ap.add_argument("--dir", required=True, help="Folder with manifest.yml + .tflite files.")
     ap.add_argument("--manifest", default="manifest.yml", help="Manifest filename in --dir.")
     ap.add_argument("--out", required=True, help="Output container path (.eidoramodel).")
-    ap.add_argument("--no-tensor-check", action="store_true",
-                    help="Skip Class-2 tensor-structure checks.")
     args = ap.parse_args()
 
     mpath = os.path.join(args.dir, args.manifest)
     if not os.path.isfile(mpath):
         fail(f"{args.manifest} not found in {args.dir}")
 
-    log("Class 1 — manifest well-formed …")
+    # Class-1 only: manifest well-formed + every referenced file present, so we
+    # don't produce an obviously-broken container. Deeper structural checks
+    # (tensor shape vs output.type) are the app's job at import time; duplicating
+    # them here would be a second source of truth that can drift. We do verify
+    # any sha256 the author declared, so a mismatched hash is caught before the
+    # container ships (not written — only checked; the manifest is left as-is).
+    log("Checking manifest is well-formed …")
     m = load_manifest(mpath)
     models = check_class1(m, args.dir)
     log(f"  ok: container {m['container']['id']!r}, {len(models)} model(s).")
 
-    if not args.no_tensor_check:
-        log("Class 2 — output.type fits each .tflite …")
-        check_class2(models, args.dir)
+    check_declared_hashes(models, args.dir)
 
     pack(args.dir, args.manifest, models, args.out)
     log("\nDone. Load this container in Eidora via 'bring your own model'.")
-    log("Note: the app still runs its own on-device self-test (Class 3) on real "
-        "faces before using the models.")
+    log("Note: the app validates the models (tensor structure, hashes) and runs "
+        "an on-device self-test on import — this tool only packs.")
 
 
 if __name__ == "__main__":

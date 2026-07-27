@@ -9,11 +9,9 @@ import android.util.Log
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.channels.FileChannel
 import kotlin.math.max
 import kotlin.math.min
 
@@ -36,15 +34,17 @@ private const val NMS_IOU_THRESHOLD = 0.4f
  *   - bbox  [1, n, 4]  (distances left/top/right/bottom in stride units)
  *   - kps   [1, n, 10] (5 landmark offsets in stride units)
  */
-class ScrfdDetector(
-    context: Context,
+class ScrfdDetector private constructor(
+    private val loaded: TfliteLoader.Loaded,
+    private val scoreThreshold: Float,
+    private val nmsIouThreshold: Float,
 ) : FaceDetector {
 
-    private val interpreter: Interpreter
-    private val gpuDelegate: GpuDelegate?
+    private val interpreter: Interpreter = loaded.interpreter
+    private val gpuDelegate: GpuDelegate? = loaded.gpuDelegate
     private val mutex = Mutex()
 
-    override val backend: String
+    override val backend: String = loaded.backend
 
     private data class ScaleOutputs(
         val score: Int,
@@ -55,41 +55,32 @@ class ScrfdDetector(
     private val scaleOutputs: Map<Int, ScaleOutputs>
 
     init {
-        // Loaded from filesDir – downloaded at runtime after user consent
-        // (see ModelDownloader / ModelDownloadWorker).
-        val modelFile = java.io.File(context.filesDir, "scrfd_2.5g_kps_640_float32.tflite")
-        val buffer =
-            java.io.FileInputStream(modelFile).channel.use { channel ->
-                channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size())
-            }
-
-        val gpu = tryCreateGpu(buffer)
-        if (gpu != null) {
-            interpreter = gpu.first
-            gpuDelegate = gpu.second
-            backend = "GPU"
-        } else {
-            interpreter = Interpreter(buffer, Interpreter.Options().apply { numThreads = 4 })
-            gpuDelegate = null
-            backend = "CPU"
-        }
-
         scaleOutputs = resolveOutputIndices()
         Log.i(TAG, "SCRFD initialized on $backend, outputs: $scaleOutputs")
     }
 
-    private fun tryCreateGpu(buffer: java.nio.MappedByteBuffer): Pair<Interpreter, GpuDelegate>? {
-        return try {
-            val compat = CompatibilityList()
-            if (!compat.isDelegateSupportedOnThisDevice) return null
-            val delegate = GpuDelegate()
-            val options = Interpreter.Options().addDelegate(delegate)
-            Pair(Interpreter(buffer, options), delegate)
-        } catch (t: Throwable) {
-            Log.w(TAG, "GPU init failed, using CPU", t)
-            null
-        }
-    }
+    /** Legacy construction: loads SCRFD from filesDir by fixed filename. */
+    constructor(context: Context) : this(
+        TfliteLoader.createInterpreter(
+            TfliteLoader.mapFile(
+                java.io.File(context.filesDir, "scrfd_2.5g_kps_640_float32.tflite"),
+            ),
+        ),
+        SCORE_THRESHOLD,
+        NMS_IOU_THRESHOLD,
+    )
+
+    /** Container construction from an explicit model file with manifest thresholds. */
+    constructor(
+        context: Context,
+        modelFile: java.io.File,
+        scoreThreshold: Float,
+        nmsIouThreshold: Float,
+    ) : this(
+        TfliteLoader.createInterpreter(TfliteLoader.mapFile(modelFile)),
+        scoreThreshold,
+        nmsIouThreshold,
+    )
 
     private fun resolveOutputIndices(): Map<Int, ScaleOutputs> {
         val anchorCounts =
@@ -193,7 +184,7 @@ class ScrfdDetector(
         val n = cols * cols * NUM_ANCHORS_PER_CELL
         for (i in 0 until n) {
             val score = scores[i][0]
-            if (score < SCORE_THRESHOLD) continue
+            if (score < scoreThreshold) continue
 
             val cellIdx = i / NUM_ANCHORS_PER_CELL
             val row = cellIdx / cols
@@ -257,7 +248,7 @@ class ScrfdDetector(
         while (sorted.isNotEmpty()) {
             val head = sorted.removeAt(0)
             keep.add(head)
-            sorted.removeAll { iou(head, it) > NMS_IOU_THRESHOLD }
+            sorted.removeAll { iou(head, it) > nmsIouThreshold }
         }
         return keep
     }

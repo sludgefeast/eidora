@@ -306,30 +306,14 @@ fun EidoraApp() {
         else -> Unit // completed – continue
     }
 
-    // ---- Model gate: block the main UI until ML models are downloaded ----
-    val embeddingSpec by produceState(org.eidora.ml.EmbeddingModelSpec.DEFAULT) {
-        value =
-            org.eidora.ml.EmbeddingModelSpec.byId(
-                org.eidora.data.settings.SettingsProvider
-                    .get(context)
-                    .getEmbeddingModelId(),
-            )
-    }
-    val detectionSpec by produceState(org.eidora.ml.DetectionModelSpec.DEFAULT) {
-        value =
-            org.eidora.ml.DetectionModelSpec.byId(
-                org.eidora.data.settings.SettingsProvider
-                    .get(context)
-                    .getDetectionModelId(),
-            )
-    }
-    var modelsReady by remember(embeddingSpec, detectionSpec) {
+    // ---- Model gate: block the main UI until the free model container is present ----
+    var modelsReady by remember {
         mutableStateOf(
-            org.eidora.ml.ModelDownloader.allModelsReady(context, detectionSpec, embeddingSpec),
+            org.eidora.ml.container.ContainerDownloader.isFreeContainerReady(context),
         )
     }
     if (!modelsReady) {
-        org.eidora.ui.common.ModelDownloadScreen(onModelsReady = { modelsReady = true })
+        org.eidora.ui.common.ContainerDownloadScreen(onReady = { modelsReady = true })
         return
     }
 
@@ -634,6 +618,28 @@ fun EidoraApp() {
                 val vm: org.eidora.ui.settings.SettingsViewModel = viewModel()
                 org.eidora.ui.settings.SettingsScreen(
                     viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onOpenModels = { navController.navigate("models") },
+                )
+            }
+            composable("models") {
+                val vm: org.eidora.ui.settings.SettingsViewModel = viewModel()
+                org.eidora.ui.settings.ModelsScreen(
+                    onBack = { navController.popBackStack() },
+                    onTestModel = { containerId, modelId ->
+                        navController.navigate("selftest/$containerId/$modelId")
+                    },
+                    onActivateModel = { containerId, modelId ->
+                        // The screen already knows the task; the VM picks the
+                        // right reset path by reading the model's task itself.
+                        vm.selectModel(containerId, modelId)
+                    },
+                )
+            }
+            composable("selftest/{containerId}/{modelId}") { entry ->
+                org.eidora.ui.settings.SelfTestScreen(
+                    containerId = entry.arguments?.getString("containerId").orEmpty(),
+                    modelId = entry.arguments?.getString("modelId").orEmpty(),
                     onBack = { navController.popBackStack() },
                 )
             }

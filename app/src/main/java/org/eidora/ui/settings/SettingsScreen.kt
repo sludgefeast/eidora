@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
@@ -28,6 +29,7 @@ import org.eidora.data.settings.SettingsRepository
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
+    onOpenModels: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
     Scaffold(
@@ -52,6 +54,14 @@ fun SettingsScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp),
         ) {
+            Spacer(Modifier.height(8.dp))
+
+            // Navigable entry: Models management screen
+            NavigationEntry(
+                title = stringResource(R.string.models_settings_entry),
+                description = stringResource(R.string.models_settings_entry_desc),
+                onClick = onOpenModels,
+            )
             Spacer(Modifier.height(8.dp))
 
             // Section: folder filter (top)
@@ -356,6 +366,40 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(32.dp))
         }
+    }
+}
+
+@Composable
+private fun NavigationEntry(
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

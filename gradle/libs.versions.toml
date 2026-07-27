@@ -20,6 +20,7 @@ junit-jupiter = "5.11.4"
 aboutlibraries = "11.2.3"
 
 appcompat = "1.7.0"
+snakeyaml = "2.6"
 
 [libraries]
 # AppCompat
@@ -54,6 +55,7 @@ tensorflow-lite-gpu = { group = "org.tensorflow", name = "tensorflow-lite-gpu", 
 # ExifInterface + XMP
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 ashampoo-xmp = { group = "com.ashampoo", name = "xmpcore-jvm", version.ref = "ashampoo-xmp" }
+snakeyaml = { group = "org.yaml", name = "snakeyaml", version.ref = "snakeyaml" }
 
 # Coil
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }

@@ -17,8 +17,8 @@ object SyncPipeline {
     const val PERIODIC_SYNC_NAME = "eidora-periodic-sync"
 
     // -----------------------------------------------------------------------
-    // Sync (Photo → Embedding). Model download is NOT part of the chain –
-    // it runs only after explicit user consent via enqueueModelDownload().
+    // Sync (Photo → Embedding). The model container is downloaded separately on
+    // first run (see ContainerDownloader), not as part of this chain.
     // -----------------------------------------------------------------------
 
     fun enqueue(context: Context) {
@@ -112,16 +112,6 @@ object SyncPipeline {
         // REPLACE (via enqueueForce) supersedes whatever is left of the old
         // chain, and a force run rescans every photo in the new folder set.
         enqueueForce(context)
-    }
-
-    fun enqueueModelDownload(context: Context) {
-        WorkManager
-            .getInstance(context)
-            .enqueueUniqueWork(
-                "eidora-model-download",
-                ExistingWorkPolicy.KEEP,
-                ModelDownloadWorker.buildRequest(),
-            )
     }
 
     // -----------------------------------------------------------------------

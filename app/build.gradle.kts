@@ -116,6 +116,7 @@ dependencies {
 
     // Ashampoo XMP (Kotlin-native XMP Core port)
     implementation(libs.ashampoo.xmp)
+    implementation(libs.snakeyaml)
 
     // Coil for image loading
     implementation(libs.coil.compose)

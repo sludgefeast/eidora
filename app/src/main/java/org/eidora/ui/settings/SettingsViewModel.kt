@@ -6,8 +6,10 @@ package org.eidora.ui.settings
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.eidora.data.settings.ClusteringConfig
 import org.eidora.data.settings.PowerConfig
 import org.eidora.data.settings.SettingsProvider
@@ -165,6 +167,92 @@ class SettingsViewModel(
 
     fun setPowerConfig(config: PowerConfig) {
         viewModelScope.launch { repo.setPowerConfig(config) }
+    }
+
+    /**
+     * Activates a model by (containerId, modelId), dispatching to the detection
+     * or embedding path based on the model's task read from its manifest.
+     */
+    fun selectModel(containerId: String, modelId: String) {
+        viewModelScope.launch {
+            val task =
+                withContext(Dispatchers.IO) {
+                    org.eidora.ml.container.ContainerStore
+                        .listContainers(getApplication())
+                        .firstOrNull { it.id == containerId }
+                        ?.manifest?.models?.firstOrNull { it.id == modelId }
+                        ?.task
+                } ?: return@launch
+            if (task == org.eidora.ml.container.ContainerManifest.TASK_DETECTION) {
+                selectDetectionModel(containerId, modelId)
+            } else {
+                selectEmbeddingModel(containerId, modelId)
+            }
+        }
+    }
+
+    /**
+     * Selects a detection model from a container as the active detector. A
+     * detector change re-scans everything (new boxes → new crops → new
+     * embeddings), so it clears derived data and restarts sync. No-op if it's
+     * already the active selection.
+     */
+    fun selectDetectionModel(containerId: String, modelId: String) {
+        viewModelScope.launch {
+            val current = repo.getSelectedDetection()
+            if (current?.containerId == containerId && current.modelId == modelId) return@launch
+            repo.setSelectedDetection(containerId, modelId)
+            try {
+                faceRepo.resetForEmbeddingModelChange()
+            } catch (t: Throwable) {
+                // best-effort; the pipeline still re-runs below
+            }
+            org.eidora.worker.SyncPipeline.restartAfterFolderChange(getApplication())
+        }
+    }
+
+    /**
+     * Selects an embedding model from a container as the active embedder.
+     * Embeddings from different models aren't comparable, so this clears all
+     * embeddings and clustered persons, resets the clustering thresholds to the
+     * model's manifest values, and restarts the pipeline. Confirmed names
+     * survive (they re-import from XMP). No-op if already active.
+     */
+    fun selectEmbeddingModel(containerId: String, modelId: String) {
+        viewModelScope.launch {
+            val current = repo.getSelectedEmbedding()
+            if (current?.containerId == containerId && current.modelId == modelId) return@launch
+            repo.setSelectedEmbedding(containerId, modelId)
+
+            // Reset clustering thresholds to the manifest's values for this
+            // model, if it declares them — thresholds tuned for the previous
+            // model live in a different embedding space.
+            val clustering =
+                withContext(Dispatchers.IO) {
+                    org.eidora.ml.container.ContainerStore
+                        .listContainers(getApplication())
+                        .firstOrNull { it.id == containerId }
+                        ?.manifest?.models?.firstOrNull { it.id == modelId }
+                        ?.clustering
+                }
+            if (clustering != null) {
+                val cfg = repo.clusteringConfig.first()
+                repo.setClusteringConfig(
+                    cfg.copy(
+                        edgeThreshold = clustering.edge,
+                        clusterMatchThreshold = clustering.clusterMatch,
+                        individualMatchThreshold = clustering.individualMatch,
+                    ),
+                )
+            }
+
+            try {
+                faceRepo.resetForEmbeddingModelChange()
+            } catch (t: Throwable) {
+                // best-effort; the pipeline still re-runs below
+            }
+            org.eidora.worker.SyncPipeline.restartAfterFolderChange(getApplication())
+        }
     }
 
     /**

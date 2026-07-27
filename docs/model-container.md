@@ -73,6 +73,7 @@ models:
   - id: <stable id, settings key>
     task: <detection|embedding>
     file: <the .tflite filename in this container>
+    sha256: <optional hex SHA-256 of the .tflite>
     name: <display name>
     description: <one line>          # optional
     version: <string>               # optional
@@ -111,6 +112,12 @@ models:
 ```
 
 Notes:
+- `model.sha256` is optional. When present, it's the hex SHA-256 of that model's
+  `.tflite`. On **import** of a user-supplied container Eidora verifies each
+  declared hash and rejects a mismatch (the source isn't trusted). On the
+  **repo download** the whole-container hash already covers integrity, so
+  per-file hashes aren't required there. Add it with `sha256sum <file>` if you
+  want import-time verification for a container you distribute.
 - `container.id` is a stable unique id for the whole set, used together with
   each model's `id` when checking for collisions on load (see Validation).
 - `output.type` names the decoder family — it is the authoritative field. (An
@@ -140,3 +147,25 @@ to decide (replace the existing model, or keep both / cancel). Different
 containers with different ids never collide; re-loading the same container id is
 what triggers the prompt.
 
+## Building a container
+
+Two ways, both using `scripts/convert_model.py` (ONNX → TFLite) and
+`scripts/pack_container.py` (manifest + TFLite → `.eidoramodel`):
+
+**Locally.** Convert your ONNX, write a `manifest.yml`, pack. See
+`scripts/README.md`. This is the simplest path and keeps everything on your
+machine.
+
+**Via GitHub Actions** — the `Build your own model container` workflow. It's a
+generic builder: you give it a JSON list of models (each with an ONNX URL, input
+name, size, and output filename) and a manifest URL; it converts every model,
+packs them into one container, and uploads the result as a workflow *artifact*
+(downloadable only by you, never a public release). It handles any number of
+models, so a multi-model container (e.g. a detector + an embedder) builds in one
+run. The workflow names no specific model and fetches nothing on its own — you
+supply everything, including models you're licensed to use. This is how you'd
+build a container for models whose licence doesn't permit Eidora to host them,
+without those models or their sources ever entering this repository.
+
+Note: `workflow_dispatch` only accepts text, so ONNX files and the manifest are
+given as URLs; put them somewhere the runner can reach.

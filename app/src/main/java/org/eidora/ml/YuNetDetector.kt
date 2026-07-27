@@ -9,11 +9,9 @@ import android.util.Log
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.channels.FileChannel
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
@@ -38,14 +36,16 @@ private const val NMS_IOU_THRESHOLD = 0.3f
  * Output is letterbox-corrected back to source-image pixel coordinates so the
  * result is interchangeable with SCRFD's.
  */
-class YuNetDetector(
-    context: Context,
+class YuNetDetector private constructor(
+    private val loaded: TfliteLoader.Loaded,
+    private val scoreThreshold: Float,
+    private val nmsIouThreshold: Float,
 ) : FaceDetector {
-    private val interpreter: Interpreter
-    private val gpuDelegate: GpuDelegate?
+    private val interpreter: Interpreter = loaded.interpreter
+    private val gpuDelegate: GpuDelegate? = loaded.gpuDelegate
     private val mutex = Mutex()
 
-    override val backend: String
+    override val backend: String = loaded.backend
 
     // Output tensor indices grouped by stride, resolved from tensor shapes so
     // the code is robust to onnx2tf's output ordering.
@@ -59,39 +59,30 @@ class YuNetDetector(
     private val strideOutputs: Map<Int, StrideOutputs>
 
     init {
-        val modelFile = java.io.File(context.filesDir, DetectionModelSpec.YUNET.filename)
-        val buffer =
-            java.io.FileInputStream(modelFile).channel.use { channel ->
-                channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size())
-            }
-
-        val gpu = tryCreateGpu(buffer)
-        if (gpu != null) {
-            interpreter = gpu.first
-            gpuDelegate = gpu.second
-            backend = "GPU"
-        } else {
-            interpreter = Interpreter(buffer, Interpreter.Options().apply { numThreads = 4 })
-            gpuDelegate = null
-            backend = "CPU"
-        }
-
         strideOutputs = resolveOutputIndices()
         Log.i(TAG, "YuNet initialized on $backend, outputs: $strideOutputs")
     }
 
-    private fun tryCreateGpu(buffer: java.nio.MappedByteBuffer): Pair<Interpreter, GpuDelegate>? {
-        return try {
-            val compat = CompatibilityList()
-            if (!compat.isDelegateSupportedOnThisDevice) return null
-            val delegate = GpuDelegate()
-            val options = Interpreter.Options().addDelegate(delegate)
-            Pair(Interpreter(buffer, options), delegate)
-        } catch (t: Throwable) {
-            Log.w(TAG, "GPU init failed, using CPU", t)
-            null
-        }
-    }
+    /** Legacy construction: loads the free YuNet from filesDir by spec filename. */
+    constructor(context: Context) : this(
+        TfliteLoader.createInterpreter(
+            TfliteLoader.mapFile(java.io.File(context.filesDir, DetectionModelSpec.YUNET.filename)),
+        ),
+        SCORE_THRESHOLD,
+        NMS_IOU_THRESHOLD,
+    )
+
+    /** Container construction from an explicit model file with manifest thresholds. */
+    constructor(
+        context: Context,
+        modelFile: java.io.File,
+        scoreThreshold: Float,
+        nmsIouThreshold: Float,
+    ) : this(
+        TfliteLoader.createInterpreter(TfliteLoader.mapFile(modelFile)),
+        scoreThreshold,
+        nmsIouThreshold,
+    )
 
     /**
      * Maps each stride to its four output tensor indices by matching the number
@@ -281,7 +272,7 @@ class YuNetDetector(
                 val clsScore = floatAt(clsBuf, cell, 0, 1)
                 val objScore = floatAt(objBuf, cell, 0, 1)
                 val score = kotlin.math.sqrt(max(0f, clsScore) * max(0f, objScore))
-                if (score < SCORE_THRESHOLD) continue
+                if (score < scoreThreshold) continue
 
                 // Decode bbox: offsets relative to the cell, times stride.
                 val bx = floatAt(bboxBuf, cell, 0, 4)
@@ -332,7 +323,7 @@ class YuNetDetector(
             keep.add(a)
             for (j in i + 1 until sorted.size) {
                 if (removed[j]) continue
-                if (iou(a, sorted[j]) > NMS_IOU_THRESHOLD) removed[j] = true
+                if (iou(a, sorted[j]) > nmsIouThreshold) removed[j] = true
             }
         }
         return keep

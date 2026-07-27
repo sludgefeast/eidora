@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import androidx.exifinterface.media.ExifInterface
 import java.io.File
+import java.io.InputStream
 
 object BitmapLoader {
     /**
@@ -48,6 +49,69 @@ object BitmapLoader {
                 ExifInterface.ORIENTATION_NORMAL,
             ) ?: ExifInterface.ORIENTATION_NORMAL
 
+        val matrix = orientationMatrix(orientation)
+
+        // Final downscale to maxSize if still too big
+        val scale = maxSize.toFloat() / maxOf(decoded.width, decoded.height)
+        if (scale < 1f) matrix.postScale(scale, scale)
+
+        val rotated =
+            if (matrix.isIdentity) {
+                decoded
+            } else {
+                Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+            }
+        if (rotated !== decoded) decoded.recycle()
+        return rotated
+    }
+
+    /**
+     * Loads a bitmap from an [InputStream] (e.g. a bundled asset), applying EXIF
+     * orientation. The stream is read twice — once for pixels, once for EXIF —
+     * so the caller must supply a factory that opens a fresh stream each time.
+     * Returns null if decoding fails.
+     */
+    fun loadOrientedBitmap(
+        openStream: () -> InputStream?,
+        maxSize: Int = 1024,
+    ): Bitmap? {
+        val decoded =
+            (openStream() ?: return null).use { input ->
+                BitmapFactory.decodeStream(
+                    input,
+                    null,
+                    BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 },
+                )
+            } ?: return null
+
+        val orientation =
+            try {
+                (openStream())?.use { input ->
+                    ExifInterface(input).getAttributeInt(
+                        ExifInterface.TAG_ORIENTATION,
+                        ExifInterface.ORIENTATION_NORMAL,
+                    )
+                } ?: ExifInterface.ORIENTATION_NORMAL
+            } catch (t: Throwable) {
+                ExifInterface.ORIENTATION_NORMAL
+            }
+
+        val matrix = orientationMatrix(orientation)
+        val scale = maxSize.toFloat() / maxOf(decoded.width, decoded.height)
+        if (scale < 1f) matrix.postScale(scale, scale)
+
+        val rotated =
+            if (matrix.isIdentity) {
+                decoded
+            } else {
+                Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+            }
+        if (rotated !== decoded) decoded.recycle()
+        return rotated
+    }
+
+    /** Builds the transform matrix for an EXIF orientation value. */
+    private fun orientationMatrix(orientation: Int): Matrix {
         val matrix = Matrix()
         when (orientation) {
             ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
@@ -64,18 +128,6 @@ object BitmapLoader {
                 matrix.postScale(-1f, 1f)
             }
         }
-
-        // Final downscale to maxSize if still too big
-        val scale = maxSize.toFloat() / maxOf(decoded.width, decoded.height)
-        if (scale < 1f) matrix.postScale(scale, scale)
-
-        val rotated =
-            if (matrix.isIdentity) {
-                decoded
-            } else {
-                Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
-            }
-        if (rotated !== decoded) decoded.recycle()
-        return rotated
+        return matrix
     }
 }
