@@ -35,6 +35,10 @@ models:
       nms_iou_threshold: 0.4
       rotation_from_eyes: true
       score_is_cls_times_obj: false
+    build:
+      onnx_url: https://github.com/yakhyo/face-reidentification/releases/latest/download/det_2.5g.onnx
+      input_name: input.1
+      size: 640
 
   - id: arcface_w600k_mbf
     task: embedding
@@ -61,3 +65,7 @@ models:
       edge: 0.50
       cluster_match: 0.55
       individual_match: 0.50
+    build:
+      onnx_url: https://github.com/yakhyo/face-reidentification/releases/latest/download/w600k_mbf.onnx
+      input_name: input.1
+      size: 112

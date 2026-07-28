@@ -75,6 +75,10 @@ models:
     file: <the .tflite filename in this container>
     sha256: <optional hex SHA-256 of the .tflite>
     name: <display name>
+    build: <optional build-time metadata; ignored by the app>
+      onnx_url: <URL to the ONNX source>
+      input_name: <ONNX input tensor name, or `auto`>
+      size: <spatial input size>
     description: <one line>          # optional
     version: <string>               # optional
     source_url: <string>            # optional
@@ -149,23 +153,49 @@ what triggers the prompt.
 
 ## Building a container
 
-Two ways, both using `scripts/convert_model.py` (ONNX → TFLite) and
-`scripts/pack_container.py` (manifest + TFLite → `.eidoramodel`):
+Both the free container and any "bring your own" container are built the same
+way: from a manifest whose models carry a `build:` block, through one shared
+script.
 
-**Locally.** Convert your ONNX, write a `manifest.yml`, pack. See
-`scripts/README.md`. This is the simplest path and keeps everything on your
-machine.
+The `build:` block per model (optional — only needed to build that model from
+source; a container of ready-made `.tflite` files doesn't need it):
 
-**Via GitHub Actions** — the `Build your own model container` workflow. It's a
-generic builder: you give it a JSON list of models (each with an ONNX URL, input
-name, size, and output filename) and a manifest URL; it converts every model,
-packs them into one container, and uploads the result as a workflow *artifact*
-(downloadable only by you, never a public release). It handles any number of
-models, so a multi-model container (e.g. a detector + an embedder) builds in one
-run. The workflow names no specific model and fetches nothing on its own — you
-supply everything, including models you're licensed to use. This is how you'd
-build a container for models whose licence doesn't permit Eidora to host them,
-without those models or their sources ever entering this repository.
+```yaml
+    build:
+      onnx_url: <URL to the ONNX>
+      input_name: <ONNX input tensor name, or `auto` to read it from the ONNX>
+      size: <spatial input size, e.g. 640 or 112>
+```
 
-Note: `workflow_dispatch` only accepts text, so ONNX files and the manifest are
-given as URLs; put them somewhere the runner can reach.
+`build:` is build-time only — the app ignores it. It keeps each model's
+provenance (where it came from, how it was converted) next to its description,
+and lets a workflow build straight from the manifest.
+
+**Locally:**
+
+```sh
+python scripts/build_container.py \
+  --manifest docs/containers/free-models/manifest.yml \
+  --out eidora-free.eidoramodel
+```
+
+`build_container.py` reads the manifest, downloads and converts each model with
+`scripts/convert_model.py` (one shared onnx2tf invocation), and packs everything
+with `scripts/pack_container.py`.
+
+**Via GitHub Actions** — two workflows, same core:
+
+- `Build free model container` builds the checked-in free manifest and
+  publishes a release.
+- `Build your own model container` takes a manifest URL you provide, builds it,
+  and uploads the result as a private artifact (never a release). This is how
+  you build a container for models whose licence doesn't permit Eidora to host
+  them — the ONNX URLs live in your manifest's `build:` blocks, and neither the
+  models nor their sources enter this repository.
+
+Both call `scripts/build_container.py`, so the conversion is identical; they
+differ only in where the manifest comes from and whether the output is a release
+or an artifact.
+
+Note: `workflow_dispatch` only accepts text, so the generic workflow takes the
+manifest as a URL; put it somewhere the runner can reach.

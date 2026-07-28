@@ -1,14 +1,20 @@
 name: Build free model container
 
-# Converts the two free models (YuNet detector + SFace embedder, both
-# Apache-2.0 from the OpenCV Zoo) to TFLite, packs them together with the
-# checked-in manifest into a single Eidora container (eidora-free.eidoramodel),
-# and publishes it as a GitHub release. The container's SHA-256 is printed and
-# attached — put it into the app's ContainerDownloader as the expected hash.
+# Builds the free container (YuNet detector + SFace embedder, both Apache-2.0
+# from the OpenCV Zoo) and publishes it as a GitHub release. The models and
+# their build parameters (ONNX URL, input name, size) live in the checked-in
+# manifest's `build:` blocks; this workflow just points the shared build script
+# at that manifest.
+#
+# Same conversion core as the "bring your own model" workflow: both call
+# scripts/build_container.py (→ convert_model.py → pack_container.py). The only
+# difference is that this one builds the checked-in free manifest and publishes
+# a release, whereas the generic one takes a user manifest and uploads an
+# artifact.
 #
 # Only free, redistributable models are built here. SCRFD/ArcFace are NOT
 # packaged or hosted (non-commercial research licence); users build those
-# themselves with scripts/convert_model.py + scripts/pack_container.py.
+# themselves via the generic workflow or the scripts.
 on:
   workflow_dispatch:
 
@@ -18,7 +24,7 @@ jobs:
     permissions:
       contents: write  # needed to create the release
     steps:
-      - name: Checkout (for manifest + pack script)
+      - name: Checkout (for manifest + build scripts)
         uses: actions/checkout@v4
 
       - name: Install Python
@@ -26,7 +32,7 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install onnx2tf, packing deps
+      - name: Install conversion + packing deps
         run: |
           pip install \
             "tensorflow==2.17.0" tf_keras "onnx==1.16.1" \
@@ -49,60 +55,10 @@ jobs:
           print("calibration data written")
           PY
 
-      # --- YuNet (detector) ---
-      - name: Download YuNet ONNX (OpenCV Zoo, Apache-2.0)
+      - name: Build container
         run: |
-          curl -L -o yunet.onnx \
-            https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
-          sha256sum yunet.onnx
-
-      - name: Convert YuNet to TFLite (640x640)
-        run: |
-          onnx2tf -i yunet.onnx -ois input:1,3,640,640 -o yunet_saved_model
-          cp yunet_saved_model/*_float32.tflite yunet_2023mar_float32.tflite
-          sha256sum yunet_2023mar_float32.tflite
-
-      # --- SFace (embedder) ---
-      - name: Download SFace ONNX (OpenCV / HuggingFace, Apache-2.0)
-        run: |
-          curl -L -o sface.onnx \
-            https://huggingface.co/opencv/face_recognition_sface/resolve/main/face_recognition_sface_2021dec.onnx
-          sha256sum sface.onnx
-
-      - name: Resolve SFace input name
-        run: |
-          python - <<'PY'
-          import onnx
-          g = onnx.load("sface.onnx").graph
-          open("sface_input.txt", "w").write(g.input[0].name)
-          print("SFace input name:", g.input[0].name)
-          PY
-
-      - name: Convert SFace to TFLite (112x112)
-        run: |
-          NAME=$(cat sface_input.txt)
-          onnx2tf -i sface.onnx -ois "${NAME}:1,3,112,112" -o sface_saved_model
-          cp sface_saved_model/*_float32.tflite sface_opencv_float32.tflite
-          sha256sum sface_opencv_float32.tflite
-
-      # --- Pack the container ---
-      - name: Assemble container folder
-        run: |
-          mkdir -p free-container
-          cp docs/containers/free-models/manifest.yml free-container/
-          cp yunet_2023mar_float32.tflite free-container/
-          cp sface_opencv_float32.tflite free-container/
-          echo "--- container folder ---"
-          ls -la free-container/
-
-      - name: Pack container
-        run: |
-          # pack_container.py does a Class-1 check (manifest well-formed, files
-          # present) and zips. Since we build against our own checked-in
-          # manifest, that's enough here; deeper model validation is the app's
-          # job at import time.
-          python scripts/pack_container.py \
-            --dir free-container \
+          python scripts/build_container.py \
+            --manifest docs/containers/free-models/manifest.yml \
             --out eidora-free.eidoramodel
           echo "--- container SHA-256 (put this into ContainerDownloader) ---"
           sha256sum eidora-free.eidoramodel | tee container-sha256.txt
@@ -115,8 +71,8 @@ jobs:
           name: "Free model container (YuNet + SFace)"
           body: |
             Eidora free model container: YuNet detector + SFace embedder,
-            both Apache-2.0 (OpenCV Zoo). Built by onnx2tf, packed and validated
-            by scripts/pack_container.py.
+            both Apache-2.0 (OpenCV Zoo). Built by scripts/build_container.py
+            (onnx2tf + pack_container.py).
 
             Put the SHA-256 below into the app's ContainerDownloader as the
             expected hash for the free container.
