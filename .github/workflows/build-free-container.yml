@@ -25,7 +25,7 @@ jobs:
       contents: write  # needed to create the release
     steps:
       - name: Checkout (for manifest + build scripts)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Python
         uses: actions/setup-python@v7
