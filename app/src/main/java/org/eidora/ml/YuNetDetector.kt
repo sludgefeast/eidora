@@ -196,21 +196,19 @@ class YuNetDetector private constructor(
     }
 
     private fun bitmapToBuffer(bitmap: Bitmap): ByteBuffer {
-        // NCHW float32, RGB, raw pixels [0,255] (YuNet preprocessing).
+        // NHWC float32, RGB, raw pixels [0,255]. The converted TFLite input
+        // tensor is [1,640,640,3] (channel-LAST), so pixels are interleaved
+        // R,G,B per pixel — NOT channel-first. (The upstream ONNX was NCHW;
+        // onnx2tf transposes to NHWC, and the preprocessing must match the
+        // tflite, or the model receives scrambled data and emits noise.)
         val buffer =
             ByteBuffer.allocateDirect(3 * INPUT_SIZE * INPUT_SIZE * 4).order(ByteOrder.nativeOrder())
         val pixels = IntArray(INPUT_SIZE * INPUT_SIZE)
         bitmap.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
-        // Channel-first: all R, then all G, then all B.
-        for (c in 0 until 3) {
-            val shift = when (c) {
-                0 -> 16 // R
-                1 -> 8 // G
-                else -> 0 // B
-            }
-            for (px in pixels) {
-                buffer.putFloat(((px shr shift) and 0xFF).toFloat())
-            }
+        for (px in pixels) {
+            buffer.putFloat(((px shr 16) and 0xFF).toFloat()) // R
+            buffer.putFloat(((px shr 8) and 0xFF).toFloat()) // G
+            buffer.putFloat((px and 0xFF).toFloat()) // B
         }
         buffer.rewind()
         return buffer
