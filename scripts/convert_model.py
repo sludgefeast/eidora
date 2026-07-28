@@ -137,6 +137,13 @@ def convert(onnx_path, input_name, size, out_path):
     provide_calibration_data()
 
     saved_dir = "eidora_convert_saved_model"
+    # Remove any output from a previous conversion — onnx2tf writes into this
+    # dir, and a leftover *_float32.tflite from an earlier model would make the
+    # "pick the float32 file" step below grab the wrong (stale) model. This is
+    # what caused two-model builds to end up with the first model duplicated.
+    import shutil
+    shutil.rmtree(saved_dir, ignore_errors=True)
+
     ois = f"{input_name}:1,3,{size},{size}"
     cmd = ["onnx2tf", "-i", onnx_path, "-ois", ois, "-o", saved_dir]
     log(f"Running: {' '.join(cmd)}")
@@ -156,11 +163,9 @@ def convert(onnx_path, input_name, size, out_path):
     ]
     if not candidates:
         die(f"No *_float32.tflite produced in {saved_dir}/. Check the onnx2tf output above.")
-    produced = os.path.join(saved_dir, candidates[0])
+    produced = os.path.join(saved_dir, sorted(candidates)[0])
 
     # Copy to the requested output name.
-    import shutil
-
     shutil.copyfile(produced, out_path)
 
     sha = hashlib.sha256(open(out_path, "rb").read()).hexdigest()
