@@ -534,19 +534,24 @@ fun EidoraApp() {
             }
         },
         bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = currentRoute == "persons",
-                    onClick = { navController.navigate("persons") { launchSingleTop = true } },
-                    icon = { Icon(Icons.Default.People, null) },
-                    label = { Text(stringResource(R.string.nav_persons)) },
-                )
-                NavigationBarItem(
-                    selected = currentRoute == "photos",
-                    onClick = { navController.navigate("photos") { launchSingleTop = true } },
-                    icon = { Icon(Icons.Default.Photo, null) },
-                    label = { Text(stringResource(R.string.nav_photos)) },
-                )
+            // Only the two top-level destinations get the navigation bar; sub
+            // screens (settings, about, models, selftest, person detail) are
+            // full-height with their own back navigation.
+            if (currentRoute == "persons" || currentRoute == "photos") {
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = currentRoute == "persons",
+                        onClick = { navController.navigate("persons") { launchSingleTop = true } },
+                        icon = { Icon(Icons.Default.People, null) },
+                        label = { Text(stringResource(R.string.nav_persons)) },
+                    )
+                    NavigationBarItem(
+                        selected = currentRoute == "photos",
+                        onClick = { navController.navigate("photos") { launchSingleTop = true } },
+                        icon = { Icon(Icons.Default.Photo, null) },
+                        label = { Text(stringResource(R.string.nav_photos)) },
+                    )
+                }
             }
         },
     ) { padding ->
