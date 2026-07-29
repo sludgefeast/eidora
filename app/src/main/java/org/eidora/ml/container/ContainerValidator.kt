@@ -98,7 +98,16 @@ object ContainerValidator {
             return Result.Failed("$id: could not read a valid input size")
         }
         val grids = STRIDES.map { (size / it) * (size / it) }.toSet()
-        val cellCounts = outShapes.filter { it.size >= 2 }.map { it[1] }.toSet()
+        // The cell-count dimension is the large one. YuNet outputs are 3-D
+        // [1, cells, channels] (cells in dim 1); SCRFD outputs are 2-D
+        // [cells, channels] (cells in dim 0). Reading a fixed index breaks one
+        // of them, so take the max dimension of each output as its cell count —
+        // channels (1/4/10) are always far smaller than cells (hundreds+).
+        val cellCounts =
+            outShapes
+                .filter { it.isNotEmpty() }
+                .map { shape -> shape.maxOrNull() ?: 0 }
+                .toSet()
         val allFit =
             cellCounts.all { cc ->
                 grids.any { g -> g != 0 && cc % g == 0 && (cc / g == 1 || cc / g == 2) }
