@@ -38,7 +38,7 @@ object ContainerDownloader {
         "https://github.com/sludgefeast/eidora/releases/download/" +
             "container-free-v1/eidora-free.eidoramodel"
     const val FREE_CONTAINER_SHA256 =
-        "ecaa3fd2fe65e5500a11cb95a242ef7f6bc383f0930945008af31eea6d91a59a"
+        "4fd7c2842772d9ee615216d6d01192271d03528337eb4c74d7c0365657b83de5"
 
     /** Downloads and unpacks the bundled free container. */
     fun downloadFreeContainer(
