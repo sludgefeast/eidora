@@ -205,10 +205,9 @@
     <string name="models_activate_confirm">Switch</string>
     <string name="selftest_title">Model self-test</string>
     <string name="selftest_running">Running…</string>
-    <string name="selftest_detection_intro">The detector was run on a test image. Do the boxes sit on the faces?</string>
-    <string name="selftest_detection_count">%1$d faces found</string>
-    <string name="selftest_detection_rotated">Rotated copy (checks orientation handling): %1$d faces</string>
-    <string name="selftest_embedding_intro">The recognizer was run on two people, two photos each. Same person should be closer (smaller distance) than different people.</string>
+    <string name="selftest_detection_intro">The detector was run on the test photos. Do the boxes sit on the faces, and does the count match?</string>
+    <string name="selftest_detection_count">%1$d of %2$d faces found</string>
+    <string name="selftest_embedding_intro">Each named face was cropped from the photo metadata and embedded. The same person should be closer (smaller distance) than different people.</string>
     <string name="selftest_embedding_same">same person</string>
     <string name="selftest_embedding_diff">different people</string>
     <string name="selftest_thresholds">Manifest thresholds: edge %1$s · cluster %2$s · individual %3$s</string>

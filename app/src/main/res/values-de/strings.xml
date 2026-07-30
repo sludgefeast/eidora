@@ -205,10 +205,9 @@
     <string name="models_activate_confirm">Wechseln</string>
     <string name="selftest_title">Modell-Selbsttest</string>
     <string name="selftest_running">Läuft…</string>
-    <string name="selftest_detection_intro">Der Detektor wurde auf ein Testbild angewendet. Sitzen die Rahmen auf den Gesichtern?</string>
-    <string name="selftest_detection_count">%1$d Gesichter gefunden</string>
-    <string name="selftest_detection_rotated">Gedrehte Kopie (prüft Orientierungs-Behandlung): %1$d Gesichter</string>
-    <string name="selftest_embedding_intro">Die Identifizierung wurde auf zwei Personen mit je zwei Fotos angewendet. Dieselbe Person sollte näher liegen (kleinerer Abstand) als verschiedene Personen.</string>
+    <string name="selftest_detection_intro">Der Detektor wurde auf die Testfotos angewendet. Sitzen die Rahmen auf den Gesichtern, und stimmt die Anzahl?</string>
+    <string name="selftest_detection_count">%1$d von %2$d Gesichtern gefunden</string>
+    <string name="selftest_embedding_intro">Jedes benannte Gesicht wurde aus den Foto-Metadaten ausgeschnitten und eingebettet. Dieselbe Person sollte näher liegen (kleinerer Abstand) als verschiedene Personen.</string>
     <string name="selftest_embedding_same">gleiche Person</string>
     <string name="selftest_embedding_diff">verschiedene Personen</string>
     <string name="selftest_thresholds">Manifest-Schwellen: edge %1$s · cluster %2$s · individual %3$s</string>

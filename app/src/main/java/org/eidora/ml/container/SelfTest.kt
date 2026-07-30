@@ -8,42 +8,51 @@ import android.graphics.Bitmap
 import org.eidora.ml.DetectedFace
 import org.eidora.ml.EmbeddingModel
 import org.eidora.util.BitmapLoader
+import org.eidora.util.ThumbnailHelper
+import org.eidora.util.XmpHelper
 import java.io.File
 
 /**
- * Runs the on-device self-test (Class-3 validation) for a container model on
- * the bundled synthetic test images, producing results the user can judge.
+ * On-device self-test (Class-3 validation) for a container model, run against
+ * real bundled test photos.
  *
- * Two kinds:
- *  - detection: run the detector on a scene, return boxes to draw over it;
- *  - embedding: run the embedder on two people × two shots, return the cosine
- *    distances plus the manifest's clustering thresholds so the numbers can be
- *    read against the decision the app would actually make.
+ * The photos live in assets/selftest/ as ordinary JPGs whose MWG face regions
+ * (name + normalized box) are stored in their XMP — the same metadata Eidora
+ * reads from any photo. Everything is derived from those files at runtime, so
+ * the test set is extended or swapped just by changing the JPGs in that folder;
+ * no code changes needed. Each JPG is copied to the cache once so the existing
+ * File-based XMP and bitmap helpers work on it unchanged.
  *
- * The test is optional and non-gating — this just computes; the screen shows the
- * outcome and the user decides.
+ * Two independent checks:
+ *  - detection: run the detector on each photo and compare the number of faces
+ *    found against the number of face regions the metadata declares;
+ *  - embedding: crop each named face straight from its metadata region (so this
+ *    is independent of the detector), embed it, and check that two crops of the
+ *    same person are closer than crops of different people. A person appearing
+ *    in more than one photo gives the same-person pair.
  */
 object SelfTest {
     private const val ASSET_DIR = "selftest"
 
-    // Bundled embedding faces: two people, two shots each (see
-    // scripts/generate_selftest_images.py).
-    private val FACE_A = listOf("face_a_1.jpg", "face_a_2.jpg")
-    private val FACE_B = listOf("face_b_1.jpg", "face_b_2.jpg")
-    private const val SCENE = "detect_scene.jpg"
-    private const val SCENE_ROTATED = "detect_scene_rotated.jpg"
+    /** One face crop from metadata, tagged with the person's name. */
+    private data class NamedCrop(val person: String, val bitmap: Bitmap)
 
-    data class DetectionResult(
-        val scene: Bitmap,
+    // ---- Detection ---------------------------------------------------------
+
+    data class PhotoDetection(
+        val name: String,
+        val photo: Bitmap,
         val faces: List<DetectedFace>,
-        /** Same scene but carrying an EXIF rotation, to check orientation handling. */
-        val rotatedScene: Bitmap,
-        val rotatedFaces: List<DetectedFace>,
-    ) {
-        /** A quick heuristic hint; the user still decides. */
+        val expected: Int,
+    )
+
+    data class DetectionResult(val photos: List<PhotoDetection>) {
+        /** Found count matches the metadata count for every photo. */
         val looksReasonable: Boolean
-            get() = faces.size in 2..5 && rotatedFaces.size == faces.size
+            get() = photos.isNotEmpty() && photos.all { it.faces.size == it.expected }
     }
+
+    // ---- Embedding ---------------------------------------------------------
 
     data class Pair2(val label: String, val distance: Float, val samePerson: Boolean)
 
@@ -53,43 +62,88 @@ object SelfTest {
         val clusterMatch: Float?,
         val individualMatch: Float?,
     ) {
-        val sameMax: Float get() = pairs.filter { it.samePerson }.maxOf { it.distance }
-        val diffMin: Float get() = pairs.filter { !it.samePerson }.minOf { it.distance }
+        private val same get() = pairs.filter { it.samePerson }
+        private val diff get() = pairs.filter { !it.samePerson }
 
-        /** Same-person clearly closer than different-person. */
-        val looksReasonable: Boolean get() = diffMin > sameMax
+        val sameMax: Float? get() = same.maxOfOrNull { it.distance }
+        val diffMin: Float? get() = diff.minOfOrNull { it.distance }
+
+        /** Same-person clearly closer than different-person (needs both kinds). */
+        val looksReasonable: Boolean
+            get() {
+                val s = sameMax
+                val d = diffMin
+                return s != null && d != null && d > s
+            }
     }
 
-    /** Runs the detection self-test with [detector] on the bundled scene(s). */
+    /** Lists the bundled test photos (any .jpg/.jpeg in the asset folder). */
+    private fun listPhotos(context: Context): List<String> =
+        (context.assets.list(ASSET_DIR) ?: emptyArray())
+            .filter { it.endsWith(".jpg", true) || it.endsWith(".jpeg", true) }
+            .sorted()
+
+    /** Copies an asset to the cache so File-based helpers can read it. Cached. */
+    private fun stageAsset(context: Context, name: String): File {
+        val out = File(context.cacheDir, "selftest_$name")
+        if (!out.exists() || out.length() == 0L) {
+            context.assets.open("$ASSET_DIR/$name").use { input ->
+                out.outputStream().use { input.copyTo(it) }
+            }
+        }
+        return out
+    }
+
+    // ---- Detection test ----------------------------------------------------
+
     suspend fun runDetection(
         context: Context,
         detector: org.eidora.ml.FaceDetector,
     ): DetectionResult {
-        val scene = loadAsset(context, SCENE) ?: error("missing $SCENE")
-        val rotated = loadAsset(context, SCENE_ROTATED) ?: error("missing $SCENE_ROTATED")
-        return DetectionResult(
-            scene = scene,
-            faces = detector.detect(scene),
-            rotatedScene = rotated,
-            rotatedFaces = detector.detect(rotated),
-        )
+        val results = mutableListOf<PhotoDetection>()
+        for (name in listPhotos(context)) {
+            val file = stageAsset(context, name)
+            val expected = XmpHelper.readFaceRegions(file).size
+            val bmp = BitmapLoader.loadOrientedBitmap(file, maxSize = 2048) ?: continue
+            val faces = detector.detect(bmp)
+            results.add(PhotoDetection(name, bmp, faces, expected))
+        }
+        return DetectionResult(results)
     }
 
-    /** Runs the embedding self-test with [embedder], using [clustering] for thresholds. */
+    // ---- Embedding test ----------------------------------------------------
+
     suspend fun runEmbedding(
         context: Context,
         embedder: EmbeddingModel,
         clustering: ContainerManifest.Clustering?,
     ): EmbeddingResult {
-        val a = FACE_A.map { embed(context, embedder, it) }
-        val b = FACE_B.map { embed(context, embedder, it) }
+        // Crop every named face from every photo, straight from its metadata.
+        val crops = mutableListOf<NamedCrop>()
+        for (name in listPhotos(context)) {
+            val file = stageAsset(context, name)
+            for (region in XmpHelper.readFaceRegions(file)) {
+                val person = region.name ?: continue
+                val crop = ThumbnailHelper.cropForEmbedding(file, region.coords) ?: continue
+                crops.add(NamedCrop(person, crop))
+            }
+        }
 
-        val pairs = listOf(
-            Pair2("A₁–A₂", EmbeddingModel.cosineDistance(a[0], a[1]), true),
-            Pair2("B₁–B₂", EmbeddingModel.cosineDistance(b[0], b[1]), true),
-            Pair2("A₁–B₁", EmbeddingModel.cosineDistance(a[0], b[0]), false),
-            Pair2("A₂–B₂", EmbeddingModel.cosineDistance(a[1], b[1]), false),
-        )
+        // Embed each crop.
+        val embedded = crops.map { it.person to embedder.computeEmbedding(it.bitmap) }
+
+        // All distinct pairs, labelled same/different by person name.
+        val pairs = mutableListOf<Pair2>()
+        for (i in embedded.indices) {
+            for (j in i + 1 until embedded.size) {
+                val (pi, ei) = embedded[i]
+                val (pj, ej) = embedded[j]
+                val same = pi == pj
+                val dist = EmbeddingModel.cosineDistance(ei, ej)
+                pairs.add(Pair2("$pi\u2013$pj", dist, same))
+            }
+        }
+
         return EmbeddingResult(
             pairs = pairs,
             edge = clustering?.edge,
@@ -97,15 +151,4 @@ object SelfTest {
             individualMatch = clustering?.individualMatch,
         )
     }
-
-    private suspend fun embed(context: Context, embedder: EmbeddingModel, asset: String): FloatArray {
-        val bmp = loadAsset(context, asset) ?: error("missing $asset")
-        return embedder.computeEmbedding(bmp)
-    }
-
-    /** Loads a bundled asset with EXIF orientation applied (via the InputStream path). */
-    private fun loadAsset(context: Context, name: String): Bitmap? =
-        BitmapLoader.loadOrientedBitmap(
-            openStream = { context.assets.open("$ASSET_DIR/$name") },
-        )
 }

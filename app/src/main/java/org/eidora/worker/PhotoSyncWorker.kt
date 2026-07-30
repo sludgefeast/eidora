@@ -650,18 +650,23 @@ class PhotoSyncWorker(
                 // We keep the bitmap alive until after detect() returns; recycle here.
                 // detect() already recycles its internally-resized copy.
             }
+        val srcW = bitmap.width.toFloat()
+        val srcH = bitmap.height.toFloat()
         bitmap.recycle()
 
         if (faces.isNotEmpty()) {
             val xmpRegions = mutableListOf<XmpFaceRegion>()
             faces.forEach { face ->
                 try {
+                    // DetectedFace coords are in source-image PIXELS; FaceRegionCoords
+                    // are NORMALIZED (0..1) — divide by the image size, or the
+                    // regions render far outside the photo and crops fail.
                     val coords =
                         FaceRegionCoords(
-                            x = face.xMin + face.width / 2f,
-                            y = face.yMin + face.height / 2f,
-                            w = face.width,
-                            h = face.height,
+                            x = (face.xMin + face.width / 2f) / srcW,
+                            y = (face.yMin + face.height / 2f) / srcH,
+                            w = face.width / srcW,
+                            h = face.height / srcH,
                         )
                     val faceId = UUID.randomUUID().toString()
                     // Compute quality score from bbox size and rotation angle.

@@ -167,29 +167,36 @@ private fun DetectionView(result: SelfTest.DetectionResult) {
     )
     Spacer(Modifier.height(12.dp))
 
-    val bmp = result.scene
-    Image(
-        bitmap = bmp.asImageBitmap(),
-        contentDescription = null,
-        contentScale = ContentScale.Fit,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(bmp.width.toFloat() / bmp.height.toFloat())
-                .drawFaceBoxes(result.faces, bmp.width, bmp.height),
-    )
-    Spacer(Modifier.height(8.dp))
-    Text(
-        stringResource(R.string.selftest_detection_count, result.faces.size),
-        style = MaterialTheme.typography.bodyMedium,
-        fontWeight = FontWeight.SemiBold,
-    )
-    Text(
-        stringResource(R.string.selftest_detection_rotated, result.rotatedFaces.size),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Spacer(Modifier.height(12.dp))
+    result.photos.forEach { photo ->
+        val bmp = photo.photo
+        Image(
+            bitmap = bmp.asImageBitmap(),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(bmp.width.toFloat() / bmp.height.toFloat())
+                    .drawFaceBoxes(photo.faces, bmp.width, bmp.height),
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(
+                R.string.selftest_detection_count,
+                photo.faces.size,
+                photo.expected,
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color =
+                if (photo.faces.size == photo.expected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+        )
+        Spacer(Modifier.height(16.dp))
+    }
     HintLine(result.looksReasonable)
 }
 
