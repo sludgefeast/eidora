@@ -210,6 +210,7 @@
     <string name="selftest_embedding_intro">Each named face was cropped from the photo metadata and embedded. The same person should be closer (smaller distance) than different people.</string>
     <string name="selftest_embedding_same">same person</string>
     <string name="selftest_embedding_diff">different people</string>
+    <string name="selftest_embedding_distance">Distance</string>
     <string name="selftest_thresholds">Manifest thresholds: edge %1$s · cluster %2$s · individual %3$s</string>
     <string name="selftest_thresholds_none">No thresholds declared in the manifest.</string>
     <string name="selftest_hint_ok">Looks consistent.</string>

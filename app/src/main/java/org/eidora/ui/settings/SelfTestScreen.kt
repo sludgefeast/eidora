@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -231,19 +235,62 @@ private fun EmbeddingView(result: SelfTest.EmbeddingResult) {
 
     result.pairs.forEach { p ->
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            val kind =
-                if (p.samePerson) stringResource(R.string.selftest_embedding_same)
-                else stringResource(R.string.selftest_embedding_diff)
-            Text("${p.label}  ($kind)", style = MaterialTheme.typography.bodyMedium)
-            Text(
-                "%.3f".format(p.distance),
-                style = MaterialTheme.typography.bodyMedium,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.SemiBold,
+            Image(
+                bitmap = p.thumbA.asImageBitmap(),
+                contentDescription = p.personA,
+                contentScale = ContentScale.Crop,
+                modifier =
+                    Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(6.dp)),
             )
+            Spacer(Modifier.width(6.dp))
+            Image(
+                bitmap = p.thumbB.asImageBitmap(),
+                contentDescription = p.personB,
+                contentScale = ContentScale.Crop,
+                modifier =
+                    Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(6.dp)),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "${p.personA} · ${p.personB}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                val kind =
+                    if (p.samePerson) stringResource(R.string.selftest_embedding_same)
+                    else stringResource(R.string.selftest_embedding_diff)
+                Text(
+                    kind,
+                    style = MaterialTheme.typography.bodySmall,
+                    color =
+                        if (p.samePerson) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    "%.3f".format(p.distance),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    stringResource(R.string.selftest_embedding_distance),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 

@@ -54,7 +54,14 @@ object SelfTest {
 
     // ---- Embedding ---------------------------------------------------------
 
-    data class Pair2(val label: String, val distance: Float, val samePerson: Boolean)
+    data class Pair2(
+        val personA: String,
+        val personB: String,
+        val thumbA: Bitmap,
+        val thumbB: Bitmap,
+        val distance: Float,
+        val samePerson: Boolean,
+    )
 
     data class EmbeddingResult(
         val pairs: List<Pair2>,
@@ -129,23 +136,32 @@ object SelfTest {
             }
         }
 
-        // Embed each crop.
-        val embedded = crops.map { it.person to embedder.computeEmbedding(it.bitmap) }
+        // Embed each crop, keeping the crop bitmap for display.
+        val embedded =
+            crops.map { Triple(it.person, it.bitmap, embedder.computeEmbedding(it.bitmap)) }
 
-        // All distinct pairs, labelled same/different by person name.
+        // All distinct pairs, labelled same/different by person name, each
+        // carrying both face thumbnails.
         val pairs = mutableListOf<Pair2>()
         for (i in embedded.indices) {
             for (j in i + 1 until embedded.size) {
-                val (pi, ei) = embedded[i]
-                val (pj, ej) = embedded[j]
+                val (pi, bi, ei) = embedded[i]
+                val (pj, bj, ej) = embedded[j]
                 val same = pi == pj
                 val dist = EmbeddingModel.cosineDistance(ei, ej)
-                pairs.add(Pair2("$pi\u2013$pj", dist, same))
+                pairs.add(Pair2(pi, pj, bi, bj, dist, same))
             }
         }
 
+        // Same-person pairs first (the key comparison), then by ascending
+        // distance so the most similar pairs lead each group.
+        val sorted =
+            pairs.sortedWith(
+                compareByDescending<Pair2> { it.samePerson }.thenBy { it.distance },
+            )
+
         return EmbeddingResult(
-            pairs = pairs,
+            pairs = sorted,
             edge = clustering?.edge,
             clusterMatch = clustering?.clusterMatch,
             individualMatch = clustering?.individualMatch,

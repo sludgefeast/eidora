@@ -167,6 +167,8 @@ class ScrfdDetector private constructor(
                 rows(outputs[idx.score]!!),
                 rows(outputs[idx.bbox]!!),
                 rows(outputs[idx.kps]!!),
+                source.width,
+                source.height,
                 candidates,
             )
         }
@@ -178,6 +180,8 @@ class ScrfdDetector private constructor(
         scores: Array<FloatArray>,
         bbox: Array<FloatArray>,
         kps: Array<FloatArray>,
+        srcW: Int,
+        srcH: Int,
         out: MutableList<DetectedFace>,
     ) {
         val cols = INPUT_SIZE / stride
@@ -211,12 +215,24 @@ class ScrfdDetector private constructor(
                         (rightEyeX - leftEyeX).toDouble(),
                     ).toFloat()
 
+            // The input was scaled (distorted, no letterbox) from source to
+            // INPUT_SIZE, so map the box back to SOURCE PIXELS: normalize by
+            // INPUT_SIZE, then multiply by the source dimension. DetectedFace
+            // coords are source pixels (same contract as YuNetDetector), so the
+            // pipeline and self-test treat both detectors identically.
+            val sx = srcW.toFloat() / INPUT_SIZE
+            val sy = srcH.toFloat() / INPUT_SIZE
+            val px1 = (x1 * sx).coerceIn(0f, srcW.toFloat())
+            val py1 = (y1 * sy).coerceIn(0f, srcH.toFloat())
+            val px2 = (x2 * sx).coerceIn(0f, srcW.toFloat())
+            val py2 = (y2 * sy).coerceIn(0f, srcH.toFloat())
+
             out.add(
                 DetectedFace(
-                    xMin = (x1 / INPUT_SIZE).coerceIn(0f, 1f),
-                    yMin = (y1 / INPUT_SIZE).coerceIn(0f, 1f),
-                    width = ((x2 - x1) / INPUT_SIZE).coerceIn(0f, 1f),
-                    height = ((y2 - y1) / INPUT_SIZE).coerceIn(0f, 1f),
+                    xMin = px1,
+                    yMin = py1,
+                    width = px2 - px1,
+                    height = py2 - py1,
                     rotationRadians = rotation,
                     score = score,
                 ),
