@@ -6,8 +6,9 @@ package org.eidora.ui.settings
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,13 +16,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import java.io.File
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -129,7 +128,7 @@ fun ModelsScreen(
             onBack = onBack,
         )
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         ) {
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
@@ -156,25 +155,32 @@ fun ModelsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(containers, key = { it.id }) { container ->
-                        ContainerCard(
-                            container = container,
-                            selectedDetection = selectedDetection,
-                            selectedEmbedding = selectedEmbedding,
-                            onDeleteContainer = {
-                                pendingDelete = PendingDelete.Container(container.id)
-                            },
-                            onDeleteModel = { modelId ->
-                                pendingDelete = PendingDelete.Model(container.id, modelId)
-                            },
-                            onTestModel = { modelId -> onTestModel(container.id, modelId) },
-                            onActivateModel = { modelId, task ->
-                                pendingActivate = PendingActivate(container.id, modelId, task)
-                            },
+                containers.forEachIndexed { index, container ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 20.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                         )
+                    } else {
+                        Spacer(Modifier.height(8.dp))
                     }
+                    ContainerCard(
+                        container = container,
+                        selectedDetection = selectedDetection,
+                        selectedEmbedding = selectedEmbedding,
+                        onDeleteContainer = {
+                            pendingDelete = PendingDelete.Container(container.id)
+                        },
+                        onDeleteModel = { modelId ->
+                            pendingDelete = PendingDelete.Model(container.id, modelId)
+                        },
+                        onTestModel = { modelId -> onTestModel(container.id, modelId) },
+                        onActivateModel = { modelId, task ->
+                            pendingActivate = PendingActivate(container.id, modelId, task)
+                        },
+                    )
                 }
+                Spacer(Modifier.height(16.dp))
             }
         }
     }
@@ -304,62 +310,62 @@ private fun ContainerCard(
     onTestModel: (String) -> Unit,
     onActivateModel: (String, String) -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        container.manifest.container.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    container.manifest.container.description?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                if (container.isProtected) {
-                    Text(
-                        stringResource(R.string.models_free_badge),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                } else {
-                    IconButton(onClick = onDeleteContainer) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = stringResource(R.string.models_delete_container),
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(8.dp))
-
-            container.manifest.models.forEach { model ->
-                val active =
-                    when (model.task) {
-                        ContainerManifest.TASK_DETECTION ->
-                            selectedDetection?.containerId == container.id &&
-                                selectedDetection.modelId == model.id
-                        else ->
-                            selectedEmbedding?.containerId == container.id &&
-                                selectedEmbedding.modelId == model.id
-                    }
-                ModelRow(
-                    model = model,
-                    protected = container.isProtected,
-                    active = active,
-                    onDelete = { onDeleteModel(model.id) },
-                    onTest = { onTestModel(model.id) },
-                    onActivate = { onActivateModel(model.id, model.task) },
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    container.manifest.container.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
                 )
+                container.manifest.container.description?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
+            if (container.isProtected) {
+                Text(
+                    stringResource(R.string.models_free_badge),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                IconButton(onClick = onDeleteContainer) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.models_delete_container),
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        container.manifest.models.forEach { model ->
+            val active =
+                when (model.task) {
+                    ContainerManifest.TASK_DETECTION ->
+                        selectedDetection?.containerId == container.id &&
+                            selectedDetection.modelId == model.id
+                    else ->
+                        selectedEmbedding?.containerId == container.id &&
+                            selectedEmbedding.modelId == model.id
+                }
+            val sizeBytes =
+                runCatching { File(container.dir, model.file).length() }.getOrDefault(0L)
+            ModelRow(
+                model = model,
+                sizeBytes = sizeBytes,
+                protected = container.isProtected,
+                active = active,
+                onDelete = { onDeleteModel(model.id) },
+                onTest = { onTestModel(model.id) },
+                onActivate = { onActivateModel(model.id, model.task) },
+            )
         }
     }
 }
@@ -367,6 +373,7 @@ private fun ContainerCard(
 @Composable
 private fun ModelRow(
     model: ContainerManifest.ModelEntry,
+    sizeBytes: Long,
     protected: Boolean,
     active: Boolean,
     onDelete: () -> Unit,
@@ -399,8 +406,10 @@ private fun ModelRow(
                     stringResource(R.string.models_embedding_label)
                 }
             val license = model.license?.name
+            val sizeLabel = formatBytes(sizeBytes)
+            val base = if (license != null) "$taskLabel · $license" else taskLabel
             Text(
-                text = if (license != null) "$taskLabel · $license" else taskLabel,
+                text = if (sizeBytes > 0) "$base · $sizeLabel" else base,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -449,4 +458,17 @@ internal fun ScreenHeader(
             style = MaterialTheme.typography.titleLarge,
         )
     }
+}
+
+/** Formats a byte count as a short human-readable size (e.g. "3.3 MB"). */
+private fun formatBytes(bytes: Long): String {
+    if (bytes <= 0) return "—"
+    val units = listOf("B", "KB", "MB", "GB")
+    var value = bytes.toDouble()
+    var unit = 0
+    while (value >= 1024 && unit < units.size - 1) {
+        value /= 1024
+        unit++
+    }
+    return if (unit == 0) "${bytes} B" else "%.1f %s".format(value, units[unit])
 }

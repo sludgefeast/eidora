@@ -281,13 +281,24 @@ class SettingsRepository(
         val APPS_PATTERNS = listOf("Android/media/", "Android/data/")
         val COMMON_PATTERNS = listOf("Pictures/", "Download/", "Downloads/")
 
-        fun categorize(relativePath: String): FolderCategory =
-            when {
-                APPS_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.APPS
-                CAMERA_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.CAMERA
-                COMMON_PATTERNS.any { relativePath.startsWith(it) } -> FolderCategory.COMMON
+        fun categorize(relativePath: String): FolderCategory {
+            // Match a pattern like "Pictures/" against both the folder itself
+            // ("Pictures") and anything beneath it ("Pictures/ChatGPT"). Without
+            // this, the bare parent folder fell through to OTHER while its
+            // subfolders were correctly categorized — e.g. "Pictures" showed up
+            // under "Sonstiges" even though "Pictures/ChatGPT" was under COMMON.
+            fun matches(patterns: List<String>) =
+                patterns.any { p ->
+                    val bare = p.trimEnd('/')
+                    relativePath == bare || relativePath.startsWith("$bare/")
+                }
+            return when {
+                matches(APPS_PATTERNS) -> FolderCategory.APPS
+                matches(CAMERA_PATTERNS) -> FolderCategory.CAMERA
+                matches(COMMON_PATTERNS) -> FolderCategory.COMMON
                 else -> FolderCategory.OTHER
             }
+        }
 
         const val DEFAULT_MIN_BATTERY_PERCENT = 20
         const val DEFAULT_MAX_BATTERY_TEMP = 40.0f
