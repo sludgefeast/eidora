@@ -26,6 +26,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos")
     suspend fun getAll(): List<PhotoEntity>
 
+    @Query("SELECT * FROM photos WHERE folder IN (:folders)")
+    suspend fun getInFolders(folders: List<String>): List<PhotoEntity>
+
     @Query("SELECT * FROM photos WHERE pending_xmp_write = 1")
     suspend fun getPendingXmpWrites(): List<PhotoEntity>
 

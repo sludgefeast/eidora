@@ -287,7 +287,48 @@ class FaceRepository(
      * thumbnails, persons and XMP face data, then marks all photos as
      * unanalyzed so the next sync re-detects everything from scratch.
      */
-    suspend fun resetAllFaces() {
+    /**
+     * Resets analysis so the pipeline re-detects faces. If [folders] is
+     * non-empty, only photos in those folders are reset (thumbnails, face
+     * regions, on-disk XMP, analyzed flag); persons left without any faces are
+     * then purged. With an empty list it resets everything (legacy behavior).
+     *
+     * The folder-scoped path exists so "re-analyze all photos" only touches the
+     * user's currently selected folders, not every photo ever seen.
+     */
+    suspend fun resetAllFaces(folders: List<String> = emptyList()) {
+        if (folders.isEmpty()) {
+            resetEverything()
+            return
+        }
+
+        val photos = photoDao.getInFolders(folders)
+        for (photo in photos) {
+            // Delete this photo's thumbnails, then its face regions.
+            faceDao.findByPhotoId(photo.id).forEach {
+                ThumbnailHelper.deleteThumbnail(context, it.id)
+            }
+            faceDao.deleteByPhotoId(photo.id)
+
+            // Clear on-disk XMP and mark unanalyzed so it gets re-processed.
+            try {
+                val file = File(photo.path)
+                if (file.exists()) {
+                    XmpHelper.clearFaceData(file)
+                    photoDao.updateModifiedAt(photo.id, file.lastModified())
+                }
+            } catch (t: Throwable) {
+                Log.w(tag, "XMP clear failed for ${photo.path}", t)
+            }
+            photoDao.updateAnalyzed(photo.id, false)
+        }
+
+        // Any person now left without faces (all its faces were in-folder) is
+        // removed; persons with remaining out-of-folder faces are kept.
+        personDao.deleteOrphaned()
+    }
+
+    private suspend fun resetEverything() {
         val allPhotos = photoDao.getAll()
 
         // Delete all thumbnails

@@ -147,11 +147,29 @@ fun EidoraApp() {
     // only the progress notifications won't show. Media + file access are required.
     val hasRequiredPermissions = hasMedia && hasFiles
 
+    // ---- Setup state, read early so we can gate BOTH the UI and the sync ----
+    // The sync must not start until the user has finished setup: folders chosen
+    // AND the free model container downloaded. Otherwise it would run against
+    // the default (camera) folder with no model ready.
+    var wizardDone by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(Unit) {
+        wizardDone = org.eidora.data.settings.SettingsProvider
+            .get(context)
+            .getFolderWizardDone()
+    }
+    var modelsReady by remember {
+        mutableStateOf(
+            org.eidora.ml.container.ContainerDownloader.isFreeContainerReady(context),
+        )
+    }
+    val setupComplete = wizardDone == true && modelsReady
+
     // Enqueue the pipeline only once per app start, even if permissions
-    // change multiple times or the composition recomposes.
+    // change multiple times or the composition recomposes — and only after
+    // setup is complete.
     var pipelineEnqueued by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(hasRequiredPermissions, pipelineEnqueued) {
-        if (hasRequiredPermissions && !pipelineEnqueued) {
+    LaunchedEffect(hasRequiredPermissions, setupComplete, pipelineEnqueued) {
+        if (hasRequiredPermissions && setupComplete && !pipelineEnqueued) {
             try {
                 SyncPipeline.enqueue(context)
                 pipelineEnqueued = true
@@ -289,14 +307,7 @@ fun EidoraApp() {
     }
 
     // ---- Folder wizard: first-run selection of which folders to process ----
-    var wizardDone by remember {
-        mutableStateOf<Boolean?>(null)
-    }
-    LaunchedEffect(Unit) {
-        wizardDone = org.eidora.data.settings.SettingsProvider
-            .get(context)
-            .getFolderWizardDone()
-    }
+    // wizardDone / modelsReady are declared near the top (they also gate sync).
     when (wizardDone) {
         null -> return // still loading the flag
         false -> {
@@ -307,11 +318,6 @@ fun EidoraApp() {
     }
 
     // ---- Model gate: block the main UI until the free model container is present ----
-    var modelsReady by remember {
-        mutableStateOf(
-            org.eidora.ml.container.ContainerDownloader.isFreeContainerReady(context),
-        )
-    }
     if (!modelsReady) {
         org.eidora.ui.common.ContainerDownloadScreen(onReady = { modelsReady = true })
         return
@@ -364,7 +370,14 @@ fun EidoraApp() {
                                 context,
                                 DatabaseProvider.getInstance(context),
                             )
-                        repo.resetAllFaces()
+                        // Only re-analyze photos in the selected folders, not
+                        // every photo the DB has ever seen.
+                        val folders =
+                            org.eidora.data.settings.SettingsProvider
+                                .get(context)
+                                .getFolderWhitelist()
+                                .toList()
+                        repo.resetAllFaces(folders)
                         SyncPipeline.enqueueForce(context)
                     }
                 }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }

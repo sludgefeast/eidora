@@ -63,6 +63,26 @@ class PhotoSyncWorker(
             Log.w(TAG, "Missing media/all-files permission – aborting sync")
             return Result.failure()
         }
+        // Don't run until the user has finished setup: folders chosen AND the
+        // free model container present. This also guards the daily periodic
+        // worker, which is scheduled independently of the UI setup gates.
+        val setupComplete =
+            try {
+                org.eidora.data.settings.SettingsProvider
+                    .get(applicationContext)
+                    .getFolderWizardDone() &&
+                    org.eidora.ml.container.ContainerDownloader
+                        .isFreeContainerReady(applicationContext)
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                Log.w(TAG, "Setup-state check failed – deferring sync", t)
+                false
+            }
+        if (!setupComplete) {
+            Log.i(TAG, "Setup not complete – skipping sync")
+            return Result.success()
+        }
         val singlePhotoId = inputData.getString(KEY_PHOTO_ID)
         return try {
             if (singlePhotoId != null) {
