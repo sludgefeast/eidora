@@ -64,7 +64,14 @@ class EmbeddingWorker(
         return try {
             val pending: List<FaceRegionEntity> = faceDao.findWithoutEmbedding()
             val total = pending.size
-            if (total == 0) return Result.success()
+            if (total == 0) {
+                // Nothing to embed, but centroids/representatives may still be
+                // unset (e.g. embeddings finished in an earlier run that never
+                // clustered). enqueueClustering is unique work, so this is a
+                // cheap no-op when clustering already ran.
+                SyncPipeline.enqueueClustering(applicationContext)
+                return Result.success()
+            }
             Log.i(TAG, "Starting embedding run for $total faces")
 
             val powerGate = PowerGate(applicationContext)
@@ -249,6 +256,13 @@ class EmbeddingWorker(
             }
 
             Log.i(TAG, "Embedding run finished: ${done.get()} / $total processed")
+            // Chain clustering after embeddings so a first-run sync (faces come
+            // from XMP metadata, then get embedded) also computes centroids and
+            // representative faces. The WorkManager chain ends at embedding, and
+            // clustering is otherwise only triggered by user actions — without
+            // this, freshly imported named persons show no avatar until the user
+            // manually clusters.
+            SyncPipeline.enqueueClustering(applicationContext)
             Result.success()
         } catch (t: Throwable) {
             t.rethrowIfCancellation()

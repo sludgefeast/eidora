@@ -201,5 +201,31 @@ class EmbeddingModel private constructor(
             for (i in result.indices) result[i] /= norm
             return result
         }
+
+        /**
+         * Picks the representative face for a person: the one whose embedding is
+         * closest to the person's weighted centroid. Returns the index into
+         * [embeddingsWithWeights], or -1 if the list is empty.
+         *
+         * A single face must always yield index 0 — that's the first-run case
+         * (one named face imported from XMP metadata) where the person's avatar
+         * would otherwise stay unset. Kept pure and separate from DAO access so
+         * this behavior is unit-testable.
+         */
+        fun representativeFaceIndex(embeddingsWithWeights: List<Pair<FloatArray, Float>>): Int {
+            if (embeddingsWithWeights.isEmpty()) return -1
+            if (embeddingsWithWeights.size == 1) return 0
+            val centroid = weightedCentroid(embeddingsWithWeights)
+            var bestIdx = 0
+            var bestDist = Float.MAX_VALUE
+            embeddingsWithWeights.forEachIndexed { idx, (emb, _) ->
+                val d = cosineDistance(emb, centroid)
+                if (d < bestDist) {
+                    bestDist = d
+                    bestIdx = idx
+                }
+            }
+            return bestIdx
+        }
     }
 }

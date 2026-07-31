@@ -558,20 +558,12 @@ class ClusteringWorker(
                         .filter { !it.ignored && it.embedding != null }
                 if (allFaces.isNotEmpty()) {
                     val basisFaces = allFaces.filter { it.name != null }.ifEmpty { allFaces }
-                    val centroid =
-                        EmbeddingModel.weightedCentroid(
-                            basisFaces.map {
-                                EmbeddingModel.bytesToFloatArray(it.embedding!!) to (it.qualityScore ?: 0.5f)
-                            },
-                        )
-
-                    val representative =
-                        basisFaces.minByOrNull { face ->
-                            EmbeddingModel.cosineDistance(
-                                EmbeddingModel.bytesToFloatArray(face.embedding!!),
-                                centroid,
-                            )
+                    val embeddingsWithWeights =
+                        basisFaces.map {
+                            EmbeddingModel.bytesToFloatArray(it.embedding!!) to (it.qualityScore ?: 0.5f)
                         }
+                    val repIdx = EmbeddingModel.representativeFaceIndex(embeddingsWithWeights)
+                    val representative = basisFaces.getOrNull(repIdx)
                     personDao.updateRepresentativeFace(person.id, representative?.id)
                 }
             } catch (t: Throwable) {
