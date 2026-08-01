@@ -250,6 +250,7 @@
     <string name="setting_resume_battery_temp">Fortsetzen ab Akkutemperatur (%1$s)</string>
     <string name="setting_resume_battery_temp_description">Die Verarbeitung läuft erst weiter, wenn der Akku auf diesen Wert abgekühlt ist. Halte den Wert unter dem Pausenwert, damit das Gerät wirklich abkühlt statt sofort wieder zu pausieren.</string>
     <string name="about_source_code">Quellcode</string>
+    <string name="about_donate">Entwicklung unterstützen</string>
     <string name="about_no_browser">Keine Browser-App gefunden</string>
     <string name="about_export_logs">Logs exportieren</string>
     <string name="about_export_logs_description">Protokolldatei für Fehlerberichte speichern</string>

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -56,6 +57,7 @@ import org.eidora.R
 import org.eidora.util.LogExporter
 
 private const val REPO_URL = "https://github.com/sludgefeast/eidora"
+private const val DONATE_URL = "https://buymeacoffee.com/sludgefeast"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -179,6 +181,21 @@ fun AboutScreen(onBack: () -> Unit) {
                         onClick = {
                             try {
                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)))
+                            } catch (t: Throwable) {
+                                Toast
+                                    .makeText(context, R.string.about_no_browser, Toast.LENGTH_SHORT)
+                                    .show()
+                            }
+                        },
+                    )
+
+                    AboutAction(
+                        icon = Icons.Default.Coffee,
+                        title = stringResource(R.string.about_donate),
+                        subtitle = DONATE_URL.removePrefix("https://"),
+                        onClick = {
+                            try {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DONATE_URL)))
                             } catch (t: Throwable) {
                                 Toast
                                     .makeText(context, R.string.about_no_browser, Toast.LENGTH_SHORT)
