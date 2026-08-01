@@ -141,30 +141,6 @@ class SettingsViewModel(
      * Either way confirmed names survive (they live on the faces and in XMP).
      * No-op if the chosen model is already active.
      */
-    fun switchDetectionModel(
-        spec: org.eidora.ml.DetectionModelSpec,
-        redetect: Boolean,
-    ) {
-        viewModelScope.launch {
-            val currentId = repo.getDetectionModelId() ?: org.eidora.ml.DetectionModelSpec.DEFAULT.id
-            if (currentId == spec.id) return@launch
-
-            repo.setDetectionModelId(spec.id)
-            if (redetect) {
-                // Re-scan everything with the new detector.
-                try {
-                    faceRepo.resetForEmbeddingModelChange()
-                } catch (t: Throwable) {
-                    // best-effort; the pipeline still re-runs below
-                }
-                org.eidora.worker.SyncPipeline
-                    .restartAfterFolderChange(getApplication())
-            }
-            // If not re-detecting, keep existing faces untouched; the new model
-            // applies to future scans only. Nothing else to do.
-        }
-    }
-
     fun setPowerConfig(config: PowerConfig) {
         viewModelScope.launch { repo.setPowerConfig(config) }
     }
@@ -173,7 +149,11 @@ class SettingsViewModel(
      * Activates a model by (containerId, modelId), dispatching to the detection
      * or embedding path based on the model's task read from its manifest.
      */
-    fun selectModel(containerId: String, modelId: String) {
+    fun selectModel(
+        containerId: String,
+        modelId: String,
+        detectionStrategy: org.eidora.data.repository.FaceRepository.DetectionChangeStrategy?,
+    ) {
         viewModelScope.launch {
             val task =
                 withContext(Dispatchers.IO) {
@@ -184,7 +164,13 @@ class SettingsViewModel(
                         ?.task
                 } ?: return@launch
             if (task == org.eidora.ml.container.ContainerManifest.TASK_DETECTION) {
-                selectDetectionModel(containerId, modelId)
+                selectDetectionModel(
+                    containerId,
+                    modelId,
+                    detectionStrategy
+                        ?: org.eidora.data.repository.FaceRepository
+                            .DetectionChangeStrategy.KEEP_ALL,
+                )
             } else {
                 selectEmbeddingModel(containerId, modelId)
             }
@@ -197,17 +183,32 @@ class SettingsViewModel(
      * embeddings), so it clears derived data and restarts sync. No-op if it's
      * already the active selection.
      */
-    fun selectDetectionModel(containerId: String, modelId: String) {
+    fun selectDetectionModel(
+        containerId: String,
+        modelId: String,
+        strategy: org.eidora.data.repository.FaceRepository.DetectionChangeStrategy,
+    ) {
         viewModelScope.launch {
             val current = repo.getSelectedDetection()
             if (current?.containerId == containerId && current.modelId == modelId) return@launch
             repo.setSelectedDetection(containerId, modelId)
             try {
-                faceRepo.resetForEmbeddingModelChange()
+                faceRepo.resetForDetectionModelChange(strategy)
             } catch (t: Throwable) {
-                // best-effort; the pipeline still re-runs below
+                // best-effort; the pipeline still re-runs below where needed
             }
-            org.eidora.worker.SyncPipeline.restartAfterFolderChange(getApplication())
+            when (strategy) {
+                // Keep everything: no reset, no rescan — the new detector
+                // applies to future scans only.
+                org.eidora.data.repository.FaceRepository.DetectionChangeStrategy.KEEP_ALL -> {}
+                // Only unconfirmed photos were reset (analyzed=false); a normal
+                // sync picks those up without touching the confirmed ones.
+                org.eidora.data.repository.FaceRepository.DetectionChangeStrategy.KEEP_CONFIRMED ->
+                    org.eidora.worker.SyncPipeline.enqueue(getApplication())
+                // Everything was cleared; force a full rescan.
+                org.eidora.data.repository.FaceRepository.DetectionChangeStrategy.REDETECT_ALL ->
+                    org.eidora.worker.SyncPipeline.restartAfterFolderChange(getApplication())
+            }
         }
     }
 
@@ -252,45 +253,6 @@ class SettingsViewModel(
                 // best-effort; the pipeline still re-runs below
             }
             org.eidora.worker.SyncPipeline.restartAfterFolderChange(getApplication())
-        }
-    }
-
-    /**
-     * Switches the embedding model. Because embeddings from different models
-     * are not comparable, this clears all embeddings and clustered persons and
-     * restarts the pipeline so everything is recomputed with the new model.
-     * Confirmed names are preserved (they re-import from XMP). No-op if the
-     * chosen model is already active.
-     */
-    fun switchEmbeddingModel(spec: org.eidora.ml.EmbeddingModelSpec) {
-        viewModelScope.launch {
-            val currentId = repo.getEmbeddingModelId() ?: org.eidora.ml.EmbeddingModelSpec.DEFAULT.id
-            if (currentId == spec.id) return@launch // already active
-
-            repo.setEmbeddingModelId(spec.id)
-
-            // Reset clustering thresholds to this model's defaults: values tuned
-            // for the previous model live in a different embedding space and
-            // would misbehave. The user can re-tune afterwards.
-            val current = repo.clusteringConfig.first()
-            repo.setClusteringConfig(
-                current.copy(
-                    edgeThreshold = spec.defaultThresholds.edge,
-                    clusterMatchThreshold = spec.defaultThresholds.clusterMatch,
-                    individualMatchThreshold = spec.defaultThresholds.individualMatch,
-                ),
-            )
-
-            try {
-                faceRepo.resetForEmbeddingModelChange()
-            } catch (t: Throwable) {
-                // best-effort; the pipeline still re-runs below
-            }
-            // The new model may not be downloaded yet; the model gate/download
-            // screen handles that. Restart sync so detection→embedding→cluster
-            // re-runs from scratch with the new model.
-            org.eidora.worker.SyncPipeline
-                .restartAfterFolderChange(getApplication())
         }
     }
 

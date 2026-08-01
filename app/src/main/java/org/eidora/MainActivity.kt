@@ -647,10 +647,11 @@ fun EidoraApp() {
                     onTestModel = { containerId, modelId ->
                         navController.navigate("selftest/$containerId/$modelId")
                     },
-                    onActivateModel = { containerId, modelId ->
+                    onActivateModel = { containerId, modelId, strategy ->
                         // The screen already knows the task; the VM picks the
                         // right reset path by reading the model's task itself.
-                        vm.selectModel(containerId, modelId)
+                        // strategy is non-null only for detection-model changes.
+                        vm.selectModel(containerId, modelId, strategy)
                     },
                 )
             }

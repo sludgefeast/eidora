@@ -432,6 +432,48 @@ class FaceRepository(
         faceDao.clearAllEmbeddings()
     }
 
+    /** What to do with existing faces when the detection model changes. */
+    enum class DetectionChangeStrategy {
+        /** Keep all detected faces; the new detector only applies to future scans. */
+        KEEP_ALL,
+
+        /**
+         * Keep photos that have at least one confirmed (named) face untouched;
+         * re-detect all other photos. Preserves the user's naming work while
+         * letting the new detector re-scan the unconfirmed rest.
+         */
+        KEEP_CONFIRMED,
+
+        /** Re-detect everything — drops all faces and persons. */
+        REDETECT_ALL,
+    }
+
+    /**
+     * Applies [strategy] when the detection model changes. For KEEP_ALL nothing
+     * is reset here. For KEEP_CONFIRMED only photos without a confirmed face are
+     * reset (their faces/thumbnails/XMP cleared, marked unanalyzed), then
+     * orphaned persons are purged. For REDETECT_ALL everything is reset.
+     */
+    suspend fun resetForDetectionModelChange(strategy: DetectionChangeStrategy) {
+        when (strategy) {
+            DetectionChangeStrategy.KEEP_ALL -> {
+                // Nothing to reset; the new detector applies to future scans.
+            }
+            DetectionChangeStrategy.KEEP_CONFIRMED -> {
+                val toReset = photoDao.idsWithoutConfirmedFace()
+                for (photoId in toReset) {
+                    resetPhotoFaces(photoId)
+                }
+                // Persons whose faces were all on re-detected photos are now
+                // empty; drop them. Persons keeping ≥1 confirmed face survive.
+                personDao.deleteOrphaned()
+            }
+            DetectionChangeStrategy.REDETECT_ALL -> {
+                resetEverything()
+            }
+        }
+    }
+
     fun observePersonsWithCount(folders: List<String>): Flow<List<PersonWithCount>> = personDao.observeAllWithConfirmedCount(folders)
 
     fun observeUnknownFaces(folders: List<String>): Flow<List<FaceRegionWithPhoto>> = faceDao.observeUnknown(folders)

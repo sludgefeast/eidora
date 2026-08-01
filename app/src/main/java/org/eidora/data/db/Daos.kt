@@ -29,6 +29,22 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE folder IN (:folders)")
     suspend fun getInFolders(folders: List<String>): List<PhotoEntity>
 
+    /**
+     * IDs of photos that have NO confirmed (named) face — i.e. no face the user
+     * has assigned to a person. Used when switching detectors: photos with at
+     * least one confirmed face are kept, the rest are re-detected.
+     */
+    @Query(
+        """
+        SELECT id FROM photos
+        WHERE id NOT IN (
+            SELECT DISTINCT photoId FROM face_regions
+            WHERE name IS NOT NULL AND ignored = 0
+        )
+        """,
+    )
+    suspend fun idsWithoutConfirmedFace(): List<String>
+
     @Query("SELECT * FROM photos WHERE pending_xmp_write = 1")
     suspend fun getPendingXmpWrites(): List<PhotoEntity>
 

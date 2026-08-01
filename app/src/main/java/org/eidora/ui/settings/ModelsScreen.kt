@@ -4,6 +4,7 @@
 package org.eidora.ui.settings
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
@@ -56,7 +57,11 @@ import org.eidora.ml.container.ContainerStore
 fun ModelsScreen(
     onBack: () -> Unit,
     onTestModel: (String, String) -> Unit = { _, _ -> },
-    onActivateModel: (String, String) -> Unit = { _, _ -> },
+    onActivateModel: (
+        String,
+        String,
+        org.eidora.data.repository.FaceRepository.DetectionChangeStrategy?,
+    ) -> Unit = { _, _, _ -> },
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -64,7 +69,9 @@ fun ModelsScreen(
     var containers by remember {
         mutableStateOf(ContainerStore.listContainers(context))
     }
-    var message by remember { mutableStateOf<String?>(null) }
+    val toast: (Int) -> Unit = { resId ->
+        Toast.makeText(context, context.getString(resId), Toast.LENGTH_SHORT).show()
+    }
 
     // Currently selected models (container id + model id), to mark them active.
     var selectedDetection by remember {
@@ -104,15 +111,15 @@ fun ModelsScreen(
                     }
                 when (result) {
                     is ContainerStore.ImportResult.Success -> {
-                        message = context.getString(R.string.models_import_success)
+                        toast(R.string.models_import_success)
                         refresh()
                     }
                     is ContainerStore.ImportResult.Invalid ->
-                        message = context.getString(R.string.models_import_invalid)
+                        toast(R.string.models_import_invalid)
                     is ContainerStore.ImportResult.Duplicate ->
                         duplicateUri = uri
                     null ->
-                        message = context.getString(R.string.models_import_invalid)
+                        toast(R.string.models_import_invalid)
                 }
             }
         }
@@ -138,15 +145,6 @@ fun ModelsScreen(
                 Text(stringResource(R.string.models_import_button))
             }
             Spacer(Modifier.height(12.dp))
-
-            message?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.height(8.dp))
-            }
 
             if (containers.isEmpty()) {
                 Text(
@@ -203,7 +201,7 @@ fun ModelsScreen(
                                 }
                             }
                         if (result is ContainerStore.ImportResult.Success) {
-                            message = context.getString(R.string.models_import_success)
+                            toast(R.string.models_import_success)
                             refresh()
                         }
                     }
@@ -254,38 +252,82 @@ fun ModelsScreen(
 
     // Activation confirmation dialog (switching a model triggers a re-sync).
     pendingActivate?.let { pa ->
-        val msg =
-            if (pa.task == ContainerManifest.TASK_DETECTION) {
-                stringResource(R.string.models_activate_detection_msg)
+        val isDetection = pa.task == ContainerManifest.TASK_DETECTION
+
+        fun activate(
+            strategy: org.eidora.data.repository.FaceRepository.DetectionChangeStrategy?,
+        ) {
+            onActivateModel(pa.containerId, pa.modelId, strategy)
+            pendingActivate = null
+            if (isDetection) {
+                selectedDetection =
+                    org.eidora.data.settings.SettingsRepository
+                        .SelectedModel(pa.containerId, pa.modelId)
             } else {
-                stringResource(R.string.models_activate_embedding_msg)
+                selectedEmbedding =
+                    org.eidora.data.settings.SettingsRepository
+                        .SelectedModel(pa.containerId, pa.modelId)
             }
-        AlertDialog(
-            onDismissRequest = { pendingActivate = null },
-            title = { Text(stringResource(R.string.models_activate_title)) },
-            text = { Text(msg) },
-            confirmButton = {
-                TextButton(onClick = {
-                    onActivateModel(pa.containerId, pa.modelId)
-                    pendingActivate = null
-                    // Reflect the new selection immediately.
-                    if (pa.task == ContainerManifest.TASK_DETECTION) {
-                        selectedDetection =
-                            org.eidora.data.settings.SettingsRepository
-                                .SelectedModel(pa.containerId, pa.modelId)
-                    } else {
-                        selectedEmbedding =
-                            org.eidora.data.settings.SettingsRepository
-                                .SelectedModel(pa.containerId, pa.modelId)
+        }
+
+        if (isDetection) {
+            // Detection change: let the user choose what happens to existing
+            // faces. The three options differ sharply in what they preserve.
+            AlertDialog(
+                onDismissRequest = { pendingActivate = null },
+                title = { Text(stringResource(R.string.models_activate_title)) },
+                text = { Text(stringResource(R.string.models_detection_change_msg)) },
+                confirmButton = {
+                    Column {
+                        TextButton(
+                            onClick = {
+                                activate(
+                                    org.eidora.data.repository.FaceRepository
+                                        .DetectionChangeStrategy.KEEP_ALL,
+                                )
+                            },
+                        ) { Text(stringResource(R.string.models_detection_keep_all)) }
+                        TextButton(
+                            onClick = {
+                                activate(
+                                    org.eidora.data.repository.FaceRepository
+                                        .DetectionChangeStrategy.KEEP_CONFIRMED,
+                                )
+                            },
+                        ) { Text(stringResource(R.string.models_detection_keep_confirmed)) }
+                        TextButton(
+                            onClick = {
+                                activate(
+                                    org.eidora.data.repository.FaceRepository
+                                        .DetectionChangeStrategy.REDETECT_ALL,
+                                )
+                            },
+                        ) { Text(stringResource(R.string.models_detection_redetect_all)) }
                     }
-                }) { Text(stringResource(R.string.models_activate_confirm)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingActivate = null }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingActivate = null }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                },
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { pendingActivate = null },
+                title = { Text(stringResource(R.string.models_activate_title)) },
+                text = { Text(stringResource(R.string.models_activate_embedding_msg)) },
+                confirmButton = {
+                    TextButton(onClick = { activate(null) }) {
+                        Text(stringResource(R.string.models_activate_confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingActivate = null }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                },
+            )
+        }
     }
 }
 
