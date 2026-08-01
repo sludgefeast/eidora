@@ -480,6 +480,7 @@ private fun FloatSetting(
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
+        Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = text,
@@ -531,6 +532,7 @@ private fun IntSetting(
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
+        Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = text,
