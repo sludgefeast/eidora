@@ -138,7 +138,11 @@ fun SettingsScreen(
                     }
                     if (isExpanded) {
                         folders.forEach { folder ->
-                            val isIncluded = folder in state.folderWhitelist
+                            val coveredByAncestor =
+                                org.eidora.data.settings.FolderHierarchy
+                                    .isCoveredByAncestor(folder, state.folderWhitelist)
+                            val isIncluded =
+                                folder in state.folderWhitelist || coveredByAncestor
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier =
@@ -148,12 +152,18 @@ fun SettingsScreen(
                             ) {
                                 Checkbox(
                                     checked = isIncluded,
+                                    // A child covered by a selected ancestor is
+                                    // locked on: it's already included, and the
+                                    // user manages it via the parent.
+                                    enabled = !coveredByAncestor,
                                     onCheckedChange = { included ->
                                         val newWl =
                                             if (included) {
-                                                state.folderWhitelist + folder
+                                                org.eidora.data.settings.FolderHierarchy
+                                                    .select(folder, state.folderWhitelist)
                                             } else {
-                                                state.folderWhitelist - folder
+                                                org.eidora.data.settings.FolderHierarchy
+                                                    .deselect(folder, state.folderWhitelist)
                                             }
                                         viewModel.setFolderWhitelist(newWl)
                                     },
@@ -161,6 +171,12 @@ fun SettingsScreen(
                                 Text(
                                     text = folder,
                                     style = MaterialTheme.typography.bodyMedium,
+                                    color =
+                                        if (coveredByAncestor) {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
                                     modifier = Modifier.padding(start = 4.dp),
                                 )
                             }
