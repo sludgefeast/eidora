@@ -430,16 +430,6 @@ private fun SectionHeader(
 
 /** Explanatory line under a section header. Keeps sections visually consistent. */
 @Composable
-private fun SectionDescription(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = 12.dp),
-    )
-}
-
-@Composable
 private fun SwitchSetting(
     label: String,
     description: String,
@@ -568,49 +558,6 @@ private fun IntSetting(
             IconButton(onClick = { onValueChange(default) }) {
                 Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.setting_reset_to_default))
             }
-        }
-    }
-}
-
-/**
- * Embedding-model picker. Selecting a different model shows a confirmation
- * dialog first, because switching recomputes every face embedding. The choice
- * is applied only after the user confirms.
- */
-/**
- * Shows a model's effective license clearly: the license name, and one line on
- * why. Restricted (non-free) models are visually flagged and carry an extra
- * note that they are not in F-Droid builds. This is the single place the app
- * explains licensing, so the user decides with full information.
- */
-@Composable
-private fun ModelLicenseRow(license: org.eidora.ml.ModelLicense) {
-    val accent =
-        if (license.isFree) {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        } else {
-            MaterialTheme.colorScheme.error
-        }
-    Column(modifier = Modifier.padding(top = 2.dp)) {
-        Text(
-            text =
-                stringResource(R.string.model_license_label) +
-                    ": " + stringResource(license.effectiveNameRes),
-            style = MaterialTheme.typography.bodySmall,
-            color = accent,
-            fontWeight = FontWeight.Medium,
-        )
-        Text(
-            text = stringResource(license.reasonRes),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (!license.isFree) {
-            Text(
-                text = stringResource(R.string.license_restricted_note),
-                style = MaterialTheme.typography.bodySmall,
-                color = accent,
-            )
         }
     }
 }

@@ -183,7 +183,7 @@ class SettingsViewModel(
      * embeddings), so it clears derived data and restarts sync. No-op if it's
      * already the active selection.
      */
-    fun selectDetectionModel(
+    private fun selectDetectionModel(
         containerId: String,
         modelId: String,
         strategy: org.eidora.data.repository.FaceRepository.DetectionChangeStrategy,
@@ -219,7 +219,7 @@ class SettingsViewModel(
      * model's manifest values, and restarts the pipeline. Confirmed names
      * survive (they re-import from XMP). No-op if already active.
      */
-    fun selectEmbeddingModel(containerId: String, modelId: String) {
+    private fun selectEmbeddingModel(containerId: String, modelId: String) {
         viewModelScope.launch {
             val current = repo.getSelectedEmbedding()
             if (current?.containerId == containerId && current.modelId == modelId) return@launch

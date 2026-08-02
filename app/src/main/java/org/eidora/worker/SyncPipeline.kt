@@ -118,7 +118,7 @@ object SyncPipeline {
     // State queries for mutual exclusion
     // -----------------------------------------------------------------------
 
-    fun isClusteringRunning(context: Context): Boolean =
+    private fun isClusteringRunning(context: Context): Boolean =
         WorkManager
             .getInstance(context)
             .getWorkInfosForUniqueWork(UNIQUE_CLUSTERING_NAME)

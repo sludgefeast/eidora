@@ -69,7 +69,7 @@ class PowerGate(
      * makes the gate oscillate — it would resume the instant the value crosses
      * back, then trip again moments later.
      */
-    fun evaluate(
+    internal fun evaluate(
         status: PowerStatus,
         config: org.eidora.data.settings.PowerConfig,
         currentlyBlocked: Boolean,

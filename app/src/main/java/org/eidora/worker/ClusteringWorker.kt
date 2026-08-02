@@ -21,6 +21,23 @@ private const val TAG = "ClusteringWorker"
 // minutes, enough for the embedding phase to finish on a large library.
 private const val MAX_EMBEDDING_WAIT_ATTEMPTS = 10
 
+/**
+ * One stored embedding of a named person, with the metadata used for weighted
+ * nearest-neighbour matching. Individual embeddings are kept (rather than a
+ * single centroid) so age- and lighting-related variation is preserved.
+ */
+private class PersonEmbedding(
+    val embedding: FloatArray,
+    val takenAt: Long?,
+    val quality: Float,
+    val isConfirmed: Boolean,
+)
+
+/** All stored embeddings of one named person. */
+private class PersonData(
+    val faces: List<PersonEmbedding>,
+)
+
 class ClusteringWorker(
     context: Context,
     params: WorkerParameters,
@@ -70,44 +87,7 @@ class ClusteringWorker(
                     .findUnclusteredWithDate()
                     .filter { it.faceRegion.embedding != null }
 
-            // PersonData: all embeddings with metadata for weighted nearest-neighbour matching.
-            // Keeping individual embeddings instead of a centroid preserves age-related variation.
-            data class PersonEmbedding(
-                val embedding: FloatArray,
-                val takenAt: Long?,
-                val quality: Float,
-                val isConfirmed: Boolean,
-            )
-
-            data class PersonData(
-                val faces: List<PersonEmbedding>,
-            )
-
-            val personData: Map<String, PersonData> =
-                personDao
-                    .getAll()
-                    .filter { it.name != null }
-                    .mapNotNull { person ->
-                        val allFaces =
-                            faceDao
-                                .findByPersonIdWithDate(person.id)
-                                .filter { !it.faceRegion.ignored && it.faceRegion.embedding != null }
-                        if (allFaces.isEmpty()) {
-                            null
-                        } else {
-                            person.id to
-                                PersonData(
-                                    allFaces.map {
-                                        PersonEmbedding(
-                                            embedding = EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!),
-                                            takenAt = it.photoTakenAt,
-                                            quality = it.faceRegion.qualityScore ?: 0.5f,
-                                            isConfirmed = it.faceRegion.name != null,
-                                        )
-                                    },
-                                )
-                        }
-                    }.toMap()
+            val personData: Map<String, PersonData> = loadPersonData(faceDao, personDao)
 
             // ----- Phase 1: Individual matching (0-30%) -----
             val individuallyAssigned = mutableSetOf<String>()
@@ -144,21 +124,12 @@ class ClusteringWorker(
                             // Weighted nearest-neighbour: find the best matching face
                             // in this person's history, boosted by temporal proximity.
                             val bestFaceDist =
-                                pd.faces.minOfOrNull { pf ->
-                                    val cosD = EmbeddingModel.cosineDistance(embedding, pf.embedding)
-                                    // Temporal bonus: reduce distance for temporally close faces
-                                    val temporalBonus =
-                                        temporalBonus(
-                                            face.photoTakenAt,
-                                            pf.takenAt,
-                                            timeWeight,
-                                        )
-                                    // Quality and confirm boost as weight on the bonus
-                                    val boost =
-                                        (pf.quality * if (pf.isConfirmed) 1.5f else 1.0f)
-                                            .coerceAtMost(1.0f)
-                                    cosD - temporalBonus * boost
-                                } ?: return@forEach
+                                bestDistanceToPerson(
+                                    embedding,
+                                    face.photoTakenAt,
+                                    pd,
+                                    timeWeight,
+                                ) ?: return@forEach
                             if (bestFaceDist < bestDist) {
                                 bestDist = bestFaceDist
                                 bestId = personId
@@ -301,19 +272,12 @@ class ClusteringWorker(
                         try {
                             // Compare cluster centroid against each person embedding (NN)
                             val bestFaceDist =
-                                pd.faces.minOfOrNull { pf ->
-                                    val cosD = EmbeddingModel.cosineDistance(clusterCentroid, pf.embedding)
-                                    val temporalBonus =
-                                        temporalBonus(
-                                            clusterMedian,
-                                            pf.takenAt,
-                                            timeWeight,
-                                        )
-                                    val boost =
-                                        (pf.quality * if (pf.isConfirmed) 1.5f else 1.0f)
-                                            .coerceAtMost(1.0f)
-                                    cosD - temporalBonus * boost
-                                } ?: return@forEach
+                                bestDistanceToPerson(
+                                    clusterCentroid,
+                                    clusterMedian,
+                                    pd,
+                                    timeWeight,
+                                ) ?: return@forEach
                             if (bestFaceDist < bestDistance) {
                                 bestDistance = bestFaceDist
                                 bestPerson = personDao.findById(personId)
@@ -414,6 +378,40 @@ class ClusteringWorker(
      * concurrently. Shows a "waiting" notification. Returns false if the worker
      * was stopped while waiting.
      */
+    /**
+     * Loads every named person's stored embeddings (with metadata) for
+     * nearest-neighbour matching. Persons whose faces are all ignored or lack an
+     * embedding are skipped. Extracted from doWork to keep the phases readable.
+     */
+    private suspend fun loadPersonData(
+        faceDao: org.eidora.data.db.FaceRegionDao,
+        personDao: org.eidora.data.db.PersonDao,
+    ): Map<String, PersonData> =
+        personDao
+            .getAll()
+            .filter { it.name != null }
+            .mapNotNull { person ->
+                val allFaces =
+                    faceDao
+                        .findByPersonIdWithDate(person.id)
+                        .filter { !it.faceRegion.ignored && it.faceRegion.embedding != null }
+                if (allFaces.isEmpty()) {
+                    null
+                } else {
+                    person.id to
+                        PersonData(
+                            allFaces.map {
+                                PersonEmbedding(
+                                    embedding = EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!),
+                                    takenAt = it.photoTakenAt,
+                                    quality = it.faceRegion.qualityScore ?: 0.5f,
+                                    isConfirmed = it.faceRegion.name != null,
+                                )
+                            },
+                        )
+                }
+            }.toMap()
+
     private suspend fun awaitSyncToFinish(): Boolean {
         val wm = WorkManager.getInstance(applicationContext)
         val syncStates = setOf(WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED)
@@ -579,6 +577,29 @@ class ClusteringWorker(
      * Subtracting this from cosine distance makes temporally close faces
      * effectively "more similar".
      */
+    /**
+     * Smallest adjusted distance between a query embedding and any of a person's
+     * stored faces. Each candidate face's cosine distance is reduced by a
+     * temporal bonus (closer in time = more likely the same person), weighted by
+     * the face's quality and a confirm boost. Returns null if the person has no
+     * faces. This is the shared nearest-neighbour rule used by both Phase 1
+     * (individual matching) and Phase 3 (cluster assignment), so the two stay
+     * consistent.
+     */
+    private fun bestDistanceToPerson(
+        queryEmbedding: FloatArray,
+        queryTakenAt: Long?,
+        person: PersonData,
+        timeWeight: Float,
+    ): Float? =
+        person.faces.minOfOrNull { pf ->
+            val cosD = EmbeddingModel.cosineDistance(queryEmbedding, pf.embedding)
+            val bonus = temporalBonus(queryTakenAt, pf.takenAt, timeWeight)
+            val boost =
+                (pf.quality * if (pf.isConfirmed) 1.5f else 1.0f).coerceAtMost(1.0f)
+            cosD - bonus * boost
+        }
+
     private fun temporalBonus(
         takenAtA: Long?,
         takenAtB: Long?,
@@ -612,7 +633,7 @@ class ClusteringWorker(
                 .build()
 
         /** PendingIntent that cancels the clustering work – used in notification. */
-        fun cancelPendingIntent(context: Context): android.app.PendingIntent {
+        private fun cancelPendingIntent(context: Context): android.app.PendingIntent {
             val intent = android.content.Intent(context, CancelClusteringReceiver::class.java)
             return android.app.PendingIntent.getBroadcast(
                 context,

@@ -84,7 +84,7 @@ object ContainerDownloader {
      * null to skip), unpacks into filesDir/containers/<id>, and parses the
      * manifest. Blocking — call off the main thread.
      */
-    fun downloadAndUnpack(
+    private fun downloadAndUnpack(
         context: Context,
         url: String,
         expectedSha256: String?,

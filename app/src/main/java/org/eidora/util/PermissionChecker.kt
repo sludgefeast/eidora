@@ -18,7 +18,7 @@ import androidx.core.content.ContextCompat
 object PermissionChecker {
 
     /** The media-read permission appropriate for the running Android version. */
-    private fun mediaPermission(): String =
+    fun mediaPermission(): String =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_IMAGES
         } else {
