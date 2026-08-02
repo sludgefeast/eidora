@@ -3,10 +3,12 @@
 
 package org.eidora.ui.settings
 
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -56,6 +58,9 @@ import org.eidora.ml.container.ContainerStore
  * its models, offers an import, and allows deleting non-protected containers or
  * individual models. Activating/choosing which model is used comes later.
  */
+private const val MODELS_README_URL =
+    "https://github.com/sludgefeast/eidora/blob/main/scripts/README.md"
+
 @Composable
 fun ModelsScreen(
     onBack: () -> Unit,
@@ -148,6 +153,28 @@ fun ModelsScreen(
             ) {
                 Text(stringResource(R.string.models_import_button))
             }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.models_import_explainer),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.models_import_learn_more),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier =
+                    Modifier.clickable {
+                        try {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(MODELS_README_URL)),
+                            )
+                        } catch (t: Throwable) {
+                            toast(R.string.about_no_browser)
+                        }
+                    },
+            )
             Spacer(Modifier.height(12.dp))
 
             if (containers.isEmpty()) {

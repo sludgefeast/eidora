@@ -164,6 +164,8 @@
     <string name="models_settings_entry">Models</string>
     <string name="models_settings_entry_desc">Manage face detection and recognition models</string>
     <string name="models_import_button">Import container…</string>
+    <string name="models_import_explainer">You can import your own model containers here — for example a higher-accuracy detector or recognizer you built yourself.</string>
+    <string name="models_import_learn_more">How to build and import models (e.g. SCRFD + ArcFace) →</string>
     <string name="models_free_badge">Included</string>
     <string name="models_active_badge">Active</string>
     <string name="selftest_action">Test</string>
