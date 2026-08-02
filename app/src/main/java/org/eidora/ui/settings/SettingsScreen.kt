@@ -12,7 +12,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +22,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.eidora.R
 import org.eidora.data.settings.SettingsRepository
+import org.eidora.ui.settings.components.FloatSetting
+import org.eidora.ui.settings.components.IntSetting
+import org.eidora.ui.settings.components.SectionHeader
+import org.eidora.ui.settings.components.SwitchSetting
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -403,161 +406,5 @@ private fun NavigationEntry(
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
         )
-    }
-}
-
-@Composable
-private fun SectionHeader(
-    text: String,
-    first: Boolean = false,
-) {
-    // A divider above each section (except the first) plus generous top space
-    // gives clear visual grouping without boxing everything in cards.
-    if (!first) {
-        HorizontalDivider(
-            modifier = Modifier.padding(top = 28.dp, bottom = 0.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-        )
-    }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = if (first) 8.dp else 20.dp, bottom = 8.dp),
-    )
-}
-
-/** Explanatory line under a section header. Keeps sections visually consistent. */
-@Composable
-private fun SwitchSetting(
-    label: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(vertical = 6.dp),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            modifier = Modifier.padding(start = 12.dp),
-        )
-    }
-}
-
-@Composable
-private fun FloatSetting(
-    label: String,
-    description: String,
-    value: Float,
-    default: Float,
-    hint: String? = null,
-    decimals: Int = 2,
-    onValueChange: (Float) -> Unit,
-) {
-    val fmt = "%.${decimals}f"
-    var text by remember(value) { mutableStateOf(fmt.format(value)) }
-    Column(modifier = Modifier.padding(vertical = 6.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (hint != null) {
-            Text(
-                text = hint,
-                style =
-                    MaterialTheme.typography.bodySmall.copy(
-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                    ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { new ->
-                    text = new
-                    new.replace(',', '.').toFloatOrNull()?.let { onValueChange(it) }
-                },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = stringResource(R.string.setting_default_hint, fmt.format(default)),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 8.dp),
-            )
-            IconButton(onClick = { onValueChange(default) }) {
-                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.setting_reset_to_default))
-            }
-        }
-    }
-}
-
-@Composable
-private fun IntSetting(
-    label: String,
-    description: String,
-    value: Int,
-    default: Int,
-    hint: String? = null,
-    onValueChange: (Int) -> Unit,
-) {
-    var text by remember(value) { mutableStateOf(value.toString()) }
-    Column(modifier = Modifier.padding(vertical = 6.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (hint != null) {
-            Text(
-                text = hint,
-                style =
-                    MaterialTheme.typography.bodySmall.copy(
-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                    ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { new ->
-                    text = new
-                    new.toIntOrNull()?.let { onValueChange(it) }
-                },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = stringResource(R.string.setting_default_hint, default.toString()),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 8.dp),
-            )
-            IconButton(onClick = { onValueChange(default) }) {
-                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.setting_reset_to_default))
-            }
-        }
     }
 }
