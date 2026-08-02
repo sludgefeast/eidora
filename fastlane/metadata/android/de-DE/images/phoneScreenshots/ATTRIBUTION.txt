@@ -1,0 +1,24 @@
+Bildquellen der Screenshots
+===========================
+
+Die in diesen Store-Screenshots gezeigten Fotografien sind historische
+Porträts von Wikimedia Commons, die dort jeweils als gemeinfrei markiert sind
+(PD-old / PD-US / Library of Congress „no known restrictions on publication").
+Sie sind kein eigenes Werk des Eidora-Projekts und werden ausschließlich in
+einem neutralen, technisch/redaktionellen Kontext verwendet (zur Demonstration
+der lokalen Gesichtserkennung und -identifizierung), nicht zu Werbezwecken.
+
+In den Screenshots abgebildete Personen: Albert Einstein (gest. 1955),
+Marie Curie (gest. 1934), Pierre Curie (gest. 1906).
+
+Jede Datei wird geladen von:
+  https://commons.wikimedia.org/wiki/Special:FilePath/<dateiname>
+Die zugehörige Commons-Seite (mit Urheber, Datum und Lizenz) lautet:
+  https://commons.wikimedia.org/wiki/File:<dateiname>
+
+Die vollständige Liste pro Foto — Dateiname, Jahr und Gemeinfreiheits-Grundlage
+— steht in ATTRIBUTION.md im Wurzelverzeichnis des Repositorys. Diese Datei ist
+der maßgebliche Nachweis; prüfe den Status jedes Fotos auf der verlinkten
+Commons-Seite, bevor du dich darauf verlässt.
+
+Keine Rechtsberatung — dies ist ein Nachweis nach bestem Wissen.

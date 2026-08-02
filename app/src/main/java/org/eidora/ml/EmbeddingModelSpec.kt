@@ -112,8 +112,8 @@ data class EmbeddingModelSpec(
          *  - embeddingDim 128 (ONNX output "fc1" [1,128]).
          *  - normalization RAW_0_255: raw pixels reproduce OpenCV's
          *    FaceRecognizerSF embeddings with cosine 1.00000; ZERO_TO_ONE and
-         *    SIGNED_UNIT give ~0.03-0.14 (garbage). Confirmed via
-         *    scripts/verify_sface.py.
+         *    SIGNED_UNIT give ~0.03-0.14 (garbage). This is why the free
+         *    container's manifest declares normalization: raw_0_255.
          *  - OpenCV's cosine-similarity threshold is 0.363, useful when tuning
          *    the clustering thresholds for this model.
          */

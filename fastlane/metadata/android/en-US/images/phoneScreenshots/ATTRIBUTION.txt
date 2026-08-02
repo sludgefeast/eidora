@@ -1,0 +1,23 @@
+Screenshot image sources
+=========================
+
+The photographs shown in these store screenshots are historical portraits
+taken from Wikimedia Commons, each marked there as public domain (PD-old /
+PD-US / Library of Congress "no known restrictions on publication"). They are
+not original work by the Eidora project and are used only in a neutral,
+technical/editorial context (demonstrating on-device face detection and
+recognition), not for advertising.
+
+People depicted in the screenshots: Albert Einstein (d. 1955), Marie Curie
+(d. 1934), Pierre Curie (d. 1906).
+
+Each file is fetched from:
+  https://commons.wikimedia.org/wiki/Special:FilePath/<filename>
+and its Commons page (with author, date and licence) is:
+  https://commons.wikimedia.org/wiki/File:<filename>
+
+The full per-photo list — filename, year and public-domain basis — is kept in
+ATTRIBUTION.md at the repository root. That file is the authoritative record;
+verify each photo's status on its linked Commons page before relying on it.
+
+Not legal advice — this is a good-faith record.
