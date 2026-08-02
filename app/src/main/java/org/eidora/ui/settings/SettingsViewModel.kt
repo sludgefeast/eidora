@@ -153,6 +153,7 @@ class SettingsViewModel(
         containerId: String,
         modelId: String,
         detectionStrategy: org.eidora.data.repository.FaceRepository.DetectionChangeStrategy?,
+        embeddingStrategy: org.eidora.data.repository.FaceRepository.EmbeddingChangeStrategy? = null,
     ) {
         viewModelScope.launch {
             val task =
@@ -172,7 +173,13 @@ class SettingsViewModel(
                             .DetectionChangeStrategy.KEEP_ALL,
                 )
             } else {
-                selectEmbeddingModel(containerId, modelId)
+                selectEmbeddingModel(
+                    containerId,
+                    modelId,
+                    embeddingStrategy
+                        ?: org.eidora.data.repository.FaceRepository
+                            .EmbeddingChangeStrategy.RECOMPUTE_ALL,
+                )
             }
         }
     }
@@ -219,40 +226,66 @@ class SettingsViewModel(
      * model's manifest values, and restarts the pipeline. Confirmed names
      * survive (they re-import from XMP). No-op if already active.
      */
-    private fun selectEmbeddingModel(containerId: String, modelId: String) {
+    private fun selectEmbeddingModel(
+        containerId: String,
+        modelId: String,
+        strategy: org.eidora.data.repository.FaceRepository.EmbeddingChangeStrategy,
+    ) {
         viewModelScope.launch {
             val current = repo.getSelectedEmbedding()
-            if (current?.containerId == containerId && current.modelId == modelId) return@launch
+            val sameSelection =
+                current?.containerId == containerId && current.modelId == modelId
+            // A same-model reimport keeps the selection but may still want to
+            // preserve embeddings; only bail early when nothing needs doing.
+            if (sameSelection &&
+                strategy ==
+                org.eidora.data.repository.FaceRepository
+                    .EmbeddingChangeStrategy.KEEP_EMBEDDINGS
+            ) {
+                return@launch
+            }
             repo.setSelectedEmbedding(containerId, modelId)
+
+            val keepEmbeddings =
+                strategy ==
+                    org.eidora.data.repository.FaceRepository
+                        .EmbeddingChangeStrategy.KEEP_EMBEDDINGS
 
             // Reset clustering thresholds to the manifest's values for this
             // model, if it declares them — thresholds tuned for the previous
-            // model live in a different embedding space.
-            val clustering =
-                withContext(Dispatchers.IO) {
-                    org.eidora.ml.container.ContainerStore
-                        .listContainers(getApplication())
-                        .firstOrNull { it.id == containerId }
-                        ?.manifest?.models?.firstOrNull { it.id == modelId }
-                        ?.clustering
+            // model live in a different embedding space. Skip when keeping
+            // embeddings, since the space (and thus the thresholds) is unchanged.
+            if (!keepEmbeddings) {
+                val clustering =
+                    withContext(Dispatchers.IO) {
+                        org.eidora.ml.container.ContainerStore
+                            .listContainers(getApplication())
+                            .firstOrNull { it.id == containerId }
+                            ?.manifest?.models?.firstOrNull { it.id == modelId }
+                            ?.clustering
+                    }
+                if (clustering != null) {
+                    val cfg = repo.clusteringConfig.first()
+                    repo.setClusteringConfig(
+                        cfg.copy(
+                            edgeThreshold = clustering.edge,
+                            clusterMatchThreshold = clustering.clusterMatch,
+                            individualMatchThreshold = clustering.individualMatch,
+                        ),
+                    )
                 }
-            if (clustering != null) {
-                val cfg = repo.clusteringConfig.first()
-                repo.setClusteringConfig(
-                    cfg.copy(
-                        edgeThreshold = clustering.edge,
-                        clusterMatchThreshold = clustering.clusterMatch,
-                        individualMatchThreshold = clustering.individualMatch,
-                    ),
-                )
             }
 
             try {
-                faceRepo.resetForEmbeddingModelChange()
+                faceRepo.resetForEmbeddingModelChange(strategy)
             } catch (t: Throwable) {
-                // best-effort; the pipeline still re-runs below
+                // best-effort; the pipeline still re-runs below when needed
             }
-            org.eidora.worker.SyncPipeline.restartAfterFolderChange(getApplication())
+            // Keeping embeddings needs no re-run — everything downstream is
+            // still valid. Recompute triggers a full pipeline restart.
+            if (!keepEmbeddings) {
+                org.eidora.worker.SyncPipeline.restartAfterFolderChange(getApplication())
+            }
         }
     }
 

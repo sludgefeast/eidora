@@ -20,10 +20,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -61,7 +64,8 @@ fun ModelsScreen(
         String,
         String,
         org.eidora.data.repository.FaceRepository.DetectionChangeStrategy?,
-    ) -> Unit = { _, _, _ -> },
+        org.eidora.data.repository.FaceRepository.EmbeddingChangeStrategy?,
+    ) -> Unit = { _, _, _, _ -> },
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -203,6 +207,33 @@ fun ModelsScreen(
                         if (result is ContainerStore.ImportResult.Success) {
                             toast(R.string.models_import_success)
                             refresh()
+                            // A reimport swaps the model files. If the replaced
+                            // container holds the active detection or embedding
+                            // model, that's effectively a reactivation with
+                            // possibly different weights — ask the same question
+                            // the activation flow does. Inactive containers just
+                            // get replaced silently.
+                            val c = result.container
+                            val activeModel =
+                                c.manifest.models.firstOrNull { m ->
+                                    when (m.task) {
+                                        ContainerManifest.TASK_DETECTION ->
+                                            selectedDetection?.containerId == c.id &&
+                                                selectedDetection.modelId == m.id
+                                        else ->
+                                            selectedEmbedding?.containerId == c.id &&
+                                                selectedEmbedding.modelId == m.id
+                                    }
+                                }
+                            if (activeModel != null) {
+                                pendingActivate =
+                                    PendingActivate(
+                                        c.id,
+                                        activeModel.id,
+                                        activeModel.task,
+                                        isReimport = true,
+                                    )
+                            }
                         }
                     }
                 }) { Text(stringResource(R.string.models_import_replace)) }
@@ -255,9 +286,10 @@ fun ModelsScreen(
         val isDetection = pa.task == ContainerManifest.TASK_DETECTION
 
         fun activate(
-            strategy: org.eidora.data.repository.FaceRepository.DetectionChangeStrategy?,
+            detectionStrategy: org.eidora.data.repository.FaceRepository.DetectionChangeStrategy?,
+            embeddingStrategy: org.eidora.data.repository.FaceRepository.EmbeddingChangeStrategy?,
         ) {
-            onActivateModel(pa.containerId, pa.modelId, strategy)
+            onActivateModel(pa.containerId, pa.modelId, detectionStrategy, embeddingStrategy)
             pendingActivate = null
             if (isDetection) {
                 selectedDetection =
@@ -273,57 +305,98 @@ fun ModelsScreen(
         if (isDetection) {
             // Detection change: let the user choose what happens to existing
             // faces. The three options differ sharply in what they preserve.
+            // All actions (incl. cancel) go in one vertical column so the long
+            // labels stack cleanly instead of overlapping the dismiss slot.
             AlertDialog(
                 onDismissRequest = { pendingActivate = null },
                 title = { Text(stringResource(R.string.models_activate_title)) },
                 text = { Text(stringResource(R.string.models_detection_change_msg)) },
                 confirmButton = {
-                    Column {
-                        TextButton(
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        DetectionStrategyButton(
+                            label = stringResource(R.string.models_detection_keep_all),
                             onClick = {
                                 activate(
                                     org.eidora.data.repository.FaceRepository
                                         .DetectionChangeStrategy.KEEP_ALL,
+                                    null,
                                 )
                             },
-                        ) { Text(stringResource(R.string.models_detection_keep_all)) }
-                        TextButton(
+                        )
+                        DetectionStrategyButton(
+                            label = stringResource(R.string.models_detection_keep_confirmed),
                             onClick = {
                                 activate(
                                     org.eidora.data.repository.FaceRepository
                                         .DetectionChangeStrategy.KEEP_CONFIRMED,
+                                    null,
                                 )
                             },
-                        ) { Text(stringResource(R.string.models_detection_keep_confirmed)) }
-                        TextButton(
+                        )
+                        DetectionStrategyButton(
+                            label = stringResource(R.string.models_detection_redetect_all),
                             onClick = {
                                 activate(
                                     org.eidora.data.repository.FaceRepository
                                         .DetectionChangeStrategy.REDETECT_ALL,
+                                    null,
                                 )
                             },
-                        ) { Text(stringResource(R.string.models_detection_redetect_all)) }
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { pendingActivate = null }) {
-                        Text(stringResource(R.string.action_cancel))
+                        )
+                        DetectionStrategyButton(
+                            label = stringResource(R.string.action_cancel),
+                            onClick = { pendingActivate = null },
+                        )
                     }
                 },
             )
         } else {
+            // Embedding change: recompute everything, or — for a same-model
+            // reimport where the vector space is unchanged — keep the existing
+            // embeddings and clusters.
             AlertDialog(
                 onDismissRequest = { pendingActivate = null },
                 title = { Text(stringResource(R.string.models_activate_title)) },
-                text = { Text(stringResource(R.string.models_activate_embedding_msg)) },
-                confirmButton = {
-                    TextButton(onClick = { activate(null) }) {
-                        Text(stringResource(R.string.models_activate_confirm))
-                    }
+                text = {
+                    Text(
+                        if (pa.isReimport) {
+                            stringResource(R.string.models_embedding_change_msg)
+                        } else {
+                            stringResource(R.string.models_activate_embedding_msg)
+                        },
+                    )
                 },
-                dismissButton = {
-                    TextButton(onClick = { pendingActivate = null }) {
-                        Text(stringResource(R.string.action_cancel))
+                confirmButton = {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        // Keeping embeddings is only safe for a same-model
+                        // reimport (unchanged vector space). Switching to a
+                        // different model must recompute, so hide it there.
+                        if (pa.isReimport) {
+                            DetectionStrategyButton(
+                                label = stringResource(R.string.models_embedding_keep),
+                                onClick = {
+                                    activate(
+                                        null,
+                                        org.eidora.data.repository.FaceRepository
+                                            .EmbeddingChangeStrategy.KEEP_EMBEDDINGS,
+                                    )
+                                },
+                            )
+                        }
+                        DetectionStrategyButton(
+                            label = stringResource(R.string.models_embedding_recompute),
+                            onClick = {
+                                activate(
+                                    null,
+                                    org.eidora.data.repository.FaceRepository
+                                        .EmbeddingChangeStrategy.RECOMPUTE_ALL,
+                                )
+                            },
+                        )
+                        DetectionStrategyButton(
+                            label = stringResource(R.string.action_cancel),
+                            onClick = { pendingActivate = null },
+                        )
                     }
                 },
             )
@@ -340,6 +413,9 @@ private data class PendingActivate(
     val containerId: String,
     val modelId: String,
     val task: String,
+    // True when this came from re-importing an already-active model (same vector
+    // space), which is the only case where keeping embeddings is safe.
+    val isReimport: Boolean = false,
 )
 
 @Composable
@@ -353,6 +429,20 @@ private fun ContainerCard(
     onActivateModel: (String, String) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        // A container that holds the active detection or embedding model must
+        // not be deletable — removing it would pull the model out from under a
+        // running configuration.
+        val containerHasActiveModel =
+            container.manifest.models.any { model ->
+                when (model.task) {
+                    ContainerManifest.TASK_DETECTION ->
+                        selectedDetection?.containerId == container.id &&
+                            selectedDetection.modelId == model.id
+                    else ->
+                        selectedEmbedding?.containerId == container.id &&
+                            selectedEmbedding.modelId == model.id
+                }
+            }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -376,10 +466,19 @@ private fun ContainerCard(
                     color = MaterialTheme.colorScheme.primary,
                 )
             } else {
-                IconButton(onClick = onDeleteContainer) {
+                IconButton(
+                    onClick = onDeleteContainer,
+                    enabled = !containerHasActiveModel,
+                ) {
                     Icon(
                         Icons.Filled.Delete,
                         contentDescription = stringResource(R.string.models_delete_container),
+                        tint =
+                            if (containerHasActiveModel) {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            } else {
+                                LocalContentColor.current
+                            },
                     )
                 }
             }
@@ -413,6 +512,24 @@ private fun ContainerCard(
 }
 
 @Composable
+private fun DetectionStrategyButton(
+    label: String,
+    onClick: () -> Unit,
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 10.dp),
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Start,
+        )
+    }
+}
+
+@Composable
 private fun ModelRow(
     model: ContainerManifest.ModelEntry,
     sizeBytes: Long,
@@ -426,6 +543,13 @@ private fun ModelRow(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val isDetection = model.task == ContainerManifest.TASK_DETECTION
+        Icon(
+            imageVector = if (isDetection) Icons.Default.Face else Icons.Default.Fingerprint,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 12.dp),
+        )
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -442,7 +566,7 @@ private fun ModelRow(
                 }
             }
             val taskLabel =
-                if (model.task == ContainerManifest.TASK_DETECTION) {
+                if (isDetection) {
                     stringResource(R.string.models_detection_label)
                 } else {
                     stringResource(R.string.models_embedding_label)
@@ -468,10 +592,21 @@ private fun ModelRow(
             Text(stringResource(R.string.selftest_action))
         }
         if (!protected) {
-            IconButton(onClick = onDelete) {
+            IconButton(
+                onClick = onDelete,
+                // An active model can't be deleted — it's in use by the current
+                // detection/recognition configuration.
+                enabled = !active,
+            ) {
                 Icon(
                     Icons.Filled.Delete,
                     contentDescription = stringResource(R.string.models_delete_model),
+                    tint =
+                        if (active) {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        } else {
+                            LocalContentColor.current
+                        },
                 )
             }
         }

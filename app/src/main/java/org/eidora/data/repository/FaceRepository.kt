@@ -432,6 +432,34 @@ class FaceRepository(
         faceDao.clearAllEmbeddings()
     }
 
+    /**
+     * What to do with existing embeddings when the embedding model changes.
+     * KEEP_EMBEDDINGS is only safe when the embedding space is unchanged — e.g.
+     * re-importing the SAME model, not switching to a different one, since
+     * embeddings from different models are not comparable.
+     */
+    enum class EmbeddingChangeStrategy {
+        /** Keep existing embeddings and clusters untouched (same-model reimport). */
+        KEEP_EMBEDDINGS,
+
+        /** Recompute all embeddings; drops clustered persons (different model). */
+        RECOMPUTE_ALL,
+    }
+
+    /**
+     * Applies [strategy] when the embedding model is (re)activated. KEEP_EMBEDDINGS
+     * leaves everything in place — use it only when the vector space is unchanged.
+     * RECOMPUTE_ALL behaves like [resetForEmbeddingModelChange].
+     */
+    suspend fun resetForEmbeddingModelChange(strategy: EmbeddingChangeStrategy) {
+        when (strategy) {
+            EmbeddingChangeStrategy.KEEP_EMBEDDINGS -> {
+                // Nothing to reset; existing embeddings stay valid.
+            }
+            EmbeddingChangeStrategy.RECOMPUTE_ALL -> resetForEmbeddingModelChange()
+        }
+    }
+
     /** What to do with existing faces when the detection model changes. */
     enum class DetectionChangeStrategy {
         /** Keep all detected faces; the new detector only applies to future scans. */

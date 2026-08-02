@@ -173,7 +173,9 @@
     <string name="models_detection_keep_confirmed">Fotos mit benanntem Gesicht behalten, Rest neu durchsuchen</string>
     <string name="models_detection_redetect_all">Alles neu durchsuchen (entfernt alle Personen)</string>
     <string name="models_activate_embedding_msg">Beim Wechsel des Identifizierungsmodells werden alle bestehenden Identifizierungen verworfen und neu berechnet. Bestätigte Namen bleiben erhalten. Das läuft im Hintergrund und kann eine Weile dauern.</string>
-    <string name="models_activate_confirm">Wechseln</string>
+    <string name="models_embedding_change_msg">Identifizierungsmodell wird erneut importiert. Wähle, was mit bestehenden Identifizierungen geschehen soll:</string>
+    <string name="models_embedding_keep">Bestehende Identifizierungen behalten (gleiches Modell)</string>
+    <string name="models_embedding_recompute">Alles neu berechnen (entfernt Cluster)</string>
     <string name="selftest_title">Modell-Selbsttest</string>
     <string name="selftest_running">Läuft…</string>
     <string name="selftest_detection_intro">Der Detektor wurde auf die Testfotos angewendet. Sitzen die Rahmen auf den Gesichtern, und stimmt die Anzahl?</string>

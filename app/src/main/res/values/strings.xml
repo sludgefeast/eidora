@@ -173,7 +173,9 @@
     <string name="models_detection_keep_confirmed">Keep photos with a named face, re-scan the rest</string>
     <string name="models_detection_redetect_all">Re-scan everything (removes all persons)</string>
     <string name="models_activate_embedding_msg">Switching the recognition model discards all existing recognitions and recomputes them. Confirmed names are kept. This runs in the background and can take a while.</string>
-    <string name="models_activate_confirm">Switch</string>
+    <string name="models_embedding_change_msg">Re-importing the recognition model. Choose what to do with existing recognitions:</string>
+    <string name="models_embedding_keep">Keep existing recognitions (same model)</string>
+    <string name="models_embedding_recompute">Recompute everything (removes clusters)</string>
     <string name="selftest_title">Model self-test</string>
     <string name="selftest_running">Running…</string>
     <string name="selftest_detection_intro">The detector was run on the test photos. Do the boxes sit on the faces, and does the count match?</string>
