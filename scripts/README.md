@@ -15,6 +15,10 @@ python scripts/build_container.py \
   --out eidora-free.eidoramodel
 ```
 
+> Prefer not to install the toolchain? `scripts/build_container_docker.sh` runs
+> this exact build inside a pinned Docker image — see [`docker/README.md`](../docker/README.md).
+> It's the easiest way to build the research container locally.
+
 Each model needs a `build:` block:
 
 ```yaml
