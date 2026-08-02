@@ -214,15 +214,20 @@ fun ModelsScreen(
                             // the activation flow does. Inactive containers just
                             // get replaced silently.
                             val c = result.container
+                            // Copy the delegated state into locals so the
+                            // null-checks below smart-cast (a `by remember`
+                            // property can't be smart-cast directly).
+                            val activeDet = selectedDetection
+                            val activeEmb = selectedEmbedding
                             val activeModel =
                                 c.manifest.models.firstOrNull { m ->
                                     when (m.task) {
                                         ContainerManifest.TASK_DETECTION ->
-                                            selectedDetection?.containerId == c.id &&
-                                                selectedDetection.modelId == m.id
+                                            activeDet?.containerId == c.id &&
+                                                activeDet.modelId == m.id
                                         else ->
-                                            selectedEmbedding?.containerId == c.id &&
-                                                selectedEmbedding.modelId == m.id
+                                            activeEmb?.containerId == c.id &&
+                                                activeEmb.modelId == m.id
                                     }
                                 }
                             if (activeModel != null) {
