@@ -546,16 +546,22 @@ private fun ModelRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        // Top-align: the icon and the top action row (name + buttons) line up,
+        // and the description/activate button flow below the name.
+        verticalAlignment = Alignment.Top,
     ) {
         val isDetection = model.task == ContainerManifest.TASK_DETECTION
         Icon(
             imageVector = if (isDetection) Icons.Default.Face else Icons.Default.Fingerprint,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(end = 12.dp),
+            // Nudge down so the icon centers on the name line rather than the
+            // very top edge of the text.
+            modifier = Modifier.padding(end = 12.dp, top = 2.dp),
         )
         Column(modifier = Modifier.weight(1f)) {
+            // Name + action buttons on one line, so Test/trash always sit level
+            // with the name regardless of how tall the description wraps.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     model.name ?: model.id,
@@ -568,6 +574,29 @@ private fun ModelRow(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
+                }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onTest) {
+                    Text(stringResource(R.string.selftest_action))
+                }
+                if (!protected) {
+                    IconButton(
+                        onClick = onDelete,
+                        // An active model can't be deleted — it's in use by the
+                        // current detection/recognition configuration.
+                        enabled = !active,
+                    ) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.models_delete_model),
+                            tint =
+                                if (active) {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                } else {
+                                    LocalContentColor.current
+                                },
+                        )
+                    }
                 }
             }
             val taskLabel =
@@ -591,28 +620,6 @@ private fun ModelRow(
                 ) {
                     Text(stringResource(R.string.models_activate))
                 }
-            }
-        }
-        TextButton(onClick = onTest) {
-            Text(stringResource(R.string.selftest_action))
-        }
-        if (!protected) {
-            IconButton(
-                onClick = onDelete,
-                // An active model can't be deleted — it's in use by the current
-                // detection/recognition configuration.
-                enabled = !active,
-            ) {
-                Icon(
-                    Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.models_delete_model),
-                    tint =
-                        if (active) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                        } else {
-                            LocalContentColor.current
-                        },
-                )
             }
         }
     }
