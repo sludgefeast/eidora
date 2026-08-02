@@ -43,4 +43,15 @@ object FolderHierarchy {
      */
     fun deselect(folder: String, whitelist: Set<String>): Set<String> =
         whitelist - folder
+
+    /**
+     * Reduces a set to its minimal form: drops any folder that is already
+     * covered by another entry in the set. Order-independent, unlike folding
+     * [select] over the entries one at a time. Use when building a selection
+     * from raw matches (e.g. pre-selecting camera folders).
+     */
+    fun minimize(folders: Set<String>): Set<String> =
+        folders.filterNot { f ->
+            folders.any { other -> other != f && isDescendant(f, other) }
+        }.toSet()
 }

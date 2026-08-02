@@ -64,14 +64,18 @@ fun FolderWizardScreen(onDone: () -> Unit) {
                 scanFolders(context)
             }
         folders = found
-        // Pre-select camera folders (default whitelist matches)
-        selected =
+        // Pre-select camera folders (default whitelist matches). Fold the raw
+        // matches through the hierarchy helper so the pre-selection is minimal
+        // (a parent, not parent + children), matching the settings behavior.
+        val rawPreselect =
             found
                 .filter { f -> SettingsRepository.DEFAULT_FOLDER_WHITELIST.any { f == it || f.startsWith("$it/") } }
                 .toSet()
                 .ifEmpty {
                     found.filter { it.contains("Camera", ignoreCase = true) }.toSet()
                 }
+        selected =
+            org.eidora.data.settings.FolderHierarchy.minimize(rawPreselect)
     }
 
     Column(
@@ -115,12 +119,24 @@ fun FolderWizardScreen(onDone: () -> Unit) {
             else ->
                 LazyColumn(Modifier.weight(1f)) {
                     items(list) { folder ->
+                        val coveredByAncestor =
+                            org.eidora.data.settings.FolderHierarchy
+                                .isCoveredByAncestor(folder, selected)
                         FolderRow(
                             folder = folder,
-                            checked = folder in selected,
+                            checked = folder in selected || coveredByAncestor,
+                            // A child covered by a selected ancestor is locked
+                            // on — it's already included via the parent.
+                            enabled = !coveredByAncestor,
                             onToggle = {
                                 selected =
-                                    if (folder in selected) selected - folder else selected + folder
+                                    if (folder in selected) {
+                                        org.eidora.data.settings.FolderHierarchy
+                                            .deselect(folder, selected)
+                                    } else {
+                                        org.eidora.data.settings.FolderHierarchy
+                                            .select(folder, selected)
+                                    }
                             },
                         )
                         Spacer(Modifier.height(8.dp))
@@ -156,13 +172,14 @@ fun FolderWizardScreen(onDone: () -> Unit) {
 private fun FolderRow(
     folder: String,
     checked: Boolean,
+    enabled: Boolean = true,
     onToggle: () -> Unit,
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         modifier = Modifier.fillMaxWidth(),
-        onClick = onToggle,
+        onClick = { if (enabled) onToggle() },
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -177,12 +194,22 @@ private fun FolderRow(
             Text(
                 folder,
                 style = MaterialTheme.typography.bodyLarge,
+                color =
+                    if (enabled) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 modifier =
                     Modifier
                         .weight(1f)
                         .padding(start = 12.dp),
             )
-            Checkbox(checked = checked, onCheckedChange = { onToggle() })
+            Checkbox(
+                checked = checked,
+                enabled = enabled,
+                onCheckedChange = { if (enabled) onToggle() },
+            )
         }
     }
 }

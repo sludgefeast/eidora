@@ -113,20 +113,46 @@ class FolderHierarchyTest {
     }
 
     @Nested
-    @DisplayName("deselect")
-    inner class Deselect {
+    @DisplayName("minimize")
+    inner class Minimize {
         @Test
-        @DisplayName("removing a parent leaves the rest untouched")
-        fun removesParent() {
-            val wl = setOf("Pictures", "DCIM/Camera")
-            assertEquals(setOf("DCIM/Camera"), FolderHierarchy.deselect("Pictures", wl))
+        @DisplayName("drops a child already covered by its parent")
+        fun dropsCoveredChild() {
+            assertEquals(
+                setOf("DCIM/Camera"),
+                FolderHierarchy.minimize(setOf("DCIM/Camera", "DCIM/Camera/Sub")),
+            )
         }
 
         @Test
-        @DisplayName("deselecting something not present is a no-op")
-        fun noOp() {
-            val wl = setOf("DCIM/Camera")
-            assertEquals(wl, FolderHierarchy.deselect("Pictures", wl))
+        @DisplayName("keeps independent folders")
+        fun keepsIndependent() {
+            val input = setOf("DCIM/Camera", "DCIM/PlantNet")
+            assertEquals(input, FolderHierarchy.minimize(input))
+        }
+
+        @Test
+        @DisplayName("collapses a deep chain to the topmost folder")
+        fun collapsesChain() {
+            assertEquals(
+                setOf("Pictures"),
+                FolderHierarchy.minimize(setOf("Pictures", "Pictures/A", "Pictures/A/B")),
+            )
+        }
+
+        @Test
+        @DisplayName("is order-independent (child listed before parent)")
+        fun orderIndependent() {
+            assertEquals(
+                setOf("Pictures"),
+                FolderHierarchy.minimize(setOf("Pictures/A/B", "Pictures/A", "Pictures")),
+            )
+        }
+
+        @Test
+        @DisplayName("empty stays empty")
+        fun empty() {
+            assertEquals(emptySet<String>(), FolderHierarchy.minimize(emptySet()))
         }
     }
 }
