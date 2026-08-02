@@ -573,23 +573,19 @@ private fun ModelRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        // Top-align: the icon and the top action row (name + buttons) line up,
-        // and the description/activate button flow below the name.
         verticalAlignment = Alignment.Top,
     ) {
         val isDetection = model.task == ContainerManifest.TASK_DETECTION
-        Icon(
-            imageVector = if (isDetection) Icons.Default.Face else Icons.Default.Fingerprint,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            // Nudge down so the icon centers on the name line rather than the
-            // very top edge of the text.
-            modifier = Modifier.padding(end = 12.dp, top = 2.dp),
-        )
         Column(modifier = Modifier.weight(1f)) {
-            // Name + action buttons on one line, so Test/trash always sit level
-            // with the name regardless of how tall the description wraps.
+            // Icon + name on one vertically-centered row, so the icon sits level
+            // with the name regardless of the description height below.
             Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (isDetection) Icons.Default.Face else Icons.Default.Fingerprint,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 12.dp),
+                )
                 Text(
                     model.name ?: model.id,
                     style = MaterialTheme.typography.bodyLarge,
@@ -602,51 +598,63 @@ private fun ModelRow(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = onTest) {
-                    Text(stringResource(R.string.selftest_action))
-                }
-                if (!protected) {
-                    IconButton(
-                        onClick = onDelete,
-                        // An active model can't be deleted — it's in use by the
-                        // current detection/recognition configuration.
-                        enabled = !active,
+            }
+            // Description and activate button are indented to line up under the
+            // name (past the icon), so the left column reads as one block.
+            Column(modifier = Modifier.padding(start = 36.dp)) {
+                val taskLabel =
+                    if (isDetection) {
+                        stringResource(R.string.models_detection_label)
+                    } else {
+                        stringResource(R.string.models_embedding_label)
+                    }
+                val license = model.license?.name
+                val sizeLabel = formatBytes(sizeBytes)
+                val base = if (license != null) "$taskLabel · $license" else taskLabel
+                Text(
+                    text = if (sizeBytes > 0) "$base · $sizeLabel" else base,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (!active) {
+                    TextButton(
+                        onClick = onActivate,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
                     ) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = stringResource(R.string.models_delete_model),
-                            tint =
-                                if (active) {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                } else {
-                                    LocalContentColor.current
-                                },
-                        )
+                        Text(stringResource(R.string.models_activate))
                     }
                 }
             }
-            val taskLabel =
-                if (isDetection) {
-                    stringResource(R.string.models_detection_label)
-                } else {
-                    stringResource(R.string.models_embedding_label)
-                }
-            val license = model.license?.name
-            val sizeLabel = formatBytes(sizeBytes)
-            val base = if (license != null) "$taskLabel · $license" else taskLabel
-            Text(
-                text = if (sizeBytes > 0) "$base · $sizeLabel" else base,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (!active) {
-                TextButton(
-                    onClick = onActivate,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+        }
+        // Fixed action column on the right: the Test button, then a trash slot
+        // that's always the same width (an empty spacer when the model can't be
+        // deleted), so the Test buttons line up across every container.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onTest) {
+                Text(stringResource(R.string.selftest_action))
+            }
+            if (!protected) {
+                IconButton(
+                    onClick = onDelete,
+                    // An active model can't be deleted — it's in use by the
+                    // current detection/recognition configuration.
+                    enabled = !active,
                 ) {
-                    Text(stringResource(R.string.models_activate))
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.models_delete_model),
+                        tint =
+                            if (active) {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            } else {
+                                LocalContentColor.current
+                            },
+                    )
                 }
+            } else {
+                // Reserve the trash's footprint so Test aligns with rows that
+                // do show a trash icon.
+                Spacer(Modifier.width(48.dp))
             }
         }
     }
