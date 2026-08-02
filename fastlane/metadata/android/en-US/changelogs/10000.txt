@@ -1,0 +1,5 @@
+First release.
+
+On-device face detection and recognition for your own photo library. Fully
+local — nothing leaves your phone. Uses the free YuNet + SFace model set
+(Apache-2.0), downloaded once and then run entirely offline.

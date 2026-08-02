@@ -1,0 +1,6 @@
+Erste Version.
+
+Lokale Gesichts-Erkennung und -Identifizierung für deine eigene Fotosammlung.
+Vollständig lokal — nichts verlässt dein Telefon. Nutzt das freie Modell-Set
+YuNet + SFace (Apache-2.0), das einmalig heruntergeladen und danach komplett
+offline ausgeführt wird.

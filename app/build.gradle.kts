@@ -15,8 +15,17 @@ android {
         applicationId = "org.eidora"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Versioning (Muster B): these values are the single source of truth.
+        // F-Droid reads them directly from this file at the tag it builds — it
+        // does NOT run our GitHub workflows. So to release:
+        //   1. bump versionCode + versionName here, commit
+        //   2. add fastlane/metadata/android/<locale>/changelogs/<versionCode>.txt
+        //   3. git tag v<versionName> on that commit and push the tag
+        // versionCode must be a monotonically increasing integer. Convention:
+        //   MAJOR*10000 + MINOR*100 + PATCH  (so 1.2.0 -> 10200). Keep each part
+        //   below 100. versionName is the human string shown to users.
+        versionCode = 10000
+        versionName = "1.0.0"
     }
 
     signingConfigs {
