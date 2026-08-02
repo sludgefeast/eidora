@@ -153,6 +153,7 @@
     <string name="permission_continue">Continue</string>
     <string name="container_download_title">Set up face models</string>
     <string name="container_download_intro">Eidora needs a face detection and recognition model to work. The free model set (YuNet + SFace, Apache-2.0) will be downloaded once and then runs fully on your device.</string>
+    <string name="container_download_size">Download size: %1$s</string>
     <string name="container_download_button">Download free models</string>
     <string name="container_downloading">Downloading model set…</string>
     <string name="container_error_network">Download failed. Check your network connection and try again.</string>

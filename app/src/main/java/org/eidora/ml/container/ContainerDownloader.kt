@@ -46,6 +46,34 @@ object ContainerDownloader {
         onProgress: ((Int) -> Unit)? = null,
     ): Result = downloadAndUnpack(context, FREE_CONTAINER_URL, FREE_CONTAINER_SHA256, onProgress)
 
+    /**
+     * Fetches the free container's download size in bytes via an HTTP HEAD
+     * request, so the UI can show it before downloading. Returns null on any
+     * failure (offline, redirect without a length, etc.) — the caller decides
+     * how to present an unknown size. This is a cheap, header-only request.
+     */
+    fun fetchFreeContainerSize(): Long? {
+        return try {
+            val connection = (URL(FREE_CONTAINER_URL).openConnection() as HttpURLConnection).apply {
+                requestMethod = "HEAD"
+                connectTimeout = 15_000
+                readTimeout = 15_000
+                instanceFollowRedirects = true
+            }
+            connection.connect()
+            val size =
+                if (connection.responseCode in 200..299) {
+                    connection.contentLengthLong
+                } else {
+                    -1L
+                }
+            connection.disconnect()
+            size.takeIf { it > 0 }
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
     /** The free container's id (matches docs/containers/free-models/manifest.yml). */
     const val FREE_CONTAINER_ID = "eidora-free"
 

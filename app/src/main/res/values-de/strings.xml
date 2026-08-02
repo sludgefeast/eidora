@@ -153,6 +153,7 @@
     <string name="permission_continue">Weiter</string>
     <string name="container_download_title">Gesichtsmodelle einrichten</string>
     <string name="container_download_intro">Eidora benötigt ein Modell zur Gesichts-Erkennung und -Identifizierung. Das freie Modell-Set (YuNet + SFace, Apache-2.0) wird einmalig heruntergeladen und läuft danach vollständig auf deinem Gerät.</string>
+    <string name="container_download_size">Download-Größe: %1$s</string>
     <string name="container_download_button">Freie Modelle herunterladen</string>
     <string name="container_downloading">Modell-Set wird heruntergeladen…</string>
     <string name="container_error_network">Download fehlgeschlagen. Prüfe deine Netzwerkverbindung und versuche es erneut.</string>

@@ -48,6 +48,14 @@ fun ContainerDownloadScreen(onReady: () -> Unit) {
     var progress by remember { mutableIntStateOf(0) }
     var error by remember { mutableStateOf<String?>(null) }
     var start by remember { mutableStateOf(false) }
+    // Download size (bytes) fetched via HEAD before downloading; null while
+    // loading or if it couldn't be determined.
+    var downloadSize by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(Unit) {
+        downloadSize =
+            withContext(Dispatchers.IO) { ContainerDownloader.fetchFreeContainerSize() }
+    }
 
     LaunchedEffect(start) {
         if (!start) return@LaunchedEffect
@@ -116,6 +124,22 @@ fun ContainerDownloadScreen(onReady: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+
+        // Show the download size once the HEAD request resolves. Hidden while
+        // loading or if it couldn't be determined, so there's no empty slot.
+        downloadSize?.let { bytes ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text =
+                    stringResource(
+                        R.string.container_download_size,
+                        org.eidora.util.formatBytes(bytes),
+                    ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
 
         Spacer(Modifier.height(32.dp))
 
