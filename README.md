@@ -18,6 +18,16 @@ person, and lets you name them. Everything happens locally on your phone. There
 is no cloud, no account, no telemetry, and no network access beyond a one-time,
 explicitly confirmed download of the recognition models.
 
+## The name
+
+*Eidora* is inspired by ancient Greek. It draws on the root εἶδος (*eîdos*),
+meaning "form", "shape", "appearance", or "image" — in philosophy, the essence
+or characteristic form of a thing. For a photo manager built around face
+recognition, the name stands for recognising and preserving people, images, and
+memories: it ties the idea of seeing and recognising to a simple, modern form,
+and reflects the app's aim of organising photos intelligently without giving up
+control over your own data.
+
 ## Why Eidora
 
 Most photo apps that recognise faces send your pictures to a server, or lock the
