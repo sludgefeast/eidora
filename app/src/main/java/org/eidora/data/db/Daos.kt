@@ -77,6 +77,12 @@ interface PhotoDao {
         modifiedAt: Long,
     )
 
+    @Query("UPDATE photos SET takenAt = :takenAt WHERE id = :id")
+    suspend fun updateTakenAt(
+        id: String,
+        takenAt: Long,
+    )
+
     @Query("UPDATE photos SET analyzed = :analyzed WHERE id = :id")
     suspend fun updateAnalyzed(
         id: String,

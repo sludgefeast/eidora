@@ -35,6 +35,7 @@ data class SettingsUiState(
     val availableFolders: List<String> = emptyList(),
     val folderWhitelist: Set<String> = SettingsRepository.DEFAULT_FOLDER_WHITELIST,
     val confirmOnAssign: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_ASSIGN,
+    val fillMissingDate: Boolean = SettingsRepository.DEFAULT_FILL_MISSING_DATE,
     val confirmOnNameSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_NAME_SUGGESTION,
     val confirmOnMergeSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_MERGE_SUGGESTION,
     val embeddingModelId: String = org.eidora.ml.EmbeddingModelSpec.DEFAULT.id,
@@ -108,6 +109,13 @@ class SettingsViewModel(
         viewModelScope.launch {
             repo.confirmOnMergeSuggestion.collect { v -> _uiState.update { it.copy(confirmOnMergeSuggestion = v) } }
         }
+        viewModelScope.launch {
+            repo.fillMissingDate.collect { v -> _uiState.update { it.copy(fillMissingDate = v) } }
+        }
+    }
+
+    fun setFillMissingDate(value: Boolean) {
+        viewModelScope.launch { repo.setFillMissingDate(value) }
     }
 
     fun setConfirmOnAssign(value: Boolean) {

@@ -717,7 +717,26 @@ class PhotoSyncWorker(
 
             if (xmpRegions.isNotEmpty()) {
                 try {
-                    XmpHelper.writeFaceRegions(file, xmpRegions)
+                    // If the photo has no capture date and the user wants missing
+                    // dates filled (Aves-style), anchor its chronological order by
+                    // writing the file's modification time as DateTimeOriginal in
+                    // the same save. Only touches files that lack a date.
+                    val photo = photoDao.findById(photoId)
+                    val fillDate =
+                        if (photo?.takenAt == null &&
+                            settingsRepo.getFillMissingDate()
+                        ) {
+                            file.lastModified()
+                        } else {
+                            null
+                        }
+                    XmpHelper.writeFaceRegions(file, xmpRegions, fillDate)
+                    // If we wrote a date, reflect it in the DB so the photo sorts
+                    // correctly without waiting for a re-scan.
+                    if (fillDate != null) {
+                        val written = FileUtil.readTakenAt(file)
+                        if (written != null) photoDao.updateTakenAt(photoId, written)
+                    }
                     photoDao.updateModifiedAt(photoId, file.lastModified())
                 } catch (t: Throwable) {
                     Log.e(TAG, "Failed to write XMP regions to ${file.name}", t)

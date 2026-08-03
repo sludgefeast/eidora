@@ -31,12 +31,16 @@ private val KEY_EMBEDDING_CONTAINER_ID = stringPreferencesKey("embedding_contain
 private val KEY_DETECTION_CONTAINER_ID = stringPreferencesKey("detection_container_id")
 private val KEY_FOLDER_WIZARD_DONE =
     androidx.datastore.preferences.core.booleanPreferencesKey("folder_wizard_done")
+private val KEY_METADATA_WIZARD_DONE =
+    androidx.datastore.preferences.core.booleanPreferencesKey("metadata_wizard_done")
 private val KEY_CONFIRM_ON_ASSIGN =
     androidx.datastore.preferences.core.booleanPreferencesKey("confirm_on_assign")
 private val KEY_CONFIRM_ON_NAME_SUGGESTION =
     androidx.datastore.preferences.core.booleanPreferencesKey("confirm_on_name_suggestion")
 private val KEY_CONFIRM_ON_MERGE_SUGGESTION =
     androidx.datastore.preferences.core.booleanPreferencesKey("confirm_on_merge_suggestion")
+private val KEY_FILL_MISSING_DATE =
+    androidx.datastore.preferences.core.booleanPreferencesKey("fill_missing_date")
 
 data class ClusteringConfig(
     val edgeThreshold: Float,
@@ -159,6 +163,16 @@ class SettingsRepository(
         context.dataStore.edit { it[KEY_FOLDER_WIZARD_DONE] = done }
     }
 
+    /** True once the first-run metadata (capture-date) step has been completed. */
+    val metadataWizardDone: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_METADATA_WIZARD_DONE] ?: false }
+
+    suspend fun getMetadataWizardDone(): Boolean = metadataWizardDone.first()
+
+    suspend fun setMetadataWizardDone(done: Boolean) {
+        context.dataStore.edit { it[KEY_METADATA_WIZARD_DONE] = done }
+    }
+
     // ---- Embedding model choice ---------------------------------------------
 
     /**
@@ -242,11 +256,16 @@ class SettingsRepository(
     val confirmOnMergeSuggestion: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_CONFIRM_ON_MERGE_SUGGESTION] ?: DEFAULT_CONFIRM_ON_MERGE_SUGGESTION }
 
+    val fillMissingDate: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_FILL_MISSING_DATE] ?: DEFAULT_FILL_MISSING_DATE }
+
     suspend fun getConfirmOnAssign(): Boolean = confirmOnAssign.first()
 
     suspend fun getConfirmOnNameSuggestion(): Boolean = confirmOnNameSuggestion.first()
 
     suspend fun getConfirmOnMergeSuggestion(): Boolean = confirmOnMergeSuggestion.first()
+
+    suspend fun getFillMissingDate(): Boolean = fillMissingDate.first()
 
     suspend fun setConfirmOnAssign(value: Boolean) {
         context.dataStore.edit { it[KEY_CONFIRM_ON_ASSIGN] = value }
@@ -258,6 +277,10 @@ class SettingsRepository(
 
     suspend fun setConfirmOnMergeSuggestion(value: Boolean) {
         context.dataStore.edit { it[KEY_CONFIRM_ON_MERGE_SUGGESTION] = value }
+    }
+
+    suspend fun setFillMissingDate(value: Boolean) {
+        context.dataStore.edit { it[KEY_FILL_MISSING_DATE] = value }
     }
 
     companion object {
@@ -272,6 +295,10 @@ class SettingsRepository(
         const val DEFAULT_CONFIRM_ON_ASSIGN = true
         const val DEFAULT_CONFIRM_ON_NAME_SUGGESTION = false
         const val DEFAULT_CONFIRM_ON_MERGE_SUGGESTION = true
+        // Like Aves: when a photo has no capture date in its metadata, write one
+        // (derived from the file's modification time) before editing, so its
+        // chronological position survives later timestamp changes. On by default.
+        const val DEFAULT_FILL_MISSING_DATE = true
 
         // Only Camera is selected by default
         val DEFAULT_FOLDER_WHITELIST: Set<String> = setOf("DCIM/Camera")

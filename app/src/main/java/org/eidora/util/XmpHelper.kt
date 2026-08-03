@@ -151,9 +151,24 @@ object XmpHelper {
     fun writeFaceRegions(
         file: File,
         regions: List<XmpFaceRegion>,
+        // If non-null and the file has no capture date yet, write this epoch-millis
+        // as EXIF DateTimeOriginal in the same save, anchoring chronological order
+        // in metadata. Callers pass the file's modification time here.
+        fillDateIfMissingMillis: Long? = null,
     ) {
         try {
             val exif = ExifInterface(file.absolutePath)
+            // Fill a missing capture date first, so it's part of the single
+            // saveAttributes() below (no second write, no race).
+            if (fillDateIfMissingMillis != null &&
+                exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) == null
+            ) {
+                val sdf = java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss", java.util.Locale.US)
+                exif.setAttribute(
+                    ExifInterface.TAG_DATETIME_ORIGINAL,
+                    sdf.format(java.util.Date(fillDateIfMissingMillis)),
+                )
+            }
             val xmpString = readXmpString(exif)
             val xmp: XMPMeta =
                 if (xmpString != null) {

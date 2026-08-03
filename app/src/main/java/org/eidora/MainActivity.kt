@@ -150,12 +150,18 @@ fun EidoraApp() {
             .get(context)
             .getFolderWizardDone()
     }
+    var metadataWizardDone by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(Unit) {
+        metadataWizardDone = org.eidora.data.settings.SettingsProvider
+            .get(context)
+            .getMetadataWizardDone()
+    }
     var modelsReady by remember {
         mutableStateOf(
             org.eidora.ml.container.ContainerDownloader.isFreeContainerReady(context),
         )
     }
-    val setupComplete = wizardDone == true && modelsReady
+    val setupComplete = wizardDone == true && metadataWizardDone == true && modelsReady
 
     // Enqueue the pipeline only once per app start, even if permissions
     // change multiple times or the composition recomposes — and only after
@@ -305,6 +311,17 @@ fun EidoraApp() {
         null -> return // still loading the flag
         false -> {
             org.eidora.ui.common.FolderWizardScreen(onDone = { wizardDone = true })
+            return
+        }
+        else -> Unit // completed – continue
+    }
+
+    // ---- Metadata step: decide about capture-date filling before anything is
+    // written to the user's files. Its own flag, shown right after folders. ----
+    when (metadataWizardDone) {
+        null -> return // still loading the flag
+        false -> {
+            org.eidora.ui.common.MetadataWizardScreen(onDone = { metadataWizardDone = true })
             return
         }
         else -> Unit // completed – continue

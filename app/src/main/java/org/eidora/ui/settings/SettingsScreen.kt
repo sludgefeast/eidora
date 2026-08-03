@@ -298,6 +298,21 @@ fun SettingsScreen(
                 onCheckedChange = { viewModel.setConfirmOnMergeSuggestion(it) },
             )
 
+            // Section: metadata
+            SectionHeader(stringResource(R.string.settings_metadata_title))
+            Text(
+                text = stringResource(R.string.settings_metadata_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+            SwitchSetting(
+                label = stringResource(R.string.setting_fill_missing_date),
+                description = stringResource(R.string.setting_fill_missing_date_description),
+                checked = state.fillMissingDate,
+                onCheckedChange = { viewModel.setFillMissingDate(it) },
+            )
+
             // Section: power
             SectionHeader(stringResource(R.string.settings_power_title))
             Text(
