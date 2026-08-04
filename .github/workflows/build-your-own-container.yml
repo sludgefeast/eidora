@@ -83,7 +83,7 @@ jobs:
       # download is ${container_name}.zip containing the .eidoramodel. That's
       # one unzip on your side; the .eidoramodel itself is not re-zipped here.
       - name: Upload container as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.container_name }}
           path: ${{ inputs.container_name }}.eidoramodel
