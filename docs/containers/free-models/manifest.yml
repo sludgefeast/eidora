@@ -5,6 +5,13 @@ container:
   name: Eidora Free Models
   description: YuNet detector + SFace embedder. Apache-2.0, free for any use.
   free: true
+  # Monotonic version for the in-app update check. Bump on every new release.
+  version: 1
+  # Identifier of SFace's embedding vector space. Change this ONLY when the
+  # embedder's output space changes (different embedder, weights, or a
+  # conversion that shifts vectors) — doing so forces a full re-embed on update.
+  # A detector-only update keeps this value, so embeddings stay valid.
+  embedding_space: sface-opencv-2021dec-raw0255-v1
 
 models:
   - id: yunet

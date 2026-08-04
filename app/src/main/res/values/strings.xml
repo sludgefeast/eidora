@@ -172,6 +172,17 @@
     <string name="models_settings_entry">Models</string>
     <string name="models_settings_entry_desc">Manage face detection and recognition models</string>
     <string name="models_import_button">Import container…</string>
+    <string name="models_update_check">Check for model updates</string>
+    <string name="models_update_checking">Checking…</string>
+    <string name="models_update_none">Your models are up to date.</string>
+    <string name="models_update_title">Model update available</string>
+    <string name="models_update_message">Version %1$s of the free model set is available. Install it now?</string>
+    <string name="models_update_install">Install</string>
+    <string name="models_update_applying">Installing…</string>
+    <string name="models_update_later">Later</string>
+    <string name="models_update_done">Models updated.</string>
+    <string name="models_update_done_recompute">Models updated. Recomputing face data — this may take a while.</string>
+    <string name="models_update_failed">Update failed. Please try again later.</string>
     <string name="models_import_explainer">You can import your own model containers here — for example a higher-accuracy detector or recognizer you built yourself.</string>
     <string name="models_import_learn_more">How to build and import models (e.g. SCRFD + ArcFace) →</string>
     <string name="models_free_badge">Included</string>

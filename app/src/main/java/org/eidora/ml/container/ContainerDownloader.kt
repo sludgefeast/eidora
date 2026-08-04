@@ -30,21 +30,113 @@ object ContainerDownloader {
     private const val TAG = "ContainerDownloader"
 
     /**
-     * The free model container (YuNet detector + SFace embedder, both
-     * Apache-2.0), built and published by the build-free-container workflow.
-     * This is what Eidora downloads on first run.
+     * Downloads and unpacks the free container for first-run install.
+     *
+     * Resolves the latest release (URL + checksum) from the GitHub Releases API,
+     * then downloads and verifies against the release's own sha256 checksum file.
+     * No hash is hard-coded; integrity rests on HTTPS to GitHub plus the checksum
+     * within the same release. Must run off the main thread.
      */
-    const val FREE_CONTAINER_URL =
-        "https://github.com/sludgefeast/eidora/releases/download/" +
-            "container-free-v1/eidora-free.eidoramodel"
-    const val FREE_CONTAINER_SHA256 =
-        "4fd7c2842772d9ee615216d6d01192271d03528337eb4c74d7c0365657b83de5"
-
-    /** Downloads and unpacks the bundled free container. */
     fun downloadFreeContainer(
         context: Context,
         onProgress: ((Int) -> Unit)? = null,
-    ): Result = downloadAndUnpack(context, FREE_CONTAINER_URL, FREE_CONTAINER_SHA256, onProgress)
+    ): Result {
+        val release =
+            ContainerUpdateChecker.latestRelease()
+                ?: return Result.NetworkError("could not resolve latest release")
+        val expectedSha =
+            if (release.checksumUrl != null) {
+                ContainerUpdateChecker.fetchExpectedSha256(release.checksumUrl)
+                    ?: return Result.Invalid("checksum unavailable")
+            } else {
+                null
+            }
+        return downloadAndUnpack(context, release.downloadUrl, expectedSha, onProgress)
+    }
+
+    /** Outcome of a free-container update. */
+    sealed interface UpdateResult {
+        /**
+         * The container was replaced. [embeddingSpaceChanged] is true when the
+         * new embedder produces a different vector space, meaning all stored
+         * embeddings are now invalid and must be recomputed. When false, existing
+         * embeddings stay valid (e.g. a detector-only update).
+         */
+        data class Success(
+            val manifest: ContainerManifest,
+            val embeddingSpaceChanged: Boolean,
+        ) : UpdateResult
+
+        data class NetworkError(val detail: String) : UpdateResult
+
+        data class Invalid(val detail: String) : UpdateResult
+    }
+
+    /**
+     * Updates the free container from [url] (an asset URL from the update check).
+     *
+     * Reads the currently-installed embedding_space BEFORE the download
+     * overwrites the manifest, then compares it to the new one so the caller
+     * knows whether a full re-embed is required.
+     *
+     * If [checksumUrl] is given, the container's expected SHA-256 is fetched from
+     * the release's checksum file and verified — no hash is hard-coded, since a
+     * future release's hash isn't known at build time. If [checksumUrl] is null
+     * (release has no checksum asset), the download proceeds unverified and
+     * integrity rests on successful manifest parsing and unpacking.
+     *
+     * Must run off the main thread.
+     */
+    fun updateFreeContainer(
+        context: Context,
+        url: String,
+        checksumUrl: String?,
+        onProgress: ((Int) -> Unit)? = null,
+    ): UpdateResult {
+        // Capture the old embedding space before anything is overwritten.
+        val oldSpace = readInstalledEmbeddingSpace(context)
+        // Fetch the expected hash from the release, if a checksum file is present.
+        val expectedSha: String?
+        if (checksumUrl != null) {
+            val fetched = ContainerUpdateChecker.fetchExpectedSha256(checksumUrl)
+            if (fetched == null) {
+                // A checksum was advertised but we couldn't read it — refuse to
+                // install unverified rather than silently skipping the check.
+                return UpdateResult.Invalid("checksum unavailable")
+            }
+            expectedSha = fetched
+        } else {
+            // No checksum asset on the release: proceed unverified (integrity
+            // rests on manifest parsing + unpacking).
+            expectedSha = null
+        }
+        return when (val result = downloadAndUnpack(context, url, expectedSha256 = expectedSha, onProgress)) {
+            is Result.Success -> {
+                val newSpace = result.manifest.container.embeddingSpace
+                // If either side didn't declare a space, be conservative and treat
+                // it as changed (forces recompute) — silent incompatibility is the
+                // worse failure.
+                val changed = oldSpace == null || newSpace == null || oldSpace != newSpace
+                UpdateResult.Success(result.manifest, embeddingSpaceChanged = changed)
+            }
+            is Result.NetworkError -> UpdateResult.NetworkError(result.detail)
+            is Result.HashMismatch -> UpdateResult.Invalid("hash mismatch")
+            is Result.Invalid -> UpdateResult.Invalid(result.detail)
+        }
+    }
+
+    /** Reads the installed free container's embedding_space, or null if absent. */
+    private fun readInstalledEmbeddingSpace(context: Context): String? {
+        return try {
+            val manifestFile = File(containerDir(context, FREE_CONTAINER_ID), "manifest.yml")
+            if (!manifestFile.isFile) return null
+            manifestFile.inputStream().use {
+                ContainerManifestParser.parse(it).container.embeddingSpace
+            }
+        } catch (t: Throwable) {
+            null
+        }
+    }
 
     /**
      * Fetches the free container's download size in bytes via an HTTP HEAD
@@ -54,7 +146,8 @@ object ContainerDownloader {
      */
     fun fetchFreeContainerSize(): Long? {
         return try {
-            val connection = (URL(FREE_CONTAINER_URL).openConnection() as HttpURLConnection).apply {
+            val release = ContainerUpdateChecker.latestRelease() ?: return null
+            val connection = (URL(release.downloadUrl).openConnection() as HttpURLConnection).apply {
                 requestMethod = "HEAD"
                 connectTimeout = 15_000
                 readTimeout = 15_000

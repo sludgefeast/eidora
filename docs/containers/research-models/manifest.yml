@@ -8,6 +8,9 @@ container:
     RESEARCH USE ONLY. Not distributed by Eidora — build this container yourself
     from models you obtain and are licensed to use.
   free: false
+  version: 1
+  # ArcFace's embedding space. Change if you swap the embedder or its weights.
+  embedding_space: arcface-w600k-r50-v1
 
 models:
   - id: scrfd_2.5g_kps

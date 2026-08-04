@@ -24,6 +24,15 @@ data class ContainerManifest(
         val name: String,
         val description: String?,
         val free: Boolean,
+        // Monotonic container version, for update comparison. Optional so pre-v1
+        // manifests still parse; treated as 0 (oldest) when absent.
+        val version: Int,
+        // Opaque identifier of the embedding vector space this container's
+        // embedder produces. Two containers with the SAME id share embeddings
+        // only if this matches; a different value means stored embeddings are
+        // incompatible and must be recomputed. Null when the container has no
+        // embedder or the author didn't declare one.
+        val embeddingSpace: String?,
     )
 
     data class License(
@@ -139,6 +148,8 @@ object ContainerManifestParser {
             name = name,
             description = m["description"] as? String,
             free = m["free"] as? Boolean ?: false,
+            version = (m["version"] as? Int) ?: 0,
+            embeddingSpace = (m["embedding_space"] as? String)?.takeIf { it.isNotBlank() },
         )
     }
 

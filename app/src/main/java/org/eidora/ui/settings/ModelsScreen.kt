@@ -104,6 +104,13 @@ fun ModelsScreen(
     // Pending activation confirmation (switching a model triggers a re-sync).
     var pendingActivate by remember { mutableStateOf<PendingActivate?>(null) }
 
+    // Free-container update: check state and any available update awaiting confirm.
+    var checkingUpdate by remember { mutableStateOf(false) }
+    var pendingUpdate by remember {
+        mutableStateOf<org.eidora.ml.container.ContainerUpdateChecker.Available?>(null)
+    }
+    var applyingUpdate by remember { mutableStateOf(false) }
+
     fun refresh() {
         containers = ContainerStore.listContainers(context)
     }
@@ -175,6 +182,43 @@ fun ModelsScreen(
                         }
                     },
             )
+            Spacer(Modifier.height(12.dp))
+
+            // Check the free container for a newer published version.
+            TextButton(
+                onClick = {
+                    if (checkingUpdate || applyingUpdate) return@TextButton
+                    checkingUpdate = true
+                    scope.launch {
+                        val installedVersion =
+                            containers
+                                .firstOrNull { it.id == ContainerDownloader.FREE_CONTAINER_ID }
+                                ?.manifest?.container?.version ?: 0
+                        val found =
+                            withContext(Dispatchers.IO) {
+                                org.eidora.ml.container.ContainerUpdateChecker
+                                    .checkForUpdate(installedVersion)
+                            }
+                        checkingUpdate = false
+                        if (found != null) {
+                            pendingUpdate = found
+                        } else {
+                            toast(R.string.models_update_none)
+                        }
+                    }
+                },
+                enabled = !checkingUpdate && !applyingUpdate,
+            ) {
+                Text(
+                    stringResource(
+                        if (checkingUpdate) {
+                            R.string.models_update_checking
+                        } else {
+                            R.string.models_update_check
+                        },
+                    ),
+                )
+            }
             Spacer(Modifier.height(12.dp))
 
             if (containers.isEmpty()) {
@@ -433,6 +477,87 @@ fun ModelsScreen(
                 },
             )
         }
+    }
+
+    // Update available: confirm, then download and (if the embedding space
+    // changed) recompute all embeddings.
+    pendingUpdate?.let { avail ->
+        AlertDialog(
+            onDismissRequest = { if (!applyingUpdate) pendingUpdate = null },
+            title = { Text(stringResource(R.string.models_update_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.models_update_message,
+                        avail.version.toString(),
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !applyingUpdate,
+                    onClick = {
+                        applyingUpdate = true
+                        scope.launch {
+                            val result =
+                                withContext(Dispatchers.IO) {
+                                    ContainerDownloader.updateFreeContainer(
+                                        context,
+                                        avail.downloadUrl,
+                                        avail.checksumUrl,
+                                    )
+                                }
+                            applyingUpdate = false
+                            pendingUpdate = null
+                            when (result) {
+                                is ContainerDownloader.UpdateResult.Success -> {
+                                    refresh()
+                                    if (result.embeddingSpaceChanged) {
+                                        // Vector space changed: existing embeddings
+                                        // are invalid. Recompute everything.
+                                        withContext(Dispatchers.IO) {
+                                            org.eidora.data.repository.FaceRepository(
+                                                context,
+                                                org.eidora.data.db.DatabaseProvider
+                                                    .getInstance(context),
+                                            ).resetForEmbeddingModelChange(
+                                                org.eidora.data.repository.FaceRepository
+                                                    .EmbeddingChangeStrategy.RECOMPUTE_ALL,
+                                            )
+                                        }
+                                        toast(R.string.models_update_done_recompute)
+                                    } else {
+                                        toast(R.string.models_update_done)
+                                    }
+                                }
+                                is ContainerDownloader.UpdateResult.NetworkError ->
+                                    toast(R.string.models_update_failed)
+                                is ContainerDownloader.UpdateResult.Invalid ->
+                                    toast(R.string.models_update_failed)
+                            }
+                        }
+                    },
+                ) {
+                    Text(
+                        stringResource(
+                            if (applyingUpdate) {
+                                R.string.models_update_applying
+                            } else {
+                                R.string.models_update_install
+                            },
+                        ),
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !applyingUpdate,
+                    onClick = { pendingUpdate = null },
+                ) {
+                    Text(stringResource(R.string.models_update_later))
+                }
+            },
+        )
     }
 }
 

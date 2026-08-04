@@ -172,6 +172,17 @@
     <string name="models_settings_entry">Modelle</string>
     <string name="models_settings_entry_desc">Modelle für Gesichts-Erkennung und -Identifizierung verwalten</string>
     <string name="models_import_button">Container importieren…</string>
+    <string name="models_update_check">Nach Modell-Updates suchen</string>
+    <string name="models_update_checking">Suche…</string>
+    <string name="models_update_none">Deine Modelle sind aktuell.</string>
+    <string name="models_update_title">Modell-Update verfügbar</string>
+    <string name="models_update_message">Version %1$s des freien Modell-Sets ist verfügbar. Jetzt installieren?</string>
+    <string name="models_update_install">Installieren</string>
+    <string name="models_update_applying">Installiere…</string>
+    <string name="models_update_later">Später</string>
+    <string name="models_update_done">Modelle aktualisiert.</string>
+    <string name="models_update_done_recompute">Modelle aktualisiert. Gesichtsdaten werden neu berechnet — das kann eine Weile dauern.</string>
+    <string name="models_update_failed">Update fehlgeschlagen. Bitte später erneut versuchen.</string>
     <string name="models_import_explainer">Hier kannst du eigene Modell-Container importieren — zum Beispiel einen selbst gebauten Detektor oder Identifizierer mit höherer Genauigkeit.</string>
     <string name="models_import_learn_more">Modelle bauen und einbinden (z.B. SCRFD + ArcFace) →</string>
     <string name="models_free_badge">Enthalten</string>
