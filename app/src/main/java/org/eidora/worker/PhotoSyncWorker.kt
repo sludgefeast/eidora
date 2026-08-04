@@ -722,10 +722,12 @@ class PhotoSyncWorker(
                     // writing the file's modification time as DateTimeOriginal in
                     // the same save. Only touches files that lack a date.
                     val photo = photoDao.findById(photoId)
+                    val fillMissingDate =
+                        org.eidora.data.settings.SettingsProvider
+                            .get(applicationContext)
+                            .getFillMissingDate()
                     val fillDate =
-                        if (photo?.takenAt == null &&
-                            settingsRepo.getFillMissingDate()
-                        ) {
+                        if (photo?.takenAt == null && fillMissingDate) {
                             file.lastModified()
                         } else {
                             null

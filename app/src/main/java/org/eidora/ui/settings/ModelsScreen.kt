@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.rememberCoroutineScope
 import org.eidora.R
+import org.eidora.ml.container.ContainerDownloader
 import org.eidora.ml.container.ContainerManifest
 import org.eidora.ml.container.ContainerStore
 
