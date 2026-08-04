@@ -73,7 +73,10 @@ data class EmbeddingModelSpec(
     companion object {
         /**
          * ArcFace w600k_mbf (MobileFaceNet backbone, InsightFace). Research-only
-         * weights (WebFace600K). Highest accuracy; not F-Droid friendly.
+         * weights (WebFace600K). Highest accuracy; not F-Droid friendly. This
+         * spec exists only so an imported bring-your-own container using ArcFace
+         * runs with the right parameters and license label — Eidora never offers
+         * or fetches it.
          */
         val ARCFACE =
             EmbeddingModelSpec(
@@ -146,8 +149,10 @@ data class EmbeddingModelSpec(
          * The default when the user has not chosen. SFACE_FREE is
          * Apache-2.0-licensed and fully verified (dim 128, RAW_0_255
          * normalization confirmed against OpenCV's reference), so F-Droid users
-         * get a fully-free default. ArcFace remains available as an opt-in
-         * accuracy upgrade for users who accept its research-only license.
+         * get a fully-free default. The ArcFace spec below exists only so that a
+         * container someone builds and imports themselves (bring your own model)
+         * runs with the right parameters and license label — Eidora never offers
+         * or fetches it.
          */
         val DEFAULT = SFACE_FREE
 

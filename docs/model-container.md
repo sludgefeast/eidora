@@ -23,10 +23,11 @@ at once.
 - **Decoder family is `output.type`** on each model entry (a separate `family`
   node was dropped as redundant). See the family list below.
 - **Multiple models per container**, mixed by task: a container holds a *set*
-  (e.g. detector + embedder that belong together). Our own models ship as two
-  containers: a **free** set (YuNet + SFace) and a **research** set
-  (SCRFD + ArcFace) — the split matches the licence, so a container is wholly
-  free or wholly research-only.
+  (e.g. detector + embedder that belong together). Eidora ships **one** set: the
+  **free** container (YuNet + SFace, Apache-2.0). A **research** set
+  (SCRFD + ArcFace) is only ever a bring-your-own container the user builds
+  themselves — Eidora doesn't host or fetch it. The split matches the licence,
+  so a container is wholly free or wholly research-only.
 - **Per-model acceptance:** good models are taken into Eidora; invalid ones are
   rejected with a message. One bad entry doesn't sink the rest.
 - **Collision handling:** if a loaded `(container.id, model.id)` already exists,

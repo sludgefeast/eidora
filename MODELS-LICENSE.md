@@ -13,20 +13,16 @@ ML models carry **two** licenses that are easy to confuse:
 2. the **weights** license (the trained numbers), which is usually tied to the
    dataset the model was trained on.
 
-In practice the **more restrictive of the two governs** what you may do: a
-permissive code license cannot lift a research-only restriction on the weights.
-For every model below, the code is open — so the effective license is decided
-by the **weights**. That is the license stated as "Effective" for each model.
+In practice the **more restrictive of the two governs** what you may do. For the
+models Eidora ships, both licenses are Apache-2.0, so the effective license is
+Apache-2.0.
 
-## Models Eidora can use
+## The models Eidora ships
 
-Eidora lets you choose, separately, which **detection** model and which
-**embedding** model to use. Each task offers a free (Apache-2.0) default and an
-optional, more accurate but research-only alternative.
+Eidora ships **one** model set — the free container — and it is fully free for
+any purpose, including commercial use. It is what the F-Droid build downloads.
 
-### Face detection
-
-#### YuNet (`yunet_2023mar`) — default, free
+### Face detection — YuNet (`yunet_2023mar`)
 
 - Source: [OpenCV Zoo](https://github.com/opencv/opencv_zoo)
   (`face_detection_yunet`).
@@ -35,17 +31,7 @@ optional, more accurate but research-only alternative.
 - **Effective license: Apache-2.0** — free for any purpose, included in
   F-Droid builds, redistributable.
 
-#### SCRFD (`scrfd_2.5g_kps_640`) — optional, research-only
-
-- Source: [InsightFace](https://github.com/deepinsight/insightface).
-- Purpose: same as YuNet; higher quality on small/rotated faces.
-- Code: open. Weights: trained by InsightFace on a research-only dataset.
-- **Effective license: non-commercial research use only.** Not part of F-Droid
-  builds; downloaded separately only if the user selects it.
-
-### Face recognition (embedding)
-
-#### SFace (`sface_opencv`) — default, free
+### Face recognition (embedding) — SFace (`sface_opencv`)
 
 - Source: [OpenCV](https://huggingface.co/opencv/face_recognition_sface)
   (MobileFaceNet backbone, SFace loss).
@@ -55,58 +41,33 @@ optional, more accurate but research-only alternative.
 - **Effective license: Apache-2.0** — free for any purpose, included in
   F-Droid builds, redistributable. Designed to pair with YuNet.
 
-#### ArcFace (`arcface_w600k_mbf`) — optional, research-only
-
-- Source: [InsightFace](https://github.com/deepinsight/insightface), trained on
-  the WebFace600K dataset.
-- Purpose: same as SFace; somewhat higher accuracy.
-- Code: open. Weights: trained on a research-only dataset.
-- **Effective license: non-commercial research use only.** Not part of F-Droid
-  builds; downloaded separately only if the user selects it.
-
 ## What this means for you
 
-- **The default configuration (YuNet + SFace) is fully free** under Apache-2.0.
-  It may be used for any purpose, including commercially, and ships in the
+- **The models Eidora ships (YuNet + SFace) are fully free** under Apache-2.0.
+  They may be used for any purpose, including commercially, and ship in the
   F-Droid build.
-- **The optional models (SCRFD, ArcFace) are non-commercial research only.**
-  Eidora's GPL license permits commercial use of the *code*, but if you select
-  an InsightFace model you are bound by its research-only weights license.
-- **Redistribution:** the Apache-2.0 models may be re-hosted freely (keep the
-  license and attribution). Do **not** re-host the InsightFace models under a
-  license claiming broader rights than their original terms.
+- **Redistribution:** these Apache-2.0 models may be re-hosted freely (keep the
+  license and attribution).
 
-## How the F-Droid build stays free
+No non-free model is part of Eidora, bundled in the APK, or required for the app
+to function.
 
-F-Droid builds default to YuNet + SFace, both Apache-2.0. The non-free models
-are never bundled and are only ever downloaded if a user explicitly switches to
-them in Settings, after reading the license shown there. No non-free model is
-required for the app to function.
+## Bringing your own model
 
-## Replacing the models
+Eidora can import a custom model container that you build yourself, if you have
+a model you are licensed to use. This is entirely separate from the app and its
+free models: Eidora does not host, reference, or fetch any such model.
 
-The model list (URLs, filenames, expected SHA-256 hashes, purpose and license
-labels) lives in
-[`ModelDownloader.kt`](app/src/main/java/org/eidora/ml/ModelDownloader.kt), and
-the per-model specs (input size, embedding dimension, normalization, thresholds,
-license) live in
-[`EmbeddingModelSpec.kt`](app/src/main/java/org/eidora/ml/EmbeddingModelSpec.kt)
-and [`FaceDetector.kt`](app/src/main/java/org/eidora/ml/FaceDetector.kt).
-To use different models, update those entries. Models must be TensorFlow Lite
-(`.tflite`) files whose input/output tensors are compatible with the existing
-detection and embedding pipeline.
+Some models people build this way — for example InsightFace's SCRFD or ArcFace —
+are **non-commercial research use only**. That restriction lives with those
+models and their weights, not with Eidora. If you build a container from a model
+like that, you are bound by its license, and you must not re-host it under terms
+claiming broader rights than its original ones. Eidora's own repository and
+workflows deliberately never reference or fetch such models, to keep the
+project's licensing clean.
 
-The conversion from an upstream ONNX model to TFLite is reproducible via the
-GitHub Actions workflows in [`.github/workflows/`](.github/workflows/): the free
-models are built by `build-free-container.yml`, and any other model you're
-licensed to use can be built with the generic `build-your-own-container.yml`,
-which names no specific model and publishes nothing — you supply the model and
-get the container back as a private artifact.
+See [`scripts/README.md`](scripts/README.md) for how to build and import a
+container. The generic build workflow names no specific model and publishes
+nothing — you supply the model and get the container back as a private artifact.
 
-Research-only models (e.g. SCRFD/ArcFace from InsightFace) are deliberately NOT
-referenced or fetched by any workflow in this repository, to keep its licensing
-clean. If you obtain such a model yourself and its licence permits your use, the
-generic workflow (or the local scripts) will build a container from it.
-
-Please verify the license of any model you bundle or link, and update this file
-accordingly.
+Please verify the license of any model you build a container from.

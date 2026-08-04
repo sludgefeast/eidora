@@ -238,7 +238,7 @@
     <string name="about_version">Version %1$s</string>
     <string name="about_tagline">Local, on-device face recognition for your photos.</string>
     <string name="about_license_line">Eidora is free software under the GPLv3.</string>
-    <string name="about_models_line">ML models: InsightFace, non-commercial research use only.</string>
+    <string name="about_models_line">ML models: YuNet + SFace, Apache-2.0.</string>
     <string name="about_libraries_header">Open-source libraries</string>
     <string name="action_back">Back</string>
     <string name="namesake_merge_into">Merge into %1$s</string>

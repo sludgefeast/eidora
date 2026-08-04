@@ -82,8 +82,8 @@ control. You can pause and resume it from the notification at any time.
 - Choose exactly which folders are analysed; everything else stays untouched
 - Battery- and temperature-aware processing, pausable from the notification
 - Review unknown and ignored faces, merge or split persons
-- Choose your detection and embedding models independently — free Apache-2.0
-  defaults, with optional higher-accuracy research models
+- Free, Apache-2.0 face detection and recognition models, run fully on device
+- Import your own model container if you have one you're licensed to use
 - Material 3 interface, English and German
 
 ## Privacy
@@ -104,25 +104,27 @@ reporter, and no advertising library in the build.
 
 The models are **not** bundled in the APK. On first run Eidora asks whether to
 download them from this repository's releases, showing each model's purpose,
-size and licence beforehand. Downloads are verified against a known SHA-256 hash.
+size and licence beforehand. Downloads are verified against the release's
+SHA-256 checksum.
 
-Eidora lets you choose the **detection** and **embedding** models separately in
-Settings. Each task has a free default and an optional research-only alternative:
+Eidora ships one model set, and it is **fully free**:
 
-| Task | Default (free) | Optional (research only) |
+| Task | Model | Licence |
 |---|---|---|
-| Detection | **YuNet** — Apache-2.0 | SCRFD (InsightFace) |
-| Embedding | **SFace** — Apache-2.0 | ArcFace (InsightFace) |
+| Detection | **YuNet** | Apache-2.0 |
+| Embedding | **SFace** | Apache-2.0 |
 
-The defaults (YuNet + SFace) are **Apache-2.0**, free for any purpose, and are
-what ships with the F-Droid build. The optional InsightFace models are
-**non-commercial research use only** and are downloaded only if you explicitly
-select them, after reading the licence shown in Settings.
+Both are **Apache-2.0** — free for any purpose, including commercial use — and
+this is what the F-Droid build downloads. No non-free model is part of Eidora or
+required for it to work.
 
-Each model actually has two licences — for its code and its trained weights —
-and the more restrictive one governs. See
-[`MODELS-LICENSE.md`](MODELS-LICENSE.md) for the full breakdown and what it means
-in practice.
+Each model carries two licences — for its code and its trained weights — and the
+more restrictive one governs; for YuNet and SFace both are Apache-2.0. See
+[`MODELS-LICENSE.md`](MODELS-LICENSE.md) for details.
+
+If you want to build and import a different model that you are licensed to use,
+Eidora can import custom model containers — see
+[`scripts/README.md`](scripts/README.md) for how to build one.
 
 ## Performance
 

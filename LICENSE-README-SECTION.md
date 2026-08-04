@@ -30,22 +30,20 @@ The GPL above covers **Eidora's own source code only**. The app itself ships
 **without** any ML model; models are downloaded at runtime, after explicit user
 consent, from the project's GitHub releases.
 
-Eidora offers a free default and an optional research-only model for each of the
-two tasks:
+Eidora ships one model set, and it is fully free:
 
-- **Detection:** YuNet (Apache-2.0, default) or SCRFD (InsightFace, research
-  only).
-- **Embedding:** SFace (Apache-2.0, default) or ArcFace (InsightFace, research
-  only).
+- **Detection:** YuNet (Apache-2.0).
+- **Embedding:** SFace (Apache-2.0).
 
-**The default models (YuNet + SFace) are Apache-2.0** — free for any use,
-including commercial, and these are what the F-Droid build uses.
+**Both are Apache-2.0** — free for any use, including commercial — and these are
+what the F-Droid build uses. No non-free model is part of Eidora or required for
+it to work.
 
-**The optional InsightFace models (SCRFD, ArcFace) are non-commercial research
-use only.** They are never bundled and are downloaded only if you explicitly
-select them in Settings, where the license is shown. If you build a commercial
-product, stay on the Apache-2.0 defaults or supply your own suitably licensed
-models; do not use the InsightFace models commercially.
+Eidora can also import a custom model container you build yourself, if you have a
+model you're licensed to use — this is separate from the app and its free models.
+Some models people build that way (e.g. InsightFace's SCRFD or ArcFace) are
+non-commercial research use only; that restriction lives with those models, not
+with Eidora, which never bundles or fetches them.
 
 Each model carries two licenses (code and weights); the more restrictive
 governs. See [`MODELS-LICENSE.md`](MODELS-LICENSE.md) for the full breakdown.

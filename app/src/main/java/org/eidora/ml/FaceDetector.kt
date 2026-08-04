@@ -62,7 +62,9 @@ data class DetectionModelSpec(
     companion object {
         /**
          * SCRFD 2.5G KPS (InsightFace). Research-only weights; highest quality
-         * on small/rotated faces but not F-Droid friendly.
+         * on small/rotated faces but not F-Droid friendly. This spec exists only
+         * so an imported bring-your-own container using SCRFD runs with the right
+         * parameters and license label — Eidora never offers or fetches it.
          */
         val SCRFD =
             DetectionModelSpec(
