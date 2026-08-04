@@ -49,6 +49,27 @@ their syntax should be checked against the current F-Droid documentation at
 submission time — the format is occasionally revised, so don't copy an old
 example blindly.
 
+## Releasing a new free model container
+
+The free model container (YuNet + SFace) is published separately from the app,
+by the **Build free model container** workflow. Its version is driven entirely
+by the manifest, so there's one source of truth:
+
+1. Bump `container.version` in
+   `docs/containers/free-models/manifest.yml` (an integer — 1, 2, 3, …). Bump it
+   whenever the container's contents change. If the **embedder** changes in a way
+   that shifts its vector space, also change `container.embedding_space` — that's
+   what makes the app recompute embeddings on update instead of silently mixing
+   incompatible ones.
+2. Run the workflow (manually — it's `workflow_dispatch`).
+
+The workflow reads `container.version`, tags the release `container-free-v<N>`,
+attaches the container and its `container-sha256.txt`, and refuses to run if a
+release with that tag already exists (so you can't overwrite a published
+container without bumping the version). The app finds the newest
+`container-free-v<N>` via the GitHub Releases API and verifies the download
+against the attached checksum — no hash is hard-coded anywhere.
+
 ## Notes
 
 - F-Droid signs with its own key, not ours. An APK you might build yourself and

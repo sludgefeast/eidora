@@ -60,22 +60,50 @@ jobs:
           python scripts/build_container.py \
             --manifest docs/containers/free-models/manifest.yml \
             --out eidora-free.eidoramodel
-          echo "--- container SHA-256 (put this into ContainerDownloader) ---"
+          echo "--- container SHA-256 (attached to the release as container-sha256.txt) ---"
           sha256sum eidora-free.eidoramodel | tee container-sha256.txt
           echo "::notice::eidora-free.eidoramodel SHA-256 is in the job log and attached to the release."
+
+      - name: Read container version from manifest
+        id: version
+        run: |
+          # The manifest is the single source of truth for the container version.
+          # Read container.version (not the per-model version:) so the release tag
+          # can't drift from what the app compares against for updates.
+          VERSION=$(python -c "import yaml; print(yaml.safe_load(open('docs/containers/free-models/manifest.yml'))['container']['version'])")
+          if ! echo "$VERSION" | grep -qE '^[0-9]+$'; then
+            echo "::error::container.version in the manifest is not an integer: '$VERSION'"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "::notice::Publishing container-free-v$VERSION"
+
+      - name: Ensure this version isn't already released
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Refuse to overwrite an existing release: if the tag is already there,
+          # the manifest's container.version wasn't bumped. Bump it and re-run.
+          TAG="container-free-v${{ steps.version.outputs.version }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists. Bump container.version in the manifest before publishing."
+            exit 1
+          fi
+          echo "::notice::$TAG is new — proceeding."
 
       - name: Publish container release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: container-free-v1
-          name: "Free model container (YuNet + SFace)"
+          tag_name: container-free-v${{ steps.version.outputs.version }}
+          name: "Free model container (YuNet + SFace) v${{ steps.version.outputs.version }}"
           body: |
             Eidora free model container: YuNet detector + SFace embedder,
             both Apache-2.0 (OpenCV Zoo). Built by scripts/build_container.py
             (onnx2tf + pack_container.py).
 
-            Put the SHA-256 below into the app's ContainerDownloader as the
-            expected hash for the free container.
+            The app verifies the download automatically against
+            container-sha256.txt attached to this release — no hash needs to be
+            entered anywhere.
           files: |
             eidora-free.eidoramodel
             container-sha256.txt
