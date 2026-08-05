@@ -92,7 +92,7 @@ jobs:
           echo "::notice::$TAG is new — proceeding."
 
       - name: Publish container release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: container-free-v${{ steps.version.outputs.version }}
           name: "Free model container (YuNet + SFace) v${{ steps.version.outputs.version }}"
