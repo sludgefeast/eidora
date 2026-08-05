@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // AGP 9+ provides built-in Kotlin support, so the standalone
+    // org.jetbrains.kotlin.android plugin is no longer applied (applying it now
+    // fails the build). The kotlin.compose and kotlin.serialization plugins are
+    // still required — they're Kotlin *compiler* plugins, not the Android one.
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
