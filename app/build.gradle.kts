@@ -149,4 +149,7 @@ dependencies {
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
     testRuntimeOnly(libs.junit.jupiter.engine)
+    // Pin the launcher to match Jupiter — Gradle 8.x bundles an older 1.x
+    // launcher, which fails test discovery against Jupiter 6.x.
+    testRuntimeOnly(libs.junit.platform.launcher)
 }

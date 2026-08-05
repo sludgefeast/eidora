@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
-import androidx.compose.material.icons.filled.RotateLeft
-import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.automirrored.filled.RotateLeft
+import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.exifinterface.media.ExifInterface
+import coil.annotation.ExperimentalCoilApi
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.CachePolicy
@@ -51,6 +52,7 @@ import kotlin.math.min
 private const val MIN_ZOOM = 1f
 private const val MAX_ZOOM = 6f
 
+@OptIn(ExperimentalCoilApi::class)
 @Composable
 fun FullscreenPhotoScreen(
     viewModel: FullscreenViewModel,
@@ -243,7 +245,7 @@ fun FullscreenPhotoScreen(
         ) {
             FilledTonalIconButton(onClick = { rotate(-90f) }) {
                 Icon(
-                    Icons.Default.RotateLeft,
+                    Icons.AutoMirrored.Filled.RotateLeft,
                     contentDescription = stringResource(R.string.action_rotate_left),
                 )
             }
@@ -252,7 +254,7 @@ fun FullscreenPhotoScreen(
             }
             FilledTonalIconButton(onClick = { rotate(90f) }) {
                 Icon(
-                    Icons.Default.RotateRight,
+                    Icons.AutoMirrored.Filled.RotateRight,
                     contentDescription = stringResource(R.string.action_rotate_right),
                 )
             }

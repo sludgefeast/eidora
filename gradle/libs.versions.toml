@@ -16,7 +16,12 @@ coil = "2.7.0"
 kotlinx-serialization = "1.9.0"
 kotlinx-coroutines = "1.11.0"
 core-ktx = "1.15.0"
-junit-jupiter = "5.11.4"
+junit-jupiter = "6.1.2"
+# Must stay aligned with junit-jupiter: JUnit 6.x numbers Platform and Jupiter
+# identically. Gradle bundles an older 1.x launcher, so we pin the matching one
+# explicitly, otherwise test discovery fails with "OutputDirectoryCreator not
+# available".
+junit-platform-launcher = "6.1.2"
 aboutlibraries = "11.2.3"
 
 appcompat = "1.7.0"
@@ -70,6 +75,7 @@ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = 
 junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit-jupiter" }
 junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit-jupiter" }
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit-jupiter" }
+junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit-platform-launcher" }
 
 # About / open-source licenses
 aboutlibraries-core = { group = "com.mikepenz", name = "aboutlibraries-core", version.ref = "aboutlibraries" }
