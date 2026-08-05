@@ -22,7 +22,7 @@ junit-jupiter = "6.1.2"
 # explicitly, otherwise test discovery fails with "OutputDirectoryCreator not
 # available".
 junit-platform-launcher = "6.1.2"
-aboutlibraries = "11.2.3"
+aboutlibraries = "15.0.4"
 
 appcompat = "1.7.0"
 snakeyaml = "2.6"
