@@ -119,10 +119,17 @@ fun AboutScreen(onBack: () -> Unit) {
         // header slot), so everything scrolls together instead of only the
         // library list moving under a fixed header.
         // aboutlibraries v15: libraries must be loaded explicitly (the old
-        // auto-discovery overload was removed). produceLibraries reads the
-        // R.raw.aboutlibraries JSON that the .android Gradle plugin generates at
-        // build time. The header slot is unchanged.
-        val libraries by produceLibraries(R.raw.aboutlibraries)
+        // auto-discovery overload was removed). We feed the produceLibraries
+        // suspend-block variant by reading the R.raw.aboutlibraries JSON that the
+        // .android Gradle plugin generates at build time. Using the block form
+        // (rather than the R.raw Int overload) keeps this independent of which
+        // module ships the Android convenience overload. The header slot is
+        // unchanged.
+        val libraries by produceLibraries {
+            context.resources
+                .openRawResource(R.raw.aboutlibraries)
+                .use { it.readBytes().decodeToString() }
+        }
         LibrariesContainer(
             libraries = libraries,
             modifier =
