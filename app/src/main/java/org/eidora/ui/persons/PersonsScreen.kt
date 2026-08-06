@@ -5,6 +5,7 @@ package org.eidora.ui.persons
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
@@ -34,7 +35,7 @@ import org.eidora.ui.common.CircleThumbnail
 import org.eidora.ui.common.LazyGridScrollbar
 import org.eidora.util.ThumbnailHelper
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersonsScreen(
     viewModel: PersonsViewModel,
@@ -252,12 +253,11 @@ private fun PersonGridItem(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .combinedClickable(onClick = onNameClick),
+                    .clickable(onClick = onNameClick),
         )
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun VirtualPersonItem(
     label: String,
@@ -269,7 +269,7 @@ private fun VirtualPersonItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier =
             Modifier
-                .combinedClickable(onClick = onClick)
+                .clickable(onClick = onClick)
                 .padding(4.dp),
     ) {
         CircleColorLabel(
@@ -286,7 +286,6 @@ private fun VirtualPersonItem(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SuggestionRow(
     suggestion: PersonSuggestionUi,
@@ -315,7 +314,7 @@ private fun SuggestionRow(
             modifier =
                 Modifier
                     .size(56.dp)
-                    .combinedClickable(onClick = onThumbnailClick),
+                    .clickable(onClick = onThumbnailClick),
         )
         Spacer(modifier = Modifier.width(12.dp))
         OutlinedTextField(

@@ -3,8 +3,7 @@
 
 package org.eidora.ui.persondetail
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,7 +20,7 @@ import org.eidora.data.db.PersonWithCount
 import org.eidora.ui.common.CircleThumbnail
 import org.eidora.util.ThumbnailHelper
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssignToPersonSheet(
     viewModel: PersonDetailViewModel,
@@ -77,7 +76,7 @@ fun AssignToPersonSheet(
                                 Text(stringResource(R.string.create_new_person, query.trim()))
                             },
                             modifier =
-                                Modifier.combinedClickable(onClick = {
+                                Modifier.clickable(onClick = {
                                     viewModel.assignToNewPerson(query.trim())
                                     onDismiss()
                                 }),
@@ -101,7 +100,6 @@ fun AssignToPersonSheet(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PersonListItem(
     personWithCount: PersonWithCount,
@@ -122,6 +120,6 @@ private fun PersonListItem(
         },
         headlineContent = { Text(personWithCount.person.name ?: "") },
         supportingContent = { Text("${personWithCount.confirmedCount} confirmed") },
-        modifier = Modifier.combinedClickable(onClick = onClick),
+        modifier = Modifier.clickable(onClick = onClick),
     )
 }

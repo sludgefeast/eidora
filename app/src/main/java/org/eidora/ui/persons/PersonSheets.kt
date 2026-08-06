@@ -3,8 +3,7 @@
 
 package org.eidora.ui.persons
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -73,7 +72,7 @@ fun RenamePersonSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MergePersonsSheet(
     persons: List<PersonWithCount>,
@@ -115,7 +114,7 @@ fun MergePersonsSheet(
                             )
                         },
                         modifier =
-                            Modifier.combinedClickable(onClick = {
+                            Modifier.clickable(onClick = {
                                 onConfirm(personWithCount.person.id)
                                 onDismiss()
                             }),

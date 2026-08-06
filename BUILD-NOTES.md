@@ -27,16 +27,15 @@ rm -rf ~/.gradle/caches/build-cache-1
 
 ## "Deprecated Gradle features ... incompatible with Gradle 9.0"
 
-This is a **warning, not an error** — it does not fail the build on Gradle 8.13.
-It originates from the Android Gradle Plugin / KSP, not from this project's
-scripts. To see the source:
+Historical note: on the old Gradle 8.13 / AGP 8.13 toolchain this appeared as a
+warning (not an error) originating from AGP / KSP, not from this project's
+scripts. The project has since migrated to **Gradle 9.6.1 and AGP 9.3.1**, so
+this warning no longer applies. To inspect any remaining deprecation warnings on
+the current toolchain:
 
 ```sh
 ./gradlew :app:assembleDebug --warning-mode all
 ```
-
-Safe to ignore until a future AGP upgrade. Do not switch to Gradle 9.0 yet:
-AGP 8.13 targets Gradle 8.x.
 
 ## jvmTarget deprecation
 

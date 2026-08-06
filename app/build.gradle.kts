@@ -158,7 +158,9 @@ dependencies {
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
     testRuntimeOnly(libs.junit.jupiter.engine)
-    // Pin the launcher to match Jupiter — Gradle 8.x bundles an older 1.x
-    // launcher, which fails test discovery against Jupiter 6.x.
+    // Explicitly pin the launcher to match junit-jupiter. Gradle bundles its own
+    // (older) junit-platform-launcher, and a mismatch against Jupiter 6.x breaks
+    // test discovery ("OutputDirectoryCreator not available"). Pinning keeps the
+    // launcher aligned with the Jupiter version regardless of Gradle's bundled one.
     testRuntimeOnly(libs.junit.platform.launcher)
 }

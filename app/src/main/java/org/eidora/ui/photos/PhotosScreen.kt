@@ -25,7 +25,6 @@ import org.eidora.R
 import org.eidora.ui.common.LazyGridScrollbar
 import java.io.File
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PhotosScreen(
     viewModel: PhotosViewModel,

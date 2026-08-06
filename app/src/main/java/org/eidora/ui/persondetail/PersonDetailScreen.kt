@@ -5,6 +5,7 @@ package org.eidora.ui.persondetail
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -38,7 +39,7 @@ import org.eidora.ui.common.CircleThumbnail
 import org.eidora.ui.common.LazyGridScrollbar
 import org.eidora.util.ThumbnailHelper
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersonDetailScreen(
     viewModel: PersonDetailViewModel,
@@ -496,7 +497,7 @@ private fun FaceGridItem(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FaceActionsSheet(
     viewMode: PersonDetailViewMode,
@@ -579,7 +580,7 @@ private fun FaceActionsSheet(
                         )
                     },
                     modifier =
-                        Modifier.combinedClickable(onClick = {
+                        Modifier.clickable(onClick = {
                             action()
                             if (!isDestructive) onDismiss()
                         }),
