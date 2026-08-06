@@ -12,11 +12,17 @@ plugins {
 
 android {
     namespace = "org.eidora"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "org.eidora"
         minSdk = 26
+        // compileSdk is 37 (needed by newer libraries) but targetSdk stays at 35
+        // on purpose: raising targetSdk opts into Android 17's runtime behaviour
+        // changes (stricter background limits, HTTPS enforcement, etc.), which
+        // should be adopted deliberately and tested — not as a side effect of a
+        // library bump. Raising compileSdk alone changes nothing at runtime and
+        // costs no users (minSdk is unaffected).
         targetSdk = 35
         // Versioning (Muster B): these values are the single source of truth.
         // F-Droid reads them directly from this file at the tag it builds — it
