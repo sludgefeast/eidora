@@ -13,10 +13,10 @@ import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.eidora.R
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.db.FaceRegionEntity
 import org.eidora.data.db.PersonEntity
-import org.eidora.R
 import org.eidora.data.db.PhotoEntity
 import org.eidora.data.settings.PowerConfig
 import org.eidora.data.settings.SettingsRepository
