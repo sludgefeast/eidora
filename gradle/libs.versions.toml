@@ -1,7 +1,10 @@
 [versions]
 agp = "9.3.1"
-kotlin = "2.2.20"
-ksp = "2.2.20-2.0.3"
+kotlin = "2.4.10"
+# KSP version is independent of the Kotlin version since KSP 2.3.0. 2.3.10 is the
+# release paired with Kotlin 2.4.10 (see kotlinlang.org KSP quickstart) and
+# carries the AGP-9 built-in-Kotlin fixes.
+ksp = "2.3.10"
 compose-bom = "2026.06.01"
 activity-compose = "1.9.3"
 lifecycle = "2.8.7"
