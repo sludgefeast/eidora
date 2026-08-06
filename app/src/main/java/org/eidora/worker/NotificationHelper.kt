@@ -45,7 +45,13 @@ object NotificationHelper {
         gateBlocked: Boolean = false,
     ): ForegroundInfo {
         val notification =
-            buildNotification(context, context.getString(R.string.notif_embedding_title), message, progress, gateBlocked = gateBlocked)
+            buildNotification(
+                context,
+                context.getString(R.string.notif_embedding_title),
+                message,
+                progress,
+                gateBlocked = gateBlocked,
+            )
         return makeForegroundInfo(NOTIFICATION_ID_EMBEDDING, notification)
     }
 

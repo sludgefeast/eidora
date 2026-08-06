@@ -374,12 +374,6 @@ class ClusteringWorker(
     }
 
     /**
-     * Waits until any active sync finishes, so sync and clustering don't run
-     * concurrently. Shows a "waiting" notification. Returns false if the worker
-     * was stopped while waiting.
-     */
-
-    /**
      * Loads every named person's stored embeddings (with metadata) for
      * nearest-neighbour matching. Persons whose faces are all ignored or lack an
      * embedding are skipped. Extracted from doWork to keep the phases readable.
@@ -413,6 +407,11 @@ class ClusteringWorker(
                 }
             }.toMap()
 
+    /**
+     * Waits until any active sync finishes, so sync and clustering don't run
+     * concurrently. Shows a "waiting" notification. Returns false if the worker
+     * was stopped while waiting.
+     */
     private suspend fun awaitSyncToFinish(): Boolean {
         val wm = WorkManager.getInstance(applicationContext)
         val syncStates = setOf(WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED)
@@ -573,13 +572,6 @@ class ClusteringWorker(
     }
 
     /**
-     * Returns a temporal bonus in [0..maxBonus] that is highest when the two
-     * timestamps are close together. Uses a Gaussian with half-width = 3 years.
-     * Subtracting this from cosine distance makes temporally close faces
-     * effectively "more similar".
-     */
-
-    /**
      * Smallest adjusted distance between a query embedding and any of a person's
      * stored faces. Each candidate face's cosine distance is reduced by a
      * temporal bonus (closer in time = more likely the same person), weighted by
@@ -602,6 +594,12 @@ class ClusteringWorker(
             cosD - bonus * boost
         }
 
+    /**
+     * Returns a temporal bonus in [0..maxBonus] that is highest when the two
+     * timestamps are close together. Uses a Gaussian with half-width = 3 years.
+     * Subtracting this from cosine distance makes temporally close faces
+     * effectively "more similar".
+     */
     private fun temporalBonus(
         takenAtA: Long?,
         takenAtB: Long?,

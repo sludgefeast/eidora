@@ -221,13 +221,6 @@ class FaceRepository(
     // -----------------------------------------------------------------------
 
     /**
-     * Merges [sourceIds] into [winnerId].
-     * @param confirmFaces when true, all faces of the winner are named (confirmed).
-     *   When false, each face keeps its current confirmed/unconfirmed status.
-     *   "Merge persons" passes false (preserve); "name/merge suggestion" passes true.
-     */
-
-    /**
      * Names an unnamed suggestion person.
      * @param confirm when true, all the suggestion's faces are also named
      *   (confirmed) and their XMP is written. When false, only the person
@@ -247,6 +240,12 @@ class FaceRepository(
         recomputeCentroid(personId)
     }
 
+    /**
+     * Merges [sourceIds] into [winnerId].
+     * @param confirmFaces when true, all faces of the winner are named (confirmed).
+     *   When false, each face keeps its current confirmed/unconfirmed status.
+     *   "Merge persons" passes false (preserve); "name/merge suggestion" passes true.
+     */
     suspend fun mergePersons(
         sourceIds: List<String>,
         winnerId: String,
@@ -282,12 +281,6 @@ class FaceRepository(
         photoDao.updateModifiedAt(photoId, file.lastModified())
         photoDao.updateAnalyzed(photoId, false)
     }
-
-    /**
-     * Resets every photo as if it were new: deletes all face regions,
-     * thumbnails, persons and XMP face data, then marks all photos as
-     * unanalyzed so the next sync re-detects everything from scratch.
-     */
 
     /**
      * Resets analysis so the pipeline re-detects faces. If [folders] is
@@ -330,6 +323,11 @@ class FaceRepository(
         personDao.deleteOrphaned()
     }
 
+    /**
+     * Resets every photo as if it were new: deletes all face regions,
+     * thumbnails, persons and XMP face data, then marks all photos as
+     * unanalyzed so the next sync re-detects everything from scratch.
+     */
     private suspend fun resetEverything() {
         val allPhotos = photoDao.getAll()
 
@@ -359,13 +357,6 @@ class FaceRepository(
     // -----------------------------------------------------------------------
     // Observe
     // -----------------------------------------------------------------------
-
-    /**
-     * Purges photos (and, via FK cascade, their face regions) whose folder is
-     * not in the current whitelist, then removes any persons left without faces.
-     * Use after the user narrows the folder selection to reclaim space.
-     * Returns the number of photos removed.
-     */
 
     /**
      * Ensures every person contains either only visible (in-folder) or only
@@ -401,6 +392,12 @@ class FaceRepository(
         return created
     }
 
+    /**
+     * Purges photos (and, via FK cascade, their face regions) whose folder is
+     * not in the current whitelist, then removes any persons left without faces.
+     * Use after the user narrows the folder selection to reclaim space.
+     * Returns the number of photos removed.
+     */
     suspend fun cleanupFoldersNotIn(folders: List<String>): Int {
         val before = photoDao.count()
         // Delete the thumbnail files first: the DB removes face rows via

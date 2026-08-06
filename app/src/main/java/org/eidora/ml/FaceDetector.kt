@@ -7,18 +7,14 @@ import android.graphics.Bitmap
 import java.io.Closeable
 
 /**
- * A detected face in source-image pixel coordinates.
+ * One detected face in source-image pixel coordinates.
  *
- * Shared by all detector backends (SCRFD, YuNet) so the rest of the pipeline
- * does not care which model produced it.
- */
-
-/**
- * One detected face. Coordinates are in SOURCE-IMAGE PIXELS (the bitmap passed
- * to [FaceDetector.detect]), not normalized and not model-input pixels. Both
- * YuNetDetector and ScrfdDetector honor this, so consumers (the sync pipeline,
- * the self-test overlay) treat every detector identically — divide by the
- * bitmap size to normalize, or scale to a displayed image directly.
+ * Coordinates are in SOURCE-IMAGE PIXELS (the bitmap passed to
+ * [FaceDetector.detect]), not normalized and not model-input pixels. Both
+ * YuNetDetector and ScrfdDetector honor this, so the rest of the pipeline does
+ * not care which model produced a face: consumers (the sync pipeline, the
+ * self-test overlay) treat every detector identically — divide by the bitmap
+ * size to normalize, or scale to a displayed image directly.
  */
 data class DetectedFace(
     val xMin: Float,

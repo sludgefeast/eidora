@@ -20,6 +20,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.db.FaceRegionEntity
+import org.eidora.data.settings.PowerConfig
+import org.eidora.data.settings.SettingsRepository
 import org.eidora.ml.EmbeddingModel
 import org.eidora.util.ThumbnailHelper
 import org.eidora.util.toFaceRegionCoords
@@ -82,11 +84,11 @@ class EmbeddingWorker(
                         .getPowerConfig()
                 } catch (t: Throwable) {
                     t.rethrowIfCancellation()
-                    org.eidora.data.settings.PowerConfig(
-                        minBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
-                        maxBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
-                        resumeBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
-                        resumeBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
+                    PowerConfig(
+                        minBatteryPercent = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
+                        maxBatteryTempCelsius = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
+                        resumeBatteryPercent = SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
+                        resumeBatteryTempCelsius = SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
                     )
                 }
 

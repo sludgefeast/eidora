@@ -16,7 +16,10 @@ import kotlinx.coroutines.launch
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.db.FaceRegionEntity
 import org.eidora.data.db.PersonEntity
+import org.eidora.R
 import org.eidora.data.db.PhotoEntity
+import org.eidora.data.settings.PowerConfig
+import org.eidora.data.settings.SettingsRepository
 import org.eidora.domain.model.FaceRegionCoords
 import org.eidora.ml.FaceDetector
 import org.eidora.util.*
@@ -120,7 +123,7 @@ class PhotoSyncWorker(
                 NotificationHelper.syncForegroundInfo(
                     applicationContext,
                     0,
-                    applicationContext.getString(org.eidora.R.string.notif_scanning_start),
+                    applicationContext.getString(R.string.notif_scanning_start),
                 ),
             )
         } catch (
@@ -142,7 +145,7 @@ class PhotoSyncWorker(
                 .AtomicInteger(0)
         val currentFile =
             java.util.concurrent.atomic
-                .AtomicReference<String>(applicationContext.getString(org.eidora.R.string.notif_scanning_start))
+                .AtomicReference<String>(applicationContext.getString(R.string.notif_scanning_start))
         val gateBlocked =
             java.util.concurrent.atomic
                 .AtomicBoolean(false)
@@ -220,12 +223,12 @@ class PhotoSyncWorker(
                     throw c // never swallow cancellation – let the coroutine stop
                 } catch (t: Throwable) {
                     Log.w(TAG, "Failed to load folder whitelist, using defaults", t)
-                    org.eidora.data.settings.SettingsRepository.DEFAULT_FOLDER_WHITELIST
+                    SettingsRepository.DEFAULT_FOLDER_WHITELIST
                 }
             val mediaEntries =
                 try {
                     collectJpegsFromMediaStore(folderWhitelist) { count ->
-                        currentFile.set(applicationContext.getString(org.eidora.R.string.notif_scanning, count))
+                        currentFile.set(applicationContext.getString(R.string.notif_scanning, count))
                     }
                 } catch (t: Throwable) {
                     Log.e(TAG, "Failed to query MediaStore for JPEGs", t)
@@ -247,7 +250,7 @@ class PhotoSyncWorker(
                         folderWhitelist,
                         sinceModifiedSec = if (isForce) 0L else lastSyncSec,
                     ) { count ->
-                        currentFile.set(applicationContext.getString(org.eidora.R.string.notif_scanning, count))
+                        currentFile.set(applicationContext.getString(R.string.notif_scanning, count))
                     }
                 } catch (t: Throwable) {
                     Log.e(TAG, "Failed to query MediaStore for JPEGs", t)
@@ -294,7 +297,7 @@ class PhotoSyncWorker(
                 runDeletionCheck(prefs, nowSec)
             }
 
-            setProgress(workDataOf(KEY_STATUS to applicationContext.getString(org.eidora.R.string.notif_scanning_start)))
+            setProgress(workDataOf(KEY_STATUS to applicationContext.getString(R.string.notif_scanning_start)))
             val jpegFiles = workEntries
 
             // Analysis phase begins: publish totals so the notifier switches from
@@ -311,11 +314,11 @@ class PhotoSyncWorker(
                         .get(applicationContext)
                         .getPowerConfig()
                 } catch (t: Throwable) {
-                    org.eidora.data.settings.PowerConfig(
-                        minBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
-                        maxBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
-                        resumeBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
-                        resumeBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
+                    PowerConfig(
+                        minBatteryPercent = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
+                        maxBatteryTempCelsius = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
+                        resumeBatteryPercent = SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
+                        resumeBatteryTempCelsius = SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
                     )
                 }
 
@@ -371,7 +374,7 @@ class PhotoSyncWorker(
             setProgress(
                 workDataOf(
                     KEY_PROGRESS to 100,
-                    KEY_STATUS to applicationContext.getString(org.eidora.R.string.notif_done),
+                    KEY_STATUS to applicationContext.getString(R.string.notif_done),
                 ),
             )
             return Result.success()
@@ -796,13 +799,9 @@ class PhotoSyncWorker(
                 .build()
 
         /**
-         * Estimates remaining time from throughput so far.
-         * Returns empty string when not enough data (< 5 items done).
-         */
-
-        /**
          * Estimates the remaining time from the average processing time per
-         * item so far.
+         * item so far. Returns an empty string when there is not enough data
+         * yet (fewer than 5 items done).
          *
          * [pausedMs] is the time spent blocked by the PowerGate (low battery or
          * high temperature). It is subtracted from the elapsed wall-clock time,
@@ -824,7 +823,7 @@ class PhotoSyncWorker(
                     done = done,
                     total = total,
                 ) ?: return ""
-            return context.getString(org.eidora.R.string.notif_eta_left, formatDuration(remainingMs))
+            return context.getString(R.string.notif_eta_left, formatDuration(remainingMs))
         }
 
         /**

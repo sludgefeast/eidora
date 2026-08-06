@@ -30,7 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.eidora.R
 
-/**
+/*
  * Shared building blocks for settings-style screens.
  *
  * These were originally private to SettingsScreen; they're extracted here so
