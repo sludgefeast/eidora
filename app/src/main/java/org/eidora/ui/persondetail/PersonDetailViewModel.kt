@@ -332,7 +332,6 @@ class PersonDetailViewModel(
         _uiState.update { it.copy(showAssignSheet = false, assignTargetFaceIds = emptySet()) }
     }
 
-
     fun assignToExistingPerson(personId: String) {
         val faceIds = _uiState.value.assignTargetFaceIds.toList()
         viewModelScope.launch {

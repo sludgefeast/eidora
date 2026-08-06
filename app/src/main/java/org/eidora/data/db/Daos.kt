@@ -161,7 +161,6 @@ interface PersonDao {
         folders: List<String>,
     ): List<PersonEntity>
 
-
     @Query("SELECT * FROM persons WHERE id = :id")
     suspend fun findById(id: String): PersonEntity?
 

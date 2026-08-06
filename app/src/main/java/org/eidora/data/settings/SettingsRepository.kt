@@ -295,6 +295,7 @@ class SettingsRepository(
         const val DEFAULT_CONFIRM_ON_ASSIGN = true
         const val DEFAULT_CONFIRM_ON_NAME_SUGGESTION = false
         const val DEFAULT_CONFIRM_ON_MERGE_SUGGESTION = true
+
         // Like Aves: when a photo has no capture date in its metadata, write one
         // (derived from the file's modification time) before editing, so its
         // chronological position survives later timestamp changes. On by default.

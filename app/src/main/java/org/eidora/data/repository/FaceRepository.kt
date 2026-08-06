@@ -226,6 +226,7 @@ class FaceRepository(
      *   When false, each face keeps its current confirmed/unconfirmed status.
      *   "Merge persons" passes false (preserve); "name/merge suggestion" passes true.
      */
+
     /**
      * Names an unnamed suggestion person.
      * @param confirm when true, all the suggestion's faces are also named
@@ -287,6 +288,7 @@ class FaceRepository(
      * thumbnails, persons and XMP face data, then marks all photos as
      * unanalyzed so the next sync re-detects everything from scratch.
      */
+
     /**
      * Resets analysis so the pipeline re-detects faces. If [folders] is
      * non-empty, only photos in those folders are reset (thumbnails, face
@@ -364,6 +366,7 @@ class FaceRepository(
      * Use after the user narrows the folder selection to reclaim space.
      * Returns the number of photos removed.
      */
+
     /**
      * Ensures every person contains either only visible (in-folder) or only
      * hidden (out-of-folder) faces. Any person that currently mixes both is

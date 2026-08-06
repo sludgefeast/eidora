@@ -93,6 +93,7 @@ object SyncPipeline {
     }
 
     /** User-initiated model download (after the consent dialog). */
+
     /**
      * Cancels the running sync and clustering chains and restarts the pipeline
      * from the beginning. Used after the folder whitelist changed: the current

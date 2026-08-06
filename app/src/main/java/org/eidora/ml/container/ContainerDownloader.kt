@@ -258,6 +258,7 @@ object ContainerDownloader {
 
     private sealed interface FetchOutcome {
         data object Ok : FetchOutcome
+
         data class Network(val detail: String) : FetchOutcome
     }
 

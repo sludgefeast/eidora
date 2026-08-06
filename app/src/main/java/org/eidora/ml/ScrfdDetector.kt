@@ -39,7 +39,6 @@ class ScrfdDetector private constructor(
     private val scoreThreshold: Float,
     private val nmsIouThreshold: Float,
 ) : FaceDetector {
-
     private val interpreter: Interpreter = loaded.interpreter
     private val gpuDelegate: GpuDelegate? = loaded.gpuDelegate
     private val mutex = Mutex()

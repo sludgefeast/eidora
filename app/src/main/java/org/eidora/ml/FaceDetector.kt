@@ -12,6 +12,7 @@ import java.io.Closeable
  * Shared by all detector backends (SCRFD, YuNet) so the rest of the pipeline
  * does not care which model produced it.
  */
+
 /**
  * One detected face. Coordinates are in SOURCE-IMAGE PIXELS (the bitmap passed
  * to [FaceDetector.detect]), not normalized and not model-input pixels. Both

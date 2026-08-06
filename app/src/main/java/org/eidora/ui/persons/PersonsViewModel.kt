@@ -63,40 +63,40 @@ class PersonsViewModel(
         viewModelScope.launch {
             @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
             settingsRepo.folderWhitelist.flatMapLatest { wl ->
-            val folders = wl.toList()
-            combine(
-                repo.observePersonsWithCount(folders),
-                personDao.observeSuggestions(folders),
-                faceDao.observeUnknownCount(folders),
-                faceDao.observeIgnoredCount(folders),
-            ) {
-                    confirmed: List<PersonWithCount>,
-                    suggestions: List<PersonEntity>,
-                    unknownCount: Int,
-                    ignoredCount: Int,
-                ->
+                val folders = wl.toList()
+                combine(
+                    repo.observePersonsWithCount(folders),
+                    personDao.observeSuggestions(folders),
+                    faceDao.observeUnknownCount(folders),
+                    faceDao.observeIgnoredCount(folders),
+                ) {
+                        confirmed: List<PersonWithCount>,
+                        suggestions: List<PersonEntity>,
+                        unknownCount: Int,
+                        ignoredCount: Int,
+                    ->
 
-                val suggestionUis =
-                    suggestions.map { person ->
-                        val faces = faceDao.findByPersonId(person.id)
-                        PersonSuggestionUi(
-                            personId = person.id,
-                            representativeFaceId = person.representativeFaceId,
-                            firstFaceId = faces.firstOrNull()?.id,
-                            faceCount = faces.size,
-                        )
-                    }
+                    val suggestionUis =
+                        suggestions.map { person ->
+                            val faces = faceDao.findByPersonId(person.id)
+                            PersonSuggestionUi(
+                                personId = person.id,
+                                representativeFaceId = person.representativeFaceId,
+                                firstFaceId = faces.firstOrNull()?.id,
+                                faceCount = faces.size,
+                            )
+                        }
 
-                PersonsUiState(
-                    confirmedPersons = confirmed,
-                    suggestions = suggestionUis,
-                    unknownCount = unknownCount,
-                    ignoredCount = ignoredCount,
-                    multiSelect = _uiState.value.multiSelect,
-                    renamingPersonId = _uiState.value.renamingPersonId,
-                    showMergeSheet = _uiState.value.showMergeSheet,
-                )
-            }
+                    PersonsUiState(
+                        confirmedPersons = confirmed,
+                        suggestions = suggestionUis,
+                        unknownCount = unknownCount,
+                        ignoredCount = ignoredCount,
+                        multiSelect = _uiState.value.multiSelect,
+                        renamingPersonId = _uiState.value.renamingPersonId,
+                        showMergeSheet = _uiState.value.showMergeSheet,
+                    )
+                }
             }.collect { newState -> _uiState.value = newState }
         }
     }

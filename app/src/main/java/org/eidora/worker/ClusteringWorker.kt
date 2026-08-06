@@ -378,6 +378,7 @@ class ClusteringWorker(
      * concurrently. Shows a "waiting" notification. Returns false if the worker
      * was stopped while waiting.
      */
+
     /**
      * Loads every named person's stored embeddings (with metadata) for
      * nearest-neighbour matching. Persons whose faces are all ignored or lack an
@@ -577,6 +578,7 @@ class ClusteringWorker(
      * Subtracting this from cosine distance makes temporally close faces
      * effectively "more similar".
      */
+
     /**
      * Smallest adjusted distance between a query embedding and any of a person's
      * stored faces. Each candidate face's cosine distance is reduced by a

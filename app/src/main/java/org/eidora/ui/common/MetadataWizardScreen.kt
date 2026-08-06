@@ -3,7 +3,6 @@
 
 package org.eidora.ui.common
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +31,6 @@ import kotlinx.coroutines.launch
 import org.eidora.R
 import org.eidora.data.settings.SettingsProvider
 import org.eidora.data.settings.SettingsRepository
-import androidx.compose.runtime.rememberCoroutineScope
 
 /**
  * First-run step that lets the user decide, before any analysis writes to their

@@ -3,9 +3,7 @@
 
 package org.eidora.ui.settings
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,17 +14,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,8 +47,11 @@ import org.eidora.ml.container.SelfTest
 
 private sealed interface TestState {
     data object Running : TestState
+
     data class Detection(val result: SelfTest.DetectionResult) : TestState
+
     data class Embedding(val result: SelfTest.EmbeddingResult) : TestState
+
     data class Failed(val message: String) : TestState
 }
 
@@ -265,8 +264,11 @@ private fun EmbeddingView(result: SelfTest.EmbeddingResult) {
                     fontWeight = FontWeight.SemiBold,
                 )
                 val kind =
-                    if (p.samePerson) stringResource(R.string.selftest_embedding_same)
-                    else stringResource(R.string.selftest_embedding_diff)
+                    if (p.samePerson) {
+                        stringResource(R.string.selftest_embedding_same)
+                    } else {
+                        stringResource(R.string.selftest_embedding_diff)
+                    }
                 Text(
                     kind,
                     style = MaterialTheme.typography.bodySmall,
@@ -322,12 +324,18 @@ private fun EmbeddingView(result: SelfTest.EmbeddingResult) {
 private fun HintLine(ok: Boolean) {
     Text(
         text =
-            if (ok) stringResource(R.string.selftest_hint_ok)
-            else stringResource(R.string.selftest_hint_bad),
+            if (ok) {
+                stringResource(R.string.selftest_hint_ok)
+            } else {
+                stringResource(R.string.selftest_hint_bad)
+            },
         style = MaterialTheme.typography.bodyMedium,
         fontWeight = FontWeight.SemiBold,
         color =
-            if (ok) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.error,
+            if (ok) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.error
+            },
     )
 }

@@ -42,7 +42,13 @@ class EmbeddingModel private constructor(
     // truth for these shape values.
     private val inputSize: Int = interpreter.getInputTensor(0).shape().let { s ->
         // NHWC [1,S,S,3] or NCHW [1,3,S,S]
-        if (s.size == 4 && s[3] == 3) s[1] else if (s.size == 4) s[2] else 112
+        if (s.size == 4 && s[3] == 3) {
+            s[1]
+        } else if (s.size == 4) {
+            s[2]
+        } else {
+            112
+        }
     }
     private val embeddingDim: Int = interpreter.getOutputTensor(0).shape().let { s ->
         s[s.size - 1]

@@ -16,7 +16,6 @@ import androidx.core.content.ContextCompat
  * them at any time via the Android settings.
  */
 object PermissionChecker {
-
     /** The media-read permission appropriate for the running Android version. */
     fun mediaPermission(): String =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -33,7 +32,6 @@ object PermissionChecker {
     /** True if the app has All-Files access (needed to write XMP back to files). */
     fun hasAllFilesAccess(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
-
 
     /**
      * The core permissions every worker needs to do useful work:

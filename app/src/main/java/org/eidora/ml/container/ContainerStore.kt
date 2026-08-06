@@ -72,7 +72,9 @@ object ContainerStore {
 
     sealed interface ImportResult {
         data class Success(val container: InstalledContainer) : ImportResult
+
         data class Invalid(val detail: String) : ImportResult
+
         data class Duplicate(val existingId: String) : ImportResult
     }
 
@@ -219,10 +221,12 @@ object ContainerStore {
     private fun rewriteManifestWithoutModel(manifestFile: File, modelId: String): Boolean {
         return try {
             val yaml = org.yaml.snakeyaml.Yaml()
+
             @Suppress("UNCHECKED_CAST")
             val root =
                 manifestFile.inputStream().use { yaml.load<Any?>(it) } as? MutableMap<String, Any?>
                     ?: return false
+
             @Suppress("UNCHECKED_CAST")
             val models = root["models"] as? List<Map<String, Any?>> ?: return false
             root["models"] = models.filter { it["id"] != modelId }

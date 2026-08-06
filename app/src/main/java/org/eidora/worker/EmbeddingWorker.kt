@@ -7,9 +7,9 @@ import android.content.Context
 import android.util.Log
 import androidx.work.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.collect
@@ -83,10 +83,10 @@ class EmbeddingWorker(
                 } catch (t: Throwable) {
                     t.rethrowIfCancellation()
                     org.eidora.data.settings.PowerConfig(
-                    minBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
-                    maxBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
-                    resumeBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
-                    resumeBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
+                        minBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
+                        maxBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
+                        resumeBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
+                        resumeBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
                     )
                 }
 
@@ -101,6 +101,7 @@ class EmbeddingWorker(
                 kotlinx.coroutines.CoroutineScope(
                     kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob(),
                 )
+
             @Suppress("UNUSED_VARIABLE")
             val notifierJob =
                 notifierScope.launch {
@@ -164,91 +165,90 @@ class EmbeddingWorker(
                 }
 
             try {
-            // Producer: crop face bitmaps in parallel on IO dispatcher
-            // Consumer (implicit): compute embedding via mutex-guarded interpreter,
-            // then write result back to DB
-            pending
-                .asFlow()
-                .flatMapMerge(concurrency = PARALLELISM) { face ->
-                    flow {
-                        powerGate.awaitOk(
-                            powerConfig,
-                            isStopped = { isStopped },
-                        ) { reason ->
-                            // Only update the shared status – the notifier handles display
-                            currentStatus.set(reason)
-                        }
-                        if (isStopped) return@flow
-                        currentStatus.set("") // clear pause reason when gate opens
-                        val bitmap =
-                            try {
-                                val photo = photoDao.findById(face.photoId) ?: return@flow
-                                val photoFile = File(photo.path)
-                                if (!photoFile.exists()) return@flow
-                                val coords = face.regionJson.toFaceRegionCoords()
-                                ThumbnailHelper.cropForEmbedding(photoFile, coords)
-                            } catch (t: Throwable) {
-                                Log.e(TAG, "Failed to prepare face ${face.id}, marking failed", t)
-                                // Permanent failure: mark it so clustering stops
-                                // waiting for this face's embedding.
-                                try {
-                                    faceDao.markEmbeddingFailed(face.id)
-                                } catch (inner: Throwable) {
-                                    Log.w(TAG, "Could not mark face ${face.id} failed", inner)
-                                }
-                                null
+                // Producer: crop face bitmaps in parallel on IO dispatcher
+                // Consumer (implicit): compute embedding via mutex-guarded interpreter,
+                // then write result back to DB
+                pending
+                    .asFlow()
+                    .flatMapMerge(concurrency = PARALLELISM) { face ->
+                        flow {
+                            powerGate.awaitOk(
+                                powerConfig,
+                                isStopped = { isStopped },
+                            ) { reason ->
+                                // Only update the shared status – the notifier handles display
+                                currentStatus.set(reason)
                             }
-                        if (bitmap != null) emit(face to bitmap)
-                    }.flowOn(Dispatchers.IO)
-                }.buffer(capacity = PARALLELISM)
-                .collect { (face, bitmap) ->
-                    try {
-                        val embedding = model.computeEmbedding(bitmap)
-                        faceDao.updateEmbedding(face.id, EmbeddingModel.floatArrayToBytes(embedding))
-                        // Refine quality score now that we have the crop bitmap:
-                        // add sharpness signal on top of the size+rotation score
-                        // already computed at detection time.
+                            if (isStopped) return@flow
+                            currentStatus.set("") // clear pause reason when gate opens
+                            val bitmap =
+                                try {
+                                    val photo = photoDao.findById(face.photoId) ?: return@flow
+                                    val photoFile = File(photo.path)
+                                    if (!photoFile.exists()) return@flow
+                                    val coords = face.regionJson.toFaceRegionCoords()
+                                    ThumbnailHelper.cropForEmbedding(photoFile, coords)
+                                } catch (t: Throwable) {
+                                    Log.e(TAG, "Failed to prepare face ${face.id}, marking failed", t)
+                                    // Permanent failure: mark it so clustering stops
+                                    // waiting for this face's embedding.
+                                    try {
+                                        faceDao.markEmbeddingFailed(face.id)
+                                    } catch (inner: Throwable) {
+                                        Log.w(TAG, "Could not mark face ${face.id} failed", inner)
+                                    }
+                                    null
+                                }
+                            if (bitmap != null) emit(face to bitmap)
+                        }.flowOn(Dispatchers.IO)
+                    }.buffer(capacity = PARALLELISM)
+                    .collect { (face, bitmap) ->
                         try {
-                            val coords = face.regionJson.toFaceRegionCoords()
-                            val refined =
-                                org.eidora.util.FaceQuality.compute(
-                                    coords = coords,
-                                    rotationRad = null, // rotation already baked into initial score
-                                    faceBitmap = bitmap,
-                                )
-                            // Blend detection-time score (2/3) with sharpness (1/3)
-                            val prev = face.qualityScore ?: refined
-                            val blended = prev * 0.667f + refined * 0.333f
-                            faceDao.updateQualityScore(face.id, blended)
+                            val embedding = model.computeEmbedding(bitmap)
+                            faceDao.updateEmbedding(face.id, EmbeddingModel.floatArrayToBytes(embedding))
+                            // Refine quality score now that we have the crop bitmap:
+                            // add sharpness signal on top of the size+rotation score
+                            // already computed at detection time.
+                            try {
+                                val coords = face.regionJson.toFaceRegionCoords()
+                                val refined =
+                                    org.eidora.util.FaceQuality.compute(
+                                        coords = coords,
+                                        rotationRad = null, // rotation already baked into initial score
+                                        faceBitmap = bitmap,
+                                    )
+                                // Blend detection-time score (2/3) with sharpness (1/3)
+                                val prev = face.qualityScore ?: refined
+                                val blended = prev * 0.667f + refined * 0.333f
+                                faceDao.updateQualityScore(face.id, blended)
+                            } catch (t: Throwable) {
+                                Log.w(TAG, "Quality score refinement failed for ${face.id}", t)
+                            }
                         } catch (t: Throwable) {
-                            Log.w(TAG, "Quality score refinement failed for ${face.id}", t)
+                            Log.e(TAG, "Failed embedding for face ${face.id}, marking failed", t)
+                            try {
+                                faceDao.markEmbeddingFailed(face.id)
+                            } catch (inner: Throwable) {
+                                Log.w(TAG, "Could not mark face ${face.id} failed", inner)
+                            }
+                        } finally {
+                            bitmap.recycle()
                         }
-                    } catch (t: Throwable) {
-                        Log.e(TAG, "Failed embedding for face ${face.id}, marking failed", t)
-                        try {
-                            faceDao.markEmbeddingFailed(face.id)
-                        } catch (inner: Throwable) {
-                            Log.w(TAG, "Could not mark face ${face.id} failed", inner)
+                        val current = done.incrementAndGet()
+                        // Periodic heartbeat so a running worker is visible in the
+                        // log (every item would flood the ring buffer; every 500
+                        // keeps a readable trail across a long run).
+                        if (current % 500 == 0) {
+                            Log.i(TAG, "Embeddings progress: $current / $total")
                         }
-                    } finally {
-                        bitmap.recycle()
+                        setProgress(
+                            workDataOf(
+                                PhotoSyncWorker.KEY_PROGRESS to (current * 100) / total,
+                                PhotoSyncWorker.KEY_STATUS to
+                                    applicationContext.getString(org.eidora.R.string.notif_embedding_title),
+                            ),
+                        )
                     }
-                    val current = done.incrementAndGet()
-                    // Periodic heartbeat so a running worker is visible in the
-                    // log (every item would flood the ring buffer; every 500
-                    // keeps a readable trail across a long run).
-                    if (current % 500 == 0) {
-                        Log.i(TAG, "Embeddings progress: $current / $total")
-                    }
-                    setProgress(
-                        workDataOf(
-                            PhotoSyncWorker.KEY_PROGRESS to (current * 100) / total,
-                            PhotoSyncWorker.KEY_STATUS to
-                                applicationContext.getString(org.eidora.R.string.notif_embedding_title),
-                        ),
-                    )
-                }
-
             } finally {
                 // MUST run even on cancellation – a leaked notifier from a
                 // stopped run would fight the next run over the notification.

@@ -155,6 +155,7 @@ object ContainerManifestParser {
 
     private fun parseModel(index: Int, raw: Any?): ContainerManifest.ModelEntry {
         val where = "models[$index]"
+
         @Suppress("UNCHECKED_CAST")
         val m = raw as? Map<String, Any?>
             ?: throw ManifestException("$where is not a mapping")

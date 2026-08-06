@@ -24,6 +24,7 @@ object ContainerValidator {
 
     sealed interface Result {
         data object Ok : Result
+
         data class Failed(val detail: String) : Result
     }
 

@@ -161,220 +161,220 @@ class PhotoSyncWorker(
                 kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob(),
             )
         notifierScope.launch {
-                var lastTick = System.currentTimeMillis()
-                // Remember what was last posted: while nothing changes there is
-                // no reason to hand another notification to the system server.
-                var lastPosted: Pair<Int, String>? = null
-                while (isActive) {
-                    val now = System.currentTimeMillis()
-                    val total = totalCount.get()
-                    val current = doneCount.get()
-                    val progress = if (total == 0) 0 else (current * 100) / total
-                    val file = currentFile.get()
-                    val blocked = gateBlocked.get()
-                    val startedAt = startedAnalysisAt.get()
-                    // While the gate blocks processing, add the elapsed tick to
-                    // the paused accumulator instead of letting it inflate the
-                    // per-item average.
-                    if (blocked && startedAt != 0L) {
-                        pausedMs.addAndGet(now - lastTick)
-                    }
-                    lastTick = now
-                    val eta =
-                        if (blocked || total == 0 || startedAt == 0L) {
-                            ""
-                        } else {
-                            formatEta(applicationContext, startedAt, current, total, pausedMs.get())
-                        }
-                    val message = if (eta.isNotEmpty()) "$file – $eta" else file
-                    val posted = progress to message
-                    if (posted != lastPosted) {
-                        try {
-                            setForeground(
-                                NotificationHelper.syncForegroundInfo(
-                                    applicationContext,
-                                    progress,
-                                    message,
-                                    gateBlocked = blocked,
-                                ),
-                            )
-                            lastPosted = posted
-                        } catch (t: Throwable) {
-                            // ignore
-                        }
-                    }
-                    // Poll slowly while the gate blocks us: nothing is being
-                    // processed, so a fast tick would only keep the CPU awake
-                    // and heat the device we are waiting to cool down.
-                    kotlinx.coroutines.delay(if (blocked) IDLE_NOTIFIER_INTERVAL_MS else ACTIVE_NOTIFIER_INTERVAL_MS)
+            var lastTick = System.currentTimeMillis()
+            // Remember what was last posted: while nothing changes there is
+            // no reason to hand another notification to the system server.
+            var lastPosted: Pair<Int, String>? = null
+            while (isActive) {
+                val now = System.currentTimeMillis()
+                val total = totalCount.get()
+                val current = doneCount.get()
+                val progress = if (total == 0) 0 else (current * 100) / total
+                val file = currentFile.get()
+                val blocked = gateBlocked.get()
+                val startedAt = startedAnalysisAt.get()
+                // While the gate blocks processing, add the elapsed tick to
+                // the paused accumulator instead of letting it inflate the
+                // per-item average.
+                if (blocked && startedAt != 0L) {
+                    pausedMs.addAndGet(now - lastTick)
                 }
-            }
-
-        try {
-        val folderWhitelist =
-            try {
-                org.eidora.data.settings.SettingsProvider
-                    .get(applicationContext)
-                    .getFolderWhitelist()
-            } catch (c: kotlinx.coroutines.CancellationException) {
-                throw c // never swallow cancellation – let the coroutine stop
-            } catch (t: Throwable) {
-                Log.w(TAG, "Failed to load folder whitelist, using defaults", t)
-                org.eidora.data.settings.SettingsRepository.DEFAULT_FOLDER_WHITELIST
-            }
-        val mediaEntries =
-            try {
-                collectJpegsFromMediaStore(folderWhitelist) { count ->
-                    currentFile.set(applicationContext.getString(org.eidora.R.string.notif_scanning, count))
-                }
-            } catch (t: Throwable) {
-                Log.e(TAG, "Failed to query MediaStore for JPEGs", t)
-                return Result.failure()
-            }
-
-        val prefs = applicationContext.getSharedPreferences("sync_state", android.content.Context.MODE_PRIVATE)
-        val nowSec = System.currentTimeMillis() / 1000
-        val lastSyncSec = prefs.getLong("last_sync_timestamp_sec", 0L)
-        val isForce = inputData.getBoolean(KEY_FORCE, false)
-
-        // -----------------------------------------------------------------------
-        // Step 1: Incremental scan – only new/modified entries since last sync.
-        // Fast: MediaStore returns a tiny result set on normal app starts.
-        // -----------------------------------------------------------------------
-        val changedEntries =
-            try {
-                collectJpegsFromMediaStore(
-                    folderWhitelist,
-                    sinceModifiedSec = if (isForce) 0L else lastSyncSec,
-                ) { count ->
-                    currentFile.set(applicationContext.getString(org.eidora.R.string.notif_scanning, count))
-                }
-            } catch (t: Throwable) {
-                Log.e(TAG, "Failed to query MediaStore for JPEGs", t)
-                return Result.failure()
-            }
-
-        // Also include not-yet-analyzed photos from a previous interrupted run.
-        val unanalyzed =
-            try {
-                photoDao
-                    .getAllPathsWithModified()
-                    .filter { !it.analyzed }
-                    .map { MediaEntry(java.io.File(it.path), it.modifiedAt / 1000, it.folder) }
-            } catch (t: Throwable) {
-                emptyList()
-            }
-
-        // Exclude photos with a pending XMP write – their mtime will change
-        // when XmpWriteWorker runs, so don't treat them as "modified" yet.
-        val pendingXmpPaths =
-            try {
-                photoDao.getPendingXmpWrites().map { it.path }.toSet()
-            } catch (t: Throwable) {
-                emptySet<String>()
-            }
-
-        val workEntries =
-            (changedEntries + unanalyzed)
-                .distinctBy { it.file.absolutePath }
-                .filter { it.file.absolutePath !in pendingXmpPaths }
-
-        Log.i(
-            TAG,
-            "Sync work set: ${workEntries.size} entries " +
-                "(${changedEntries.size} changed since ${lastSyncSec}s, ${unanalyzed.size} unanalyzed)",
-        )
-
-        // Step 2: Deletion check – only run periodically (every ~24h) or on force.
-        val lastDeletionCheck = prefs.getLong("last_deletion_check_sec", 0L)
-        val deletionCheckIntervalSec = 24 * 3600L
-        val isPeriodic = inputData.keyValueMap.isEmpty()
-        if (isForce || isPeriodic || nowSec - lastDeletionCheck > deletionCheckIntervalSec) {
-            if (isStopped) return Result.success()
-            runDeletionCheck(prefs, nowSec)
-        }
-
-        setProgress(workDataOf(KEY_STATUS to applicationContext.getString(org.eidora.R.string.notif_scanning_start)))
-        val jpegFiles = workEntries
-
-        // Analysis phase begins: publish totals so the notifier switches from
-        // scan messages to per-file progress with ETA.
-        totalCount.set(jpegFiles.size)
-        startedAnalysisAt.set(System.currentTimeMillis())
-        val total = jpegFiles.size
-        Log.i(TAG, "Starting face detection for $total photos")
-
-        val powerGate = PowerGate(applicationContext)
-        val powerConfig =
-            try {
-                org.eidora.data.settings.SettingsProvider
-                    .get(applicationContext)
-                    .getPowerConfig()
-            } catch (t: Throwable) {
-                org.eidora.data.settings.PowerConfig(
-                    minBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
-                    maxBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
-                    resumeBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
-                    resumeBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
-                )
-            }
-
-        @OptIn(ExperimentalCoroutinesApi::class)
-        flow { jpegFiles.forEach { emit(it) } }
-            .flatMapMerge(concurrency = SYNC_PARALLELISM) { entry ->
-                flow {
-                    powerGate.awaitOk(powerConfig) { reason ->
-                        gateBlocked.set(true)
-                        currentFile.set(reason)
+                lastTick = now
+                val eta =
+                    if (blocked || total == 0 || startedAt == 0L) {
+                        ""
+                    } else {
+                        formatEta(applicationContext, startedAt, current, total, pausedMs.get())
                     }
-                    gateBlocked.set(false)
-                    currentFile.set(entry.file.name)
+                val message = if (eta.isNotEmpty()) "$file – $eta" else file
+                val posted = progress to message
+                if (posted != lastPosted) {
                     try {
-                        processFile(entry.file, entry.folder)
+                        setForeground(
+                            NotificationHelper.syncForegroundInfo(
+                                applicationContext,
+                                progress,
+                                message,
+                                gateBlocked = blocked,
+                            ),
+                        )
+                        lastPosted = posted
                     } catch (t: Throwable) {
-                        Log.e(TAG, "Failed to process file ${entry.file.name}, skipping", t)
+                        // ignore
                     }
-                    emit(entry)
                 }
-            }.collect { _ ->
-                val current = doneCount.incrementAndGet()
-                if (current % 500 == 0) {
-                    Log.i(TAG, "Detection progress: $current / $total")
-                }
-                setProgress(workDataOf(KEY_PROGRESS to (current * 100) / total))
+                // Poll slowly while the gate blocks us: nothing is being
+                // processed, so a fast tick would only keep the CPU awake
+                // and heat the device we are waiting to cool down.
+                kotlinx.coroutines.delay(if (blocked) IDLE_NOTIFIER_INTERVAL_MS else ACTIVE_NOTIFIER_INTERVAL_MS)
             }
-        Log.i(TAG, "Face detection finished: ${doneCount.get()} / $total")
-
-        try {
-            personDao.deleteOrphaned()
-        } catch (t: Throwable) {
-            Log.e(TAG, "Failed to delete orphaned persons", t)
         }
 
-        // Remove thumbnail files left behind by cascade deletes or interrupted
-        // runs. Cheap: one query plus a directory listing.
         try {
-            val validIds = faceDao.allIds().toSet()
-            val removed = org.eidora.util.ThumbnailHelper.sweepOrphans(applicationContext, validIds)
-            if (removed > 0) Log.i(TAG, "Swept $removed orphan thumbnail(s)")
-        } catch (t: Throwable) {
-            t.rethrowIfCancellation()
-            Log.w(TAG, "Thumbnail sweep failed", t)
-        }
+            val folderWhitelist =
+                try {
+                    org.eidora.data.settings.SettingsProvider
+                        .get(applicationContext)
+                        .getFolderWhitelist()
+                } catch (c: kotlinx.coroutines.CancellationException) {
+                    throw c // never swallow cancellation – let the coroutine stop
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Failed to load folder whitelist, using defaults", t)
+                    org.eidora.data.settings.SettingsRepository.DEFAULT_FOLDER_WHITELIST
+                }
+            val mediaEntries =
+                try {
+                    collectJpegsFromMediaStore(folderWhitelist) { count ->
+                        currentFile.set(applicationContext.getString(org.eidora.R.string.notif_scanning, count))
+                    }
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to query MediaStore for JPEGs", t)
+                    return Result.failure()
+                }
 
-        // Persist sync timestamp so next run only fetches newer entries
-        prefs.edit().putLong("last_sync_timestamp_sec", nowSec).apply()
+            val prefs = applicationContext.getSharedPreferences("sync_state", android.content.Context.MODE_PRIVATE)
+            val nowSec = System.currentTimeMillis() / 1000
+            val lastSyncSec = prefs.getLong("last_sync_timestamp_sec", 0L)
+            val isForce = inputData.getBoolean(KEY_FORCE, false)
 
-        // Remove old generation-based fast path key if present
-        prefs.edit().remove("media_generation").apply()
+            // -----------------------------------------------------------------------
+            // Step 1: Incremental scan – only new/modified entries since last sync.
+            // Fast: MediaStore returns a tiny result set on normal app starts.
+            // -----------------------------------------------------------------------
+            val changedEntries =
+                try {
+                    collectJpegsFromMediaStore(
+                        folderWhitelist,
+                        sinceModifiedSec = if (isForce) 0L else lastSyncSec,
+                    ) { count ->
+                        currentFile.set(applicationContext.getString(org.eidora.R.string.notif_scanning, count))
+                    }
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to query MediaStore for JPEGs", t)
+                    return Result.failure()
+                }
 
-        setProgress(
-            workDataOf(
-                KEY_PROGRESS to 100,
-                KEY_STATUS to applicationContext.getString(org.eidora.R.string.notif_done),
-            ),
-        )
-        return Result.success()
+            // Also include not-yet-analyzed photos from a previous interrupted run.
+            val unanalyzed =
+                try {
+                    photoDao
+                        .getAllPathsWithModified()
+                        .filter { !it.analyzed }
+                        .map { MediaEntry(java.io.File(it.path), it.modifiedAt / 1000, it.folder) }
+                } catch (t: Throwable) {
+                    emptyList()
+                }
+
+            // Exclude photos with a pending XMP write – their mtime will change
+            // when XmpWriteWorker runs, so don't treat them as "modified" yet.
+            val pendingXmpPaths =
+                try {
+                    photoDao.getPendingXmpWrites().map { it.path }.toSet()
+                } catch (t: Throwable) {
+                    emptySet<String>()
+                }
+
+            val workEntries =
+                (changedEntries + unanalyzed)
+                    .distinctBy { it.file.absolutePath }
+                    .filter { it.file.absolutePath !in pendingXmpPaths }
+
+            Log.i(
+                TAG,
+                "Sync work set: ${workEntries.size} entries " +
+                    "(${changedEntries.size} changed since ${lastSyncSec}s, ${unanalyzed.size} unanalyzed)",
+            )
+
+            // Step 2: Deletion check – only run periodically (every ~24h) or on force.
+            val lastDeletionCheck = prefs.getLong("last_deletion_check_sec", 0L)
+            val deletionCheckIntervalSec = 24 * 3600L
+            val isPeriodic = inputData.keyValueMap.isEmpty()
+            if (isForce || isPeriodic || nowSec - lastDeletionCheck > deletionCheckIntervalSec) {
+                if (isStopped) return Result.success()
+                runDeletionCheck(prefs, nowSec)
+            }
+
+            setProgress(workDataOf(KEY_STATUS to applicationContext.getString(org.eidora.R.string.notif_scanning_start)))
+            val jpegFiles = workEntries
+
+            // Analysis phase begins: publish totals so the notifier switches from
+            // scan messages to per-file progress with ETA.
+            totalCount.set(jpegFiles.size)
+            startedAnalysisAt.set(System.currentTimeMillis())
+            val total = jpegFiles.size
+            Log.i(TAG, "Starting face detection for $total photos")
+
+            val powerGate = PowerGate(applicationContext)
+            val powerConfig =
+                try {
+                    org.eidora.data.settings.SettingsProvider
+                        .get(applicationContext)
+                        .getPowerConfig()
+                } catch (t: Throwable) {
+                    org.eidora.data.settings.PowerConfig(
+                        minBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
+                        maxBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,
+                        resumeBatteryPercent = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_PERCENT,
+                        resumeBatteryTempCelsius = org.eidora.data.settings.SettingsRepository.DEFAULT_RESUME_BATTERY_TEMP,
+                    )
+                }
+
+            @OptIn(ExperimentalCoroutinesApi::class)
+            flow { jpegFiles.forEach { emit(it) } }
+                .flatMapMerge(concurrency = SYNC_PARALLELISM) { entry ->
+                    flow {
+                        powerGate.awaitOk(powerConfig) { reason ->
+                            gateBlocked.set(true)
+                            currentFile.set(reason)
+                        }
+                        gateBlocked.set(false)
+                        currentFile.set(entry.file.name)
+                        try {
+                            processFile(entry.file, entry.folder)
+                        } catch (t: Throwable) {
+                            Log.e(TAG, "Failed to process file ${entry.file.name}, skipping", t)
+                        }
+                        emit(entry)
+                    }
+                }.collect { _ ->
+                    val current = doneCount.incrementAndGet()
+                    if (current % 500 == 0) {
+                        Log.i(TAG, "Detection progress: $current / $total")
+                    }
+                    setProgress(workDataOf(KEY_PROGRESS to (current * 100) / total))
+                }
+            Log.i(TAG, "Face detection finished: ${doneCount.get()} / $total")
+
+            try {
+                personDao.deleteOrphaned()
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to delete orphaned persons", t)
+            }
+
+            // Remove thumbnail files left behind by cascade deletes or interrupted
+            // runs. Cheap: one query plus a directory listing.
+            try {
+                val validIds = faceDao.allIds().toSet()
+                val removed = org.eidora.util.ThumbnailHelper.sweepOrphans(applicationContext, validIds)
+                if (removed > 0) Log.i(TAG, "Swept $removed orphan thumbnail(s)")
+            } catch (t: Throwable) {
+                t.rethrowIfCancellation()
+                Log.w(TAG, "Thumbnail sweep failed", t)
+            }
+
+            // Persist sync timestamp so next run only fetches newer entries
+            prefs.edit().putLong("last_sync_timestamp_sec", nowSec).apply()
+
+            // Remove old generation-based fast path key if present
+            prefs.edit().remove("media_generation").apply()
+
+            setProgress(
+                workDataOf(
+                    KEY_PROGRESS to 100,
+                    KEY_STATUS to applicationContext.getString(org.eidora.R.string.notif_done),
+                ),
+            )
+            return Result.success()
         } finally {
             // MUST run even on cancellation: a leaked notifier loop from a
             // previous (stopped) run would fight the new run's notifier over
@@ -799,6 +799,7 @@ class PhotoSyncWorker(
          * Estimates remaining time from throughput so far.
          * Returns empty string when not enough data (< 5 items done).
          */
+
         /**
          * Estimates the remaining time from the average processing time per
          * item so far.

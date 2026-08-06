@@ -65,8 +65,8 @@ class PhotosViewModel(
             settingsRepo.folderWhitelist
                 .flatMapLatest { folders -> db.photoDao().observeAllSortedByDate(folders.toList()) }
                 .collect { photos ->
-                _uiState.update { it.copy(items = buildListItems(photos)) }
-            }
+                    _uiState.update { it.copy(items = buildListItems(photos)) }
+                }
         }
     }
 
@@ -79,19 +79,19 @@ class PhotosViewModel(
                 .flatMapLatest { folders ->
                     db.faceRegionDao().observeConfirmedPhotosForPerson(personId, folders.toList())
                 }.collect { photos ->
-                val faceMap =
-                    db
-                        .faceRegionDao()
-                        .findByPersonId(personId)
-                        .filter { it.name != null && !it.ignored }
-                        .associate { it.photoId to it.id }
-                _uiState.update {
-                    it.copy(
-                        items = buildListItems(photos),
-                        confirmedFaceByPhoto = faceMap,
-                    )
+                    val faceMap =
+                        db
+                            .faceRegionDao()
+                            .findByPersonId(personId)
+                            .filter { it.name != null && !it.ignored }
+                            .associate { it.photoId to it.id }
+                    _uiState.update {
+                        it.copy(
+                            items = buildListItems(photos),
+                            confirmedFaceByPhoto = faceMap,
+                        )
+                    }
                 }
-            }
         }
     }
 
