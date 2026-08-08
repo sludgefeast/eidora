@@ -6,10 +6,13 @@ package org.eidora.ui.common
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -56,6 +59,11 @@ fun MetadataWizardScreen(onDone: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxSize()
+                // Keep content clear of the status bar, navigation bar and any
+                // display cutout (e.g. an in-display front camera), so the title
+                // never sits underneath the camera. safeDrawing reports these
+                // per-device, so we don't guess the cutout position.
+                .windowInsetsPadding(WindowInsets.safeDrawing)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
     ) {
