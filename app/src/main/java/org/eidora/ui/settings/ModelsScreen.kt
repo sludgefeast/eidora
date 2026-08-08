@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -24,7 +25,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -185,43 +188,6 @@ fun ModelsScreen(
             )
             Spacer(Modifier.height(12.dp))
 
-            // Check the free container for a newer published version.
-            TextButton(
-                onClick = {
-                    if (checkingUpdate || applyingUpdate) return@TextButton
-                    checkingUpdate = true
-                    scope.launch {
-                        val installedVersion =
-                            containers
-                                .firstOrNull { it.id == ContainerDownloader.FREE_CONTAINER_ID }
-                                ?.manifest?.container?.version ?: 0
-                        val found =
-                            withContext(Dispatchers.IO) {
-                                org.eidora.ml.container.ContainerUpdateChecker
-                                    .checkForUpdate(installedVersion)
-                            }
-                        checkingUpdate = false
-                        if (found != null) {
-                            pendingUpdate = found
-                        } else {
-                            toast(R.string.models_update_none)
-                        }
-                    }
-                },
-                enabled = !checkingUpdate && !applyingUpdate,
-            ) {
-                Text(
-                    stringResource(
-                        if (checkingUpdate) {
-                            R.string.models_update_checking
-                        } else {
-                            R.string.models_update_check
-                        },
-                    ),
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-
             if (containers.isEmpty()) {
                 Text(
                     stringResource(R.string.models_empty),
@@ -252,6 +218,37 @@ fun ModelsScreen(
                         onActivateModel = { modelId, task ->
                             pendingActivate = PendingActivate(container.id, modelId, task)
                         },
+                        onCheckUpdate =
+                            if (container.isProtected) {
+                                {
+                                    if (!checkingUpdate && !applyingUpdate) {
+                                        checkingUpdate = true
+                                        scope.launch {
+                                            val installedVersion =
+                                                containers
+                                                    .firstOrNull {
+                                                        it.id ==
+                                                            ContainerDownloader.FREE_CONTAINER_ID
+                                                    }
+                                                    ?.manifest?.container?.version ?: 0
+                                            val found =
+                                                withContext(Dispatchers.IO) {
+                                                    org.eidora.ml.container.ContainerUpdateChecker
+                                                        .checkForUpdate(installedVersion)
+                                                }
+                                            checkingUpdate = false
+                                            if (found != null) {
+                                                pendingUpdate = found
+                                            } else {
+                                                toast(R.string.models_update_none)
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                null
+                            },
+                        checkingUpdate = checkingUpdate,
                     )
                 }
                 Spacer(Modifier.height(16.dp))
@@ -586,6 +583,8 @@ private fun ContainerCard(
     onDeleteModel: (String) -> Unit,
     onTestModel: (String) -> Unit,
     onActivateModel: (String, String) -> Unit,
+    onCheckUpdate: (() -> Unit)? = null,
+    checkingUpdate: Boolean = false,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // A container that holds the active detection or embedding model must
@@ -619,11 +618,26 @@ private fun ContainerCard(
                 }
             }
             if (container.isProtected) {
-                Text(
-                    stringResource(R.string.models_free_badge),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                if (onCheckUpdate != null) {
+                    IconButton(
+                        onClick = { if (!checkingUpdate) onCheckUpdate() },
+                        enabled = !checkingUpdate,
+                    ) {
+                        if (checkingUpdate) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.Refresh,
+                                contentDescription =
+                                    stringResource(R.string.models_update_check),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                }
             } else {
                 IconButton(
                     onClick = onDeleteContainer,
