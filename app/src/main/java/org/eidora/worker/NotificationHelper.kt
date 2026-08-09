@@ -26,6 +26,7 @@ object NotificationHelper {
         progress: Int,
         status: String,
         gateBlocked: Boolean = false,
+        eta: String? = null,
     ): ForegroundInfo {
         val notification =
             buildNotification(
@@ -34,6 +35,7 @@ object NotificationHelper {
                 status,
                 progress,
                 gateBlocked = gateBlocked,
+                eta = eta,
             )
         return makeForegroundInfo(NOTIFICATION_ID_SYNC, notification)
     }
@@ -43,6 +45,7 @@ object NotificationHelper {
         progress: Int,
         message: String,
         gateBlocked: Boolean = false,
+        eta: String? = null,
     ): ForegroundInfo {
         val notification =
             buildNotification(
@@ -51,6 +54,7 @@ object NotificationHelper {
                 message,
                 progress,
                 gateBlocked = gateBlocked,
+                eta = eta,
             )
         return makeForegroundInfo(NOTIFICATION_ID_EMBEDDING, notification)
     }
@@ -119,6 +123,7 @@ object NotificationHelper {
         progress: Int,
         cancelIntent: android.app.PendingIntent? = null,
         gateBlocked: Boolean = false,
+        eta: String? = null,
     ): Notification {
         val builder =
             NotificationCompat
@@ -131,6 +136,14 @@ object NotificationHelper {
                 .setDeleteIntent(CancelReceiver.deleteIntent(context))
                 .setOngoing(false)
                 .setSilent(true)
+
+        // The remaining-time estimate goes on its own line (subText) so the file
+        // name on the content line can be shown in full width and simply ellipsized
+        // when long — instead of the two sharing one line and making the whole
+        // notification flip between one and two lines as the name length changes.
+        if (!eta.isNullOrEmpty()) {
+            builder.setSubText(eta)
+        }
 
         // Manual pause always offers Resume. A power/thermal gate block offers
         // no pause action at all – pausing a run that is already blocked by the

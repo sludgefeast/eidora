@@ -82,6 +82,7 @@
     <string name="notif_running">Läuft…</string>
     <string name="notif_scanning">Durchsuche Medien… %1$d geprüft</string>
     <string name="notif_scanning_start">Durchsuche Medien…</string>
+    <string name="notif_triaging">Prüfe Fotos…</string>
     <string name="notif_done">Fertig</string>
     <string name="notif_eta_left">%1$s verbleibend</string>
     <string name="notif_preparing">Vorbereitung…</string>

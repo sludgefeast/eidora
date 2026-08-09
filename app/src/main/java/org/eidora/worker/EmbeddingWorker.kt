@@ -93,7 +93,10 @@ class EmbeddingWorker(
                 }
 
             val done = AtomicInteger(0)
-            val startedAt = System.currentTimeMillis()
+            // Smoothed ETA: EMA of per-item time, warm-up skipped. Replaces the
+            // plain overall-average estimate, which stayed skewed for a long time
+            // after any early fast/slow stretch.
+            val etaEstimator = PhotoSyncWorker.EtaEstimator()
             // Shared status: either "X%" or a pause reason – the notifier reads this
             val currentStatus =
                 java.util.concurrent.atomic
@@ -107,43 +110,41 @@ class EmbeddingWorker(
             @Suppress("UNUSED_VARIABLE")
             val notifierJob =
                 notifierScope.launch {
-                    // Time spent blocked by the PowerGate, excluded from the ETA.
-                    val pausedMs =
-                        java.util.concurrent.atomic
-                            .AtomicLong(0L)
                     var lastTick = System.currentTimeMillis()
-                    var lastPosted: Pair<Int, String>? = null
+                    var lastPosted: Triple<Int, String, String>? = null
                     while (isActive) {
                         val current = done.get()
                         val progress = if (total == 0) 0 else (current * 100) / total
                         // A non-empty status is a PowerGate/pause reason: show it
                         // without an ETA and without the Pause action. The time
-                        // spent blocked is accumulated and excluded from the ETA
-                        // so the estimate reflects actual processing speed.
+                        // spent blocked is fed to the estimator as paused time so
+                        // the estimate reflects actual processing speed.
                         val status = currentStatus.get()
                         val blocked = status.isNotEmpty()
                         val nowTick = System.currentTimeMillis()
-                        if (blocked) pausedMs.addAndGet(nowTick - lastTick)
+                        if (blocked) etaEstimator.addPaused(nowTick - lastTick)
                         lastTick = nowTick
+                        etaEstimator.update(current, nowTick)
                         val eta =
                             if (blocked) {
                                 ""
                             } else {
-                                PhotoSyncWorker.formatEta(
+                                PhotoSyncWorker.formatEtaFrom(
                                     applicationContext,
-                                    startedAt,
+                                    etaEstimator,
                                     current,
                                     total,
-                                    pausedMs.get(),
                                 )
                             }
+                        // Progress on the content line, ETA on its own subText line
+                        // (or the pause reason when blocked). Keeping them apart
+                        // stops the notification flipping between one and two lines.
                         val message =
                             when {
                                 blocked -> status
-                                eta.isNotEmpty() -> "$progress% – $eta"
                                 else -> "$progress%"
                             }
-                        val posted = progress to message
+                        val posted = Triple(progress, message, eta)
                         if (posted != lastPosted) {
                             try {
                                 setForeground(
@@ -152,6 +153,7 @@ class EmbeddingWorker(
                                         progress,
                                         message,
                                         gateBlocked = blocked,
+                                        eta = eta.ifEmpty { null },
                                     ),
                                 )
                                 lastPosted = posted

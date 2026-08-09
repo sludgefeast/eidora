@@ -152,12 +152,11 @@ class PhotoSyncWorker(
         val startedAnalysisAt =
             java.util.concurrent.atomic
                 .AtomicLong(0L)
-        // Milliseconds spent blocked by the PowerGate during the analysis
-        // phase. Subtracted from the elapsed time so the ETA reflects actual
-        // processing speed rather than wall-clock time including pauses.
-        val pausedMs =
-            java.util.concurrent.atomic
-                .AtomicLong(0L)
+        // Smoothed remaining-time estimator (EMA of per-item time, warm-up
+        // skipped). Only fed during phase 2 (ML detection); phase 1 keeps the
+        // ETA hidden via startedAnalysisAt == 0. Pauses (PowerGate) are fed to
+        // the estimator directly, so no separate paused-time accumulator here.
+        val etaEstimator = EtaEstimator()
 
         val notifierScope =
             kotlinx.coroutines.CoroutineScope(
@@ -167,7 +166,7 @@ class PhotoSyncWorker(
             var lastTick = System.currentTimeMillis()
             // Remember what was last posted: while nothing changes there is
             // no reason to hand another notification to the system server.
-            var lastPosted: Pair<Int, String>? = null
+            var lastPosted: Triple<Int, String, String>? = null
             while (isActive) {
                 val now = System.currentTimeMillis()
                 val total = totalCount.get()
@@ -176,29 +175,36 @@ class PhotoSyncWorker(
                 val file = currentFile.get()
                 val blocked = gateBlocked.get()
                 val startedAt = startedAnalysisAt.get()
-                // While the gate blocks processing, add the elapsed tick to
-                // the paused accumulator instead of letting it inflate the
+                // While the gate blocks processing, feed the elapsed tick to the
+                // estimator as paused time instead of letting it inflate the
                 // per-item average.
                 if (blocked && startedAt != 0L) {
-                    pausedMs.addAndGet(now - lastTick)
+                    etaEstimator.addPaused(now - lastTick)
                 }
                 lastTick = now
+                // startedAt == 0 → phase 1 (triage): keep the ETA hidden. In
+                // phase 2 the estimator is fed the running count.
                 val eta =
                     if (blocked || total == 0 || startedAt == 0L) {
                         ""
                     } else {
-                        formatEta(applicationContext, startedAt, current, total, pausedMs.get())
+                        etaEstimator.update(current, now)
+                        formatEtaFrom(applicationContext, etaEstimator, current, total)
                     }
-                val message = if (eta.isNotEmpty()) "$file – $eta" else file
-                val posted = progress to message
+                // File name and ETA are kept separate: the name is the content
+                // line (ellipsized when long), the ETA is its own subText line.
+                // Combining them made the notification flip between one and two
+                // lines as the file-name length changed.
+                val posted = Triple(progress, file, eta)
                 if (posted != lastPosted) {
                     try {
                         setForeground(
                             NotificationHelper.syncForegroundInfo(
                                 applicationContext,
                                 progress,
-                                message,
+                                file,
                                 gateBlocked = blocked,
+                                eta = eta.ifEmpty { null },
                             ),
                         )
                         lastPosted = posted
@@ -300,13 +306,6 @@ class PhotoSyncWorker(
             setProgress(workDataOf(KEY_STATUS to applicationContext.getString(R.string.notif_scanning_start)))
             val jpegFiles = workEntries
 
-            // Analysis phase begins: publish totals so the notifier switches from
-            // scan messages to per-file progress with ETA.
-            totalCount.set(jpegFiles.size)
-            startedAnalysisAt.set(System.currentTimeMillis())
-            val total = jpegFiles.size
-            Log.i(TAG, "Starting face detection for $total photos")
-
             val powerGate = PowerGate(applicationContext)
             val powerConfig =
                 try {
@@ -322,6 +321,29 @@ class PhotoSyncWorker(
                     )
                 }
 
+            // Two-phase analysis. Photos fall into two very different cost
+            // classes: those that already carry face metadata (XMP) only need a
+            // cheap metadata import, while those without must go through the ML
+            // detector, which is far slower. Mixing them in one pass made the ETA
+            // swing wildly (it averaged both classes together). So:
+            //   Phase 1 (triage): read XMP for every photo — which we do anyway —
+            //     and import the ones that have face regions immediately, marking
+            //     them analyzed. Collect the rest into the ML queue.
+            //   Phase 2 (detection): run only the ML queue through the detector,
+            //     and start the ETA clock here so it measures a single cost class.
+            // XMP reading is relatively cheap (header parse via ExifInterface, no
+            // full-image decode), so phase 1 stays fast even for large libraries.
+
+            // --- Phase 1: triage + XMP import ---
+            // ETA stays hidden in this phase (startedAnalysisAt == 0); the notifier
+            // shows a plain "checking X / total" progress instead.
+            totalCount.set(jpegFiles.size)
+            doneCount.set(0)
+            startedAnalysisAt.set(0L)
+            currentFile.set(applicationContext.getString(R.string.notif_triaging))
+            Log.i(TAG, "Phase 1 (triage) for ${jpegFiles.size} photos")
+
+            val mlQueue = java.util.concurrent.CopyOnWriteArrayList<MediaEntry>()
             @OptIn(ExperimentalCoroutinesApi::class)
             flow { jpegFiles.forEach { emit(it) } }
                 .flatMapMerge(concurrency = SYNC_PARALLELISM) { entry ->
@@ -331,10 +353,48 @@ class PhotoSyncWorker(
                             currentFile.set(reason)
                         }
                         gateBlocked.set(false)
+                        currentFile.set(
+                            applicationContext.getString(R.string.notif_triaging),
+                        )
+                        try {
+                            val handled = triageFile(entry.file, entry.folder)
+                            if (!handled) mlQueue.add(entry)
+                        } catch (t: Throwable) {
+                            t.rethrowIfCancellation()
+                            Log.e(TAG, "Triage failed for ${entry.file.name}, skipping", t)
+                        }
+                        emit(entry)
+                    }
+                }.collect { _ ->
+                    doneCount.incrementAndGet()
+                }
+            Log.i(
+                TAG,
+                "Phase 1 done: ${jpegFiles.size - mlQueue.size} imported from XMP, " +
+                    "${mlQueue.size} need detection",
+            )
+
+            // --- Phase 2: ML detection (ETA measured here) ---
+            totalCount.set(mlQueue.size)
+            doneCount.set(0)
+            startedAnalysisAt.set(System.currentTimeMillis())
+            val total = mlQueue.size
+            Log.i(TAG, "Phase 2 (detection) for $total photos")
+
+            @OptIn(ExperimentalCoroutinesApi::class)
+            flow { mlQueue.forEach { emit(it) } }
+                .flatMapMerge(concurrency = SYNC_PARALLELISM) { entry ->
+                    flow {
+                        powerGate.awaitOk(powerConfig) { reason ->
+                            gateBlocked.set(true)
+                            currentFile.set(reason)
+                        }
+                        gateBlocked.set(false)
                         currentFile.set(entry.file.name)
                         try {
-                            processFile(entry.file, entry.folder)
+                            detectFile(entry.file, entry.folder)
                         } catch (t: Throwable) {
+                            t.rethrowIfCancellation()
                             Log.e(TAG, "Failed to process file ${entry.file.name}, skipping", t)
                         }
                         emit(entry)
@@ -412,8 +472,20 @@ class PhotoSyncWorker(
         }
 
         try {
-            importXmpAndAnalyze(file, photoId)
+            // Single-photo re-sync forces reprocessing: clear any existing face
+            // regions and mark unanalyzed so triageFile re-imports/re-detects
+            // instead of short-circuiting on an already-analyzed row.
+            deleteFaceRegionsForPhoto(photoId)
+            photoDao.update(photoId, photo.modifiedAt, photo.takenAt, analyzed = false)
+            // Same two-step logic as the batch path: import XMP if present,
+            // otherwise run detection. triageFile handles registration + XMP and
+            // returns false when the photo still needs ML detection.
+            val needsDetection = !triageFile(file, photo.folder)
+            if (needsDetection) {
+                detectFile(file, photo.folder)
+            }
         } catch (t: Throwable) {
+            t.rethrowIfCancellation()
             Log.e(TAG, "Failed to import/analyze ${file.name}", t)
         }
         try {
@@ -536,10 +608,19 @@ class PhotoSyncWorker(
         return result
     }
 
-    private suspend fun processFile(
+    /**
+     * Phase 1: register the photo and, if it already carries XMP face regions,
+     * import them immediately (cheap, no ML). Returns true when the photo is
+     * fully handled here, false when it still needs ML detection in phase 2.
+     *
+     * Reading the XMP header is work we do for every photo anyway, so using it
+     * to split the cheap (metadata) from the expensive (ML) class costs nothing
+     * extra.
+     */
+    private suspend fun triageFile(
         file: File,
         folder: String,
-    ) {
+    ): Boolean {
         val path = file.absolutePath
         val modifiedAt = file.lastModified()
         val takenAt =
@@ -551,41 +632,38 @@ class PhotoSyncWorker(
             }
 
         val existing = photoDao.findByPath(path)
-        when {
-            existing == null -> {
-                val photoId = UUID.randomUUID().toString()
-                photoDao.upsert(
-                    PhotoEntity(
-                        id = photoId,
-                        path = path,
-                        folder = folder,
-                        modifiedAt = modifiedAt,
-                        takenAt = takenAt,
-                        analyzed = false,
-                    ),
-                )
-                importXmpAndAnalyze(file, photoId)
+        val photoId =
+            when {
+                existing == null -> {
+                    val id = UUID.randomUUID().toString()
+                    photoDao.upsert(
+                        PhotoEntity(
+                            id = id,
+                            path = path,
+                            folder = folder,
+                            modifiedAt = modifiedAt,
+                            takenAt = takenAt,
+                            analyzed = false,
+                        ),
+                    )
+                    id
+                }
+                existing.modifiedAt != modifiedAt -> {
+                    photoDao.update(existing.id, modifiedAt, takenAt, analyzed = false)
+                    photoDao.updateFolder(existing.id, folder)
+                    deleteFaceRegionsForPhoto(existing.id)
+                    existing.id
+                }
+                !existing.analyzed -> {
+                    // Recovery: a previous run was interrupted after registering
+                    // the photo but before finishing analysis. Clear any partial
+                    // face regions and re-run import/detection from scratch.
+                    deleteFaceRegionsForPhoto(existing.id)
+                    existing.id
+                }
+                else -> return true // already analyzed, nothing to do
             }
-            existing.modifiedAt != modifiedAt -> {
-                photoDao.update(existing.id, modifiedAt, takenAt, analyzed = false)
-                photoDao.updateFolder(existing.id, folder)
-                deleteFaceRegionsForPhoto(existing.id)
-                importXmpAndAnalyze(file, existing.id)
-            }
-            !existing.analyzed -> {
-                // Recovery: a previous run was interrupted after registering
-                // the photo but before finishing analysis. Clear any partial
-                // face regions and re-run the import/detection from scratch.
-                deleteFaceRegionsForPhoto(existing.id)
-                importXmpAndAnalyze(file, existing.id)
-            }
-        }
-    }
 
-    private suspend fun importXmpAndAnalyze(
-        file: File,
-        photoId: String,
-    ) {
         val xmpRegions =
             try {
                 XmpHelper.readFaceRegions(file)
@@ -594,44 +672,61 @@ class PhotoSyncWorker(
                 emptyList()
             }
 
-        if (xmpRegions.isNotEmpty()) {
-            xmpRegions.forEach { xmpRegion ->
-                try {
-                    val faceId = UUID.randomUUID().toString()
-                    val person = xmpRegion.name?.let { name -> findOrCreatePerson(name) }
-                    // No SCRFD data available → derive quality from bbox size only.
-                    // Sharpness will be refined in EmbeddingWorker when the crop
-                    // bitmap is available. rotationRad = null → frontalScore defaults to 0.5.
-                    val qualityScore =
-                        org.eidora.util.FaceQuality.computeFast(
-                            xmpRegion.coords,
-                            rotationRad = null,
-                        )
-                    faceDao.insert(
-                        FaceRegionEntity(
-                            id = faceId,
-                            photoId = photoId,
-                            personId = person?.id,
-                            name = xmpRegion.name,
-                            regionJson = xmpRegion.coords.toJson(),
-                            ignored = false,
-                            qualityScore = qualityScore,
-                        ),
-                    )
-                    ThumbnailHelper.createThumbnail(applicationContext, file, xmpRegion.coords, faceId)
-                } catch (t: Throwable) {
-                    Log.e(TAG, "Failed to import XMP region", t)
-                }
-            }
-            photoDao.updateAnalyzed(photoId, true)
-            try {
-                refreshPersonTags(file, photoId)
-            } catch (t: Throwable) {
-                Log.e(TAG, "Failed to refresh person tags for ${file.name}", t)
-            }
-        } else {
-            runFaceDetection(file, photoId)
+        if (xmpRegions.isEmpty()) {
+            // No metadata → defer to phase 2 (ML detection).
+            return false
         }
+
+        // Import the XMP face regions right away.
+        xmpRegions.forEach { xmpRegion ->
+            try {
+                val faceId = UUID.randomUUID().toString()
+                val person = xmpRegion.name?.let { name -> findOrCreatePerson(name) }
+                // No SCRFD data available → derive quality from bbox size only.
+                // Sharpness will be refined in EmbeddingWorker when the crop
+                // bitmap is available. rotationRad = null → frontalScore defaults to 0.5.
+                val qualityScore =
+                    org.eidora.util.FaceQuality.computeFast(
+                        xmpRegion.coords,
+                        rotationRad = null,
+                    )
+                faceDao.insert(
+                    FaceRegionEntity(
+                        id = faceId,
+                        photoId = photoId,
+                        personId = person?.id,
+                        name = xmpRegion.name,
+                        regionJson = xmpRegion.coords.toJson(),
+                        ignored = false,
+                        qualityScore = qualityScore,
+                    ),
+                )
+                ThumbnailHelper.createThumbnail(applicationContext, file, xmpRegion.coords, faceId)
+            } catch (t: Throwable) {
+                t.rethrowIfCancellation()
+                Log.e(TAG, "Failed to import XMP region", t)
+            }
+        }
+        photoDao.updateAnalyzed(photoId, true)
+        try {
+            refreshPersonTags(file, photoId)
+        } catch (t: Throwable) {
+            t.rethrowIfCancellation()
+            Log.e(TAG, "Failed to refresh person tags for ${file.name}", t)
+        }
+        return true
+    }
+
+    /**
+     * Phase 2: run the ML detector on a photo that has no XMP face metadata.
+     * The photo row already exists (created in phase 1) and is looked up by path.
+     */
+    private suspend fun detectFile(
+        file: File,
+        folder: String,
+    ) {
+        val photoId = photoDao.findByPath(file.absolutePath)?.id ?: return
+        runFaceDetection(file, photoId)
     }
 
     private suspend fun runFaceDetection(
@@ -798,56 +893,6 @@ class PhotoSyncWorker(
                 .setInputData(workDataOf(KEY_FORCE to true))
                 .build()
 
-        /**
-         * Estimates the remaining time from the average processing time per
-         * item so far. Returns an empty string when there is not enough data
-         * yet (fewer than 5 items done).
-         *
-         * [pausedMs] is the time spent blocked by the PowerGate (low battery or
-         * high temperature). It is subtracted from the elapsed wall-clock time,
-         * because no items are processed while blocked — counting it would
-         * inflate the per-item average and keep the ETA high even though
-         * progress was made before the pause.
-         */
-        internal fun formatEta(
-            context: android.content.Context,
-            startedAt: Long,
-            done: Int,
-            total: Int,
-            pausedMs: Long = 0L,
-        ): String {
-            val remainingMs =
-                remainingMillis(
-                    elapsedMs = System.currentTimeMillis() - startedAt,
-                    pausedMs = pausedMs,
-                    done = done,
-                    total = total,
-                ) ?: return ""
-            return context.getString(R.string.notif_eta_left, formatDuration(remainingMs))
-        }
-
-        /**
-         * Remaining milliseconds based on the average time per processed item,
-         * or null when no meaningful estimate is possible yet.
-         *
-         * [pausedMs] (time blocked by the PowerGate) is subtracted from
-         * [elapsedMs]: no items are processed while blocked, so including it
-         * would inflate the per-item average and keep the estimate high even
-         * after substantial progress.
-         */
-        internal fun remainingMillis(
-            elapsedMs: Long,
-            pausedMs: Long,
-            done: Int,
-            total: Int,
-        ): Long? {
-            if (done < 5 || done >= total) return null
-            val working = elapsedMs - pausedMs
-            if (working <= 0) return null
-            val perItem = working.toDouble() / done
-            return ((total - done) * perItem).toLong()
-        }
-
         private fun formatDuration(ms: Long): String {
             val totalSec = ms / 1000
             val h = totalSec / 3600
@@ -858,6 +903,99 @@ class PhotoSyncWorker(
                 m > 0 -> "%dm %ds".format(m, s)
                 else -> "%ds".format(s)
             }
+        }
+
+        /**
+         * Formats a remaining-time string from an [EtaEstimator]. Returns an
+         * empty string until the estimator has a stable estimate.
+         */
+        internal fun formatEtaFrom(
+            context: android.content.Context,
+            estimator: EtaEstimator,
+            done: Int,
+            total: Int,
+        ): String {
+            val remainingMs = estimator.remainingMillis(done, total) ?: return ""
+            return context.getString(R.string.notif_eta_left, formatDuration(remainingMs))
+        }
+    }
+
+    /**
+     * Smoothed remaining-time estimator based on an exponential moving average
+     * (EMA) of the time spent per item, rather than the overall average.
+     *
+     * Why EMA: a plain total-average is dominated by the whole history, so once
+     * an early stretch is unusually fast or slow the estimate stays skewed for a
+     * long time. An EMA weights recent items more, so the ETA tracks the current
+     * throughput and settles quickly after a speed change.
+     *
+     * Warm-up: the first [warmup] completed items are not measured (only counted).
+     * Startup is atypical — model init, parallel tasks spinning up, JIT — so
+     * measuring it would poison the first estimate. The clock effectively starts
+     * once processing has settled.
+     *
+     * Pauses: call [addPaused] with time spent blocked (PowerGate); it is excluded
+     * so the estimate reflects real processing speed, not wall-clock time.
+     *
+     * Not thread-safe; the notifier ticks it from a single coroutine.
+     */
+    class EtaEstimator(
+        private val warmup: Int = 8,
+        private val alpha: Double = 0.15,
+    ) {
+        private var lastDone = 0
+        private var lastTimeMs = 0L
+        private var emaPerItemMs = 0.0
+        private var haveEma = false
+        private var pausedSinceLastMs = 0L
+
+        /** Accumulate time (ms) spent blocked since the last update. */
+        fun addPaused(ms: Long) {
+            if (ms > 0) pausedSinceLastMs += ms
+        }
+
+        /**
+         * Feed the current progress. Call on every notifier tick; it only updates
+         * the average when [done] has advanced. [nowMs] is the current time.
+         */
+        fun update(
+            done: Int,
+            nowMs: Long,
+        ) {
+            if (lastTimeMs == 0L) {
+                lastTimeMs = nowMs
+                lastDone = done
+                return
+            }
+            val deltaItems = done - lastDone
+            if (deltaItems <= 0) return
+
+            val working = (nowMs - lastTimeMs) - pausedSinceLastMs
+            pausedSinceLastMs = 0
+            lastTimeMs = nowMs
+            lastDone = done
+            if (working <= 0) return
+
+            // Skip the warm-up window: count items but don't measure them.
+            if (done <= warmup) return
+
+            val perItem = working.toDouble() / deltaItems
+            emaPerItemMs =
+                if (!haveEma) {
+                    haveEma = true
+                    perItem
+                } else {
+                    alpha * perItem + (1 - alpha) * emaPerItemMs
+                }
+        }
+
+        /** Estimated remaining milliseconds, or null while warming up. */
+        fun remainingMillis(
+            done: Int,
+            total: Int,
+        ): Long? {
+            if (!haveEma || done >= total) return null
+            return ((total - done) * emaPerItemMs).toLong()
         }
     }
 }
