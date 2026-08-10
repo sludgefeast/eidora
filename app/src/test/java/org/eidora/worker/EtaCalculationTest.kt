@@ -11,84 +11,129 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
-@DisplayName("PhotoSyncWorker.remainingMillis")
+@DisplayName("PhotoSyncWorker.EtaEstimator")
 class EtaCalculationTest {
     private val minute = 60_000L
+
+    // Helper: feed the estimator a steady stream of items, each taking
+    // [perItemMs], starting at t0. Returns the estimator positioned at [done].
+    private fun steady(
+        estimator: PhotoSyncWorker.EtaEstimator,
+        done: Int,
+        perItemMs: Long,
+        startMs: Long = 0L,
+    ): PhotoSyncWorker.EtaEstimator {
+        var now = startMs
+        // Prime at 0 items.
+        estimator.update(0, now)
+        for (i in 1..done) {
+            now += perItemMs
+            estimator.update(i, now)
+        }
+        return estimator
+    }
 
     @Nested
     @DisplayName("returns null")
     inner class NoEstimate {
         @Test
-        fun `before enough items are done`() {
-            assertNull(PhotoSyncWorker.remainingMillis(minute, 0, done = 4, total = 100))
+        fun `while still in the warm-up window`() {
+            // warmup = 5: items within the window are counted but not measured,
+            // so there is no estimate yet.
+            val est = PhotoSyncWorker.EtaEstimator(warmup = 5)
+            steady(est, done = 4, perItemMs = minute)
+            assertNull(est.remainingMillis(done = 4, total = 100))
         }
 
         @Test
         fun `when all items are done`() {
-            assertNull(PhotoSyncWorker.remainingMillis(minute, 0, done = 100, total = 100))
-        }
-
-        @Test
-        fun `when paused time exceeds elapsed time`() {
-            assertNull(PhotoSyncWorker.remainingMillis(minute, 2 * minute, done = 10, total = 100))
+            val est = PhotoSyncWorker.EtaEstimator(warmup = 2)
+            steady(est, done = 100, perItemMs = minute)
+            assertNull(est.remainingMillis(done = 100, total = 100))
         }
     }
 
     @Test
-    @DisplayName("extrapolates from the per-item average")
+    @DisplayName("extrapolates from the per-item time")
     fun basicEstimate() {
-        // 10 of 100 done in 10 minutes -> 1 min/item -> 90 min remaining
-        val remaining = PhotoSyncWorker.remainingMillis(10 * minute, 0, done = 10, total = 100)
-        assertEquals(90 * minute, remaining)
+        // Steady 1 min/item. After warm-up, 10 of 100 done -> 90 min remaining.
+        val est = PhotoSyncWorker.EtaEstimator(warmup = 2)
+        steady(est, done = 10, perItemMs = minute)
+        val remaining = est.remainingMillis(done = 10, total = 100)
+        assertNotNull(remaining)
+        // Allow a small tolerance: the EMA converges to the steady rate.
+        assertEquals(90.0, remaining!!.toDouble() / minute, 0.001)
     }
 
     @Test
-    @DisplayName("excludes paused time from the average")
+    @DisplayName("excludes paused time from the estimate")
     fun pausedTimeExcluded() {
-        // 30 of 100 done. 90 min wall-clock, but 60 of those were spent blocked
-        // by the PowerGate -> 30 min of actual work -> 1 min/item -> 70 min left.
-        val remaining =
-            PhotoSyncWorker.remainingMillis(
-                elapsedMs = 90 * minute,
-                pausedMs = 60 * minute,
-                done = 30,
-                total = 100,
-            )
-        assertEquals(70 * minute, remaining)
-    }
+        // Two estimators at the same real work pace (1 min/item). One also spends
+        // 60 min blocked, reported via addPaused; the estimates must match.
+        val noPause = PhotoSyncWorker.EtaEstimator(warmup = 2)
+        steady(noPause, done = 30, perItemMs = minute)
 
-    @Test
-    @DisplayName("a long pause does not inflate the estimate")
-    fun pauseDoesNotInflate() {
-        // Same progress, same real work time; only the pause differs.
-        val withoutPause =
-            PhotoSyncWorker.remainingMillis(30 * minute, 0, done = 30, total = 100)
-        val withPause =
-            PhotoSyncWorker.remainingMillis(90 * minute, 60 * minute, done = 30, total = 100)
-        assertEquals(withoutPause, withPause)
+        val withPause = PhotoSyncWorker.EtaEstimator(warmup = 2)
+        var now = 0L
+        withPause.update(0, now)
+        for (i in 1..30) {
+            now += minute
+            // On item 15, a 60-minute PowerGate pause happens before processing.
+            if (i == 15) {
+                withPause.addPaused(60 * minute)
+                now += 60 * minute
+            }
+            withPause.update(i, now)
+        }
+
+        val a = noPause.remainingMillis(done = 30, total = 100)!!
+        val b = withPause.remainingMillis(done = 30, total = 100)!!
+        // Same underlying rate -> estimates within a tight tolerance.
+        assertEquals(a.toDouble() / minute, b.toDouble() / minute, 0.5)
     }
 
     @Test
     @DisplayName("estimate shrinks as more items complete")
     fun shrinksWithProgress() {
-        val early = PhotoSyncWorker.remainingMillis(10 * minute, 0, done = 10, total = 100)!!
-        val later = PhotoSyncWorker.remainingMillis(50 * minute, 0, done = 50, total = 100)!!
+        val est = PhotoSyncWorker.EtaEstimator(warmup = 2)
+        steady(est, done = 10, perItemMs = minute)
+        val early = est.remainingMillis(done = 10, total = 100)!!
+        // Continue to 50 done at the same pace.
+        var now = 10 * minute
+        for (i in 11..50) {
+            now += minute
+            est.update(i, now)
+        }
+        val later = est.remainingMillis(done = 50, total = 100)!!
         assertTrue(later < early, "later estimate ($later) should be below early ($early)")
     }
 
     @Test
-    @DisplayName("ignoring the pause would have kept the estimate high")
-    fun regressionAgainstOldBehaviour() {
-        // The old formula divided wall-clock time by done, so after a long
-        // pause the ETA stayed roughly at its pre-pause value.
-        val corrected =
-            PhotoSyncWorker.remainingMillis(90 * minute, 60 * minute, done = 30, total = 100)!!
-        val uncorrected =
-            PhotoSyncWorker.remainingMillis(90 * minute, 0, done = 30, total = 100)!!
-        assertNotNull(corrected)
+    @DisplayName("adapts to a speed change (EMA)")
+    fun adaptsToSpeedChange() {
+        // Run fast (30 s/item) for a while, then slow down (2 min/item). The EMA
+        // should move the estimate up toward the new, slower rate rather than
+        // staying anchored to the fast start like a whole-run average would.
+        val est = PhotoSyncWorker.EtaEstimator(warmup = 2)
+        var now = 0L
+        est.update(0, now)
+        for (i in 1..20) {
+            now += 30_000L
+            est.update(i, now)
+        }
+        val afterFast = est.remainingMillis(done = 20, total = 100)!!
+
+        for (i in 21..40) {
+            now += 2 * minute
+            est.update(i, now)
+        }
+        val afterSlow = est.remainingMillis(done = 40, total = 100)!!
+
+        // Per remaining item is now much larger, so despite fewer items left the
+        // estimate should have risen well above the fast-phase figure.
         assertTrue(
-            corrected < uncorrected,
-            "corrected ($corrected) must be below uncorrected ($uncorrected)",
+            afterSlow > afterFast,
+            "estimate after slowdown ($afterSlow) should exceed fast-phase ($afterFast)",
         )
     }
 }
