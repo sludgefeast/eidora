@@ -22,7 +22,7 @@ class TriageWorker(
     context: Context,
     params: WorkerParameters,
 ) : PipelineWorker(context, params) {
-    private val photoDao by lazy { DatabaseProvider.get(applicationContext).photoDao() }
+    private val photoDao by lazy { DatabaseProvider.getInstance(applicationContext).photoDao() }
 
     override val step: Int = NotificationHelper.STEP_TRIAGE
 

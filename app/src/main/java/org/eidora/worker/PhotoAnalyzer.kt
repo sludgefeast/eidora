@@ -36,7 +36,7 @@ import java.util.UUID
 class PhotoAnalyzer(
     private val context: Context,
 ) {
-    private val db by lazy { DatabaseProvider.get(context) }
+    private val db by lazy { DatabaseProvider.getInstance(context) }
     private val photoDao by lazy { db.photoDao() }
     private val personDao by lazy { db.personDao() }
     private val faceDao by lazy { db.faceRegionDao() }

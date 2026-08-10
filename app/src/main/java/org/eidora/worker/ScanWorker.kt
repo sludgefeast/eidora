@@ -34,7 +34,7 @@ class ScanWorker(
     context: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
-    private val db by lazy { DatabaseProvider.get(applicationContext) }
+    private val db by lazy { DatabaseProvider.getInstance(applicationContext) }
     private val photoDao by lazy { db.photoDao() }
     private val analyzer by lazy { PhotoAnalyzer(applicationContext) }
 
@@ -163,8 +163,8 @@ class ScanWorker(
                 }
             if (isStopped) return
             val dbPaths = photoDao.getAllPathsWithModified().map { it.path }.toSet()
-            (dbPaths - allMediaPaths).forEach { path ->
-                if (isStopped) return@forEach
+            for (path in (dbPaths - allMediaPaths)) {
+                if (isStopped) break
                 try {
                     analyzer.deletePhoto(path)
                 } catch (t: Throwable) {

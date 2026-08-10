@@ -148,7 +148,7 @@ abstract class PipelineWorker(
         return Result.success()
     }
 
-    private fun loadPowerConfig(): PowerConfig =
+    private suspend fun loadPowerConfig(): PowerConfig =
         try {
             SettingsProvider.get(applicationContext).getPowerConfig()
         } catch (t: Throwable) {

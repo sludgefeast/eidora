@@ -24,7 +24,7 @@ class SinglePhotoWorker(
     context: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
-    private val db by lazy { DatabaseProvider.get(applicationContext) }
+    private val db by lazy { DatabaseProvider.getInstance(applicationContext) }
     private val photoDao by lazy { db.photoDao() }
     private val personDao by lazy { db.personDao() }
     private val analyzer by lazy { PhotoAnalyzer(applicationContext) }
