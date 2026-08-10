@@ -96,7 +96,7 @@ class EmbeddingWorker(
             // Smoothed ETA: EMA of per-item time, warm-up skipped. Replaces the
             // plain overall-average estimate, which stayed skewed for a long time
             // after any early fast/slow stretch.
-            val etaEstimator = PhotoSyncWorker.EtaEstimator()
+            val etaEstimator = EtaEstimator()
             // Shared status: either "X%" or a pause reason – the notifier reads this
             val currentStatus =
                 java.util.concurrent.atomic
@@ -129,7 +129,7 @@ class EmbeddingWorker(
                             if (blocked) {
                                 ""
                             } else {
-                                PhotoSyncWorker.formatEtaFrom(
+                                formatEtaFrom(
                                     applicationContext,
                                     etaEstimator,
                                     current,
@@ -161,7 +161,7 @@ class EmbeddingWorker(
                                 // ignore
                             }
                         }
-                        // Back off while blocked - see PhotoSyncWorker for why.
+                        // Back off while blocked - nothing changes during a pause.
                         kotlinx.coroutines.delay(
                             if (blocked) IDLE_NOTIFIER_INTERVAL_MS else ACTIVE_NOTIFIER_INTERVAL_MS,
                         )
@@ -247,8 +247,8 @@ class EmbeddingWorker(
                         }
                         setProgress(
                             workDataOf(
-                                PhotoSyncWorker.KEY_PROGRESS to (current * 100) / total,
-                                PhotoSyncWorker.KEY_STATUS to
+                                NotificationHelper.KEY_PROGRESS to (current * 100) / total,
+                                NotificationHelper.KEY_STATUS to
                                     applicationContext.getString(org.eidora.R.string.notif_embedding_title),
                             ),
                         )

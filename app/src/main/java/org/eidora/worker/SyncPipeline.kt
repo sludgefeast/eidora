@@ -6,10 +6,8 @@ package org.eidora.worker
 import android.content.Context
 import android.util.Log
 import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import androidx.work.workDataOf
 
 object SyncPipeline {
     const val UNIQUE_SYNC_NAME = "eidora-sync-pipeline"
@@ -30,8 +28,10 @@ object SyncPipeline {
             .beginUniqueWork(
                 UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.KEEP,
-                PhotoSyncWorker.buildRequest(),
-            ).then(EmbeddingWorker.buildRequest())
+                ScanWorker.buildRequest(),
+            ).then(TriageWorker.buildRequest())
+            .then(DetectionWorker.buildRequest())
+            .then(EmbeddingWorker.buildRequest())
             .enqueue()
     }
 
@@ -46,8 +46,10 @@ object SyncPipeline {
             .beginUniqueWork(
                 UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.REPLACE,
-                PhotoSyncWorker.buildForceRequest(),
-            ).then(EmbeddingWorker.buildRequest())
+                ScanWorker.buildForceRequest(),
+            ).then(TriageWorker.buildRequest())
+            .then(DetectionWorker.buildRequest())
+            .then(EmbeddingWorker.buildRequest())
             .enqueue()
     }
 
@@ -55,16 +57,12 @@ object SyncPipeline {
         context: Context,
         photoId: String,
     ) {
-        val syncRequest =
-            OneTimeWorkRequestBuilder<PhotoSyncWorker>()
-                .setInputData(workDataOf(PhotoSyncWorker.KEY_PHOTO_ID to photoId))
-                .build()
         WorkManager
             .getInstance(context)
             .beginUniqueWork(
                 UNIQUE_SYNC_NAME,
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
-                syncRequest,
+                SinglePhotoWorker.buildRequest(photoId),
             ).then(EmbeddingWorker.buildRequest())
             .enqueue()
     }

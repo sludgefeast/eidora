@@ -21,17 +21,54 @@ object NotificationHelper {
     const val NOTIFICATION_ID_CLUSTERING = 1003
     const val NOTIFICATION_ID_DOWNLOAD = 1004
 
+    // Pipeline steps as the user perceives them, each a long-running phase with
+    // its own progress/ETA. Numbered so the notification title can show
+    // "Step X/N", giving the user a mental model that more phases follow instead
+    // of the app appearing to restart each time a new phase begins. Media
+    // scanning is a brief preparation and is not counted as a step.
+    const val TOTAL_STEPS = 4
+    const val STEP_TRIAGE = 1 // checking photos for existing face metadata
+    const val STEP_DETECTION = 2 // ML face detection
+    const val STEP_EMBEDDING = 3 // embedding computation
+    const val STEP_CLUSTERING = 4 // grouping faces into people
+
+    // Progress keys published via WorkManager setProgress, read by observers.
+    const val KEY_PROGRESS = "progress"
+    const val KEY_STATUS = "status"
+
+    /**
+     * Prefixes a phase title with its step position, e.g. "Step 2/4 · Detecting
+     * faces". When [step] is null (a phase that isn't part of the numbered
+     * pipeline, e.g. media scanning) the plain title is returned unchanged.
+     */
+    private fun titleWithStep(
+        context: Context,
+        title: String,
+        step: Int?,
+    ): String =
+        if (step == null) {
+            title
+        } else {
+            context.getString(R.string.notif_step, step, TOTAL_STEPS, title)
+        }
+
     fun syncForegroundInfo(
         context: Context,
         progress: Int,
         status: String,
         gateBlocked: Boolean = false,
         eta: String? = null,
+        step: Int? = null,
+        title: String? = null,
     ): ForegroundInfo {
         val notification =
             buildNotification(
                 context,
-                context.getString(R.string.notification_sync_title),
+                titleWithStep(
+                    context,
+                    title ?: context.getString(R.string.notification_sync_title),
+                    step,
+                ),
                 status,
                 progress,
                 gateBlocked = gateBlocked,
@@ -50,7 +87,11 @@ object NotificationHelper {
         val notification =
             buildNotification(
                 context,
-                context.getString(R.string.notif_embedding_title),
+                titleWithStep(
+                    context,
+                    context.getString(R.string.notif_embedding_title),
+                    STEP_EMBEDDING,
+                ),
                 message,
                 progress,
                 gateBlocked = gateBlocked,
@@ -69,7 +110,11 @@ object NotificationHelper {
         val notification =
             buildNotification(
                 context,
-                context.getString(R.string.notif_clustering_title),
+                titleWithStep(
+                    context,
+                    context.getString(R.string.notif_clustering_title),
+                    STEP_CLUSTERING,
+                ),
                 message ?: context.getString(R.string.notif_running),
                 progress,
                 cancelIntent = cancelIntent,

@@ -17,9 +17,28 @@ data class PhotoEntity(
     val folder: String = "",
     val modifiedAt: Long,
     val takenAt: Long?,
-    val analyzed: Boolean = false,
+    /**
+     * Pipeline stage of this photo. Replaces the old boolean `analyzed`, letting
+     * the separate Scan/Triage/Detection workers each pick out exactly the rows
+     * they own. See [PhotoStage].
+     */
+    val stage: Int = PhotoStage.NEW,
     @ColumnInfo(name = "pending_xmp_write") val pendingXmpWrite: Boolean = false,
 )
+
+/**
+ * Stages a photo moves through in the analysis pipeline. Each worker reads the
+ * stage it owns and advances it, so work isn't duplicated or skipped:
+ *   NEW               → scanned, not yet examined              (TriageWorker reads)
+ *   NEEDS_DETECTION   → triaged, has no XMP, needs ML          (DetectionWorker reads)
+ *   DONE              → finished (XMP imported or ML detected)
+ * `analyzed == true` in the old model corresponds exactly to DONE.
+ */
+object PhotoStage {
+    const val NEW = 0
+    const val NEEDS_DETECTION = 1
+    const val DONE = 2
+}
 
 @Entity(
     tableName = "persons",

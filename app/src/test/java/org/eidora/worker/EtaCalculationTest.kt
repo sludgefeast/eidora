@@ -11,18 +11,18 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
-@DisplayName("PhotoSyncWorker.EtaEstimator")
+@DisplayName("EtaEstimator")
 class EtaCalculationTest {
     private val minute = 60_000L
 
     // Helper: feed the estimator a steady stream of items, each taking
     // [perItemMs], starting at t0. Returns the estimator positioned at [done].
     private fun steady(
-        estimator: PhotoSyncWorker.EtaEstimator,
+        estimator: EtaEstimator,
         done: Int,
         perItemMs: Long,
         startMs: Long = 0L,
-    ): PhotoSyncWorker.EtaEstimator {
+    ): EtaEstimator {
         var now = startMs
         // Prime at 0 items.
         estimator.update(0, now)
@@ -40,14 +40,14 @@ class EtaCalculationTest {
         fun `while still in the warm-up window`() {
             // warmup = 5: items within the window are counted but not measured,
             // so there is no estimate yet.
-            val est = PhotoSyncWorker.EtaEstimator(warmup = 5)
+            val est = EtaEstimator(warmup = 5)
             steady(est, done = 4, perItemMs = minute)
             assertNull(est.remainingMillis(done = 4, total = 100))
         }
 
         @Test
         fun `when all items are done`() {
-            val est = PhotoSyncWorker.EtaEstimator(warmup = 2)
+            val est = EtaEstimator(warmup = 2)
             steady(est, done = 100, perItemMs = minute)
             assertNull(est.remainingMillis(done = 100, total = 100))
         }
@@ -57,7 +57,7 @@ class EtaCalculationTest {
     @DisplayName("extrapolates from the per-item time")
     fun basicEstimate() {
         // Steady 1 min/item. After warm-up, 10 of 100 done -> 90 min remaining.
-        val est = PhotoSyncWorker.EtaEstimator(warmup = 2)
+        val est = EtaEstimator(warmup = 2)
         steady(est, done = 10, perItemMs = minute)
         val remaining = est.remainingMillis(done = 10, total = 100)
         assertNotNull(remaining)
@@ -70,10 +70,10 @@ class EtaCalculationTest {
     fun pausedTimeExcluded() {
         // Two estimators at the same real work pace (1 min/item). One also spends
         // 60 min blocked, reported via addPaused; the estimates must match.
-        val noPause = PhotoSyncWorker.EtaEstimator(warmup = 2)
+        val noPause = EtaEstimator(warmup = 2)
         steady(noPause, done = 30, perItemMs = minute)
 
-        val withPause = PhotoSyncWorker.EtaEstimator(warmup = 2)
+        val withPause = EtaEstimator(warmup = 2)
         var now = 0L
         withPause.update(0, now)
         for (i in 1..30) {
@@ -95,7 +95,7 @@ class EtaCalculationTest {
     @Test
     @DisplayName("estimate shrinks as more items complete")
     fun shrinksWithProgress() {
-        val est = PhotoSyncWorker.EtaEstimator(warmup = 2)
+        val est = EtaEstimator(warmup = 2)
         steady(est, done = 10, perItemMs = minute)
         val early = est.remainingMillis(done = 10, total = 100)!!
         // Continue to 50 done at the same pace.
@@ -114,7 +114,7 @@ class EtaCalculationTest {
         // Run fast (30 s/item) for a while, then slow down (2 min/item). The EMA
         // should move the estimate up toward the new, slower rate rather than
         // staying anchored to the fast start like a whole-run average would.
-        val est = PhotoSyncWorker.EtaEstimator(warmup = 2)
+        val est = EtaEstimator(warmup = 2)
         var now = 0L
         est.update(0, now)
         for (i in 1..20) {

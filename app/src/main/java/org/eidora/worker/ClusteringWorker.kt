@@ -523,8 +523,8 @@ class ClusteringWorker(
         try {
             setProgress(
                 workDataOf(
-                    PhotoSyncWorker.KEY_PROGRESS to percent,
-                    PhotoSyncWorker.KEY_STATUS to message,
+                    NotificationHelper.KEY_PROGRESS to percent,
+                    NotificationHelper.KEY_STATUS to message,
                 ),
             )
             setForeground(

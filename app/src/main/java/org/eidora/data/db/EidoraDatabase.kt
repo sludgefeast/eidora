@@ -12,7 +12,7 @@ import androidx.room.RoomDatabase
         PersonEntity::class,
         FaceRegionEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class EidoraDatabase : RoomDatabase() {

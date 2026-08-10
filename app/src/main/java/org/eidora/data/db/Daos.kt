@@ -57,18 +57,18 @@ interface PhotoDao {
         modifiedAt: Long,
     )
 
-    @Query("SELECT path, folder, modifiedAt, analyzed FROM photos")
+    @Query("SELECT path, folder, modifiedAt, stage FROM photos")
     suspend fun getAllPathsWithModified(): List<PathModified>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(photo: PhotoEntity)
 
-    @Query("UPDATE photos SET modifiedAt = :modifiedAt, takenAt = :takenAt, analyzed = :analyzed WHERE id = :id")
+    @Query("UPDATE photos SET modifiedAt = :modifiedAt, takenAt = :takenAt, stage = :stage WHERE id = :id")
     suspend fun update(
         id: String,
         modifiedAt: Long,
         takenAt: Long?,
-        analyzed: Boolean,
+        stage: Int,
     )
 
     @Query("UPDATE photos SET modifiedAt = :modifiedAt WHERE id = :id")
@@ -83,11 +83,28 @@ interface PhotoDao {
         takenAt: Long,
     )
 
-    @Query("UPDATE photos SET analyzed = :analyzed WHERE id = :id")
+    @Query("UPDATE photos SET stage = :stage WHERE id = :id")
+    suspend fun updateStage(
+        id: String,
+        stage: Int,
+    )
+
+    /**
+     * Back-compat helper mirroring the old boolean flag: `true` means the photo
+     * is fully processed (stage DONE), `false` resets it to the start (stage NEW)
+     * so a later run re-processes it. Callers that need the intermediate
+     * NEEDS_DETECTION stage use [updateStage] directly.
+     */
     suspend fun updateAnalyzed(
         id: String,
         analyzed: Boolean,
-    )
+    ) = updateStage(id, if (analyzed) PhotoStage.DONE else PhotoStage.NEW)
+
+    @Query("SELECT * FROM photos WHERE stage = :stage")
+    suspend fun getByStage(stage: Int): List<PhotoEntity>
+
+    @Query("SELECT COUNT(*) FROM photos WHERE stage = :stage")
+    suspend fun countByStage(stage: Int): Int
 
     @Query("DELETE FROM photos WHERE path = :path")
     suspend fun deleteByPath(path: String)
@@ -286,7 +303,7 @@ interface FaceRegionDao {
 
     @Query(
         """
-        SELECT DISTINCT ph.id, ph.path, ph.folder, ph.modifiedAt, ph.takenAt, ph.analyzed, ph.pending_xmp_write
+        SELECT DISTINCT ph.id, ph.path, ph.folder, ph.modifiedAt, ph.takenAt, ph.stage, ph.pending_xmp_write
         FROM photos ph
         JOIN face_regions f ON f.photoId = ph.id
         WHERE f.personId = :personId
@@ -490,5 +507,5 @@ data class PathModified(
     val path: String,
     val folder: String,
     val modifiedAt: Long,
-    val analyzed: Boolean,
+    val stage: Int,
 )

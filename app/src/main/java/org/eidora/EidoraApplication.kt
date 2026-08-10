@@ -12,7 +12,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import org.eidora.data.db.DatabaseProvider
-import org.eidora.worker.PhotoSyncWorker
+import org.eidora.worker.PeriodicSyncWorker
 import java.util.concurrent.TimeUnit
 
 class EidoraApplication : Application() {
@@ -32,7 +32,7 @@ class EidoraApplication : Application() {
      */
     private fun schedulePeriodicSync() {
         val request =
-            PeriodicWorkRequestBuilder<PhotoSyncWorker>(1, TimeUnit.DAYS)
+            PeriodicWorkRequestBuilder<PeriodicSyncWorker>(1, TimeUnit.DAYS)
                 .setConstraints(
                     Constraints
                         .Builder()
