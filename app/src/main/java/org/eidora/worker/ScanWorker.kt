@@ -39,6 +39,7 @@ class ScanWorker(
     private val analyzer by lazy { PhotoAnalyzer(applicationContext) }
 
     override suspend fun doWork(): Result {
+        Log.i(TAG, "ScanWorker started (force=${inputData.getBoolean(KEY_FORCE, false)})")
         val folderWhitelist =
             try {
                 SettingsProvider.get(applicationContext).getFolderWhitelist()
@@ -54,12 +55,28 @@ class ScanWorker(
         val lastSyncSec = prefs.getLong("last_sync_timestamp_sec", 0L)
         val isForce = inputData.getBoolean(KEY_FORCE, false)
 
+        // If the database has no photos, the incremental timestamp is stale
+        // (e.g. a destructive schema migration wiped the rows but the pref
+        // survived). Fall back to a full scan so we don't skip everything.
+        val dbPhotoCount =
+            try {
+                photoDao.countByStage(PhotoStage.NEW) +
+                    photoDao.countByStage(PhotoStage.NEEDS_DETECTION) +
+                    photoDao.countByStage(PhotoStage.DONE)
+            } catch (t: Throwable) {
+                0
+            }
+        val fullScan = isForce || dbPhotoCount == 0
+        if (fullScan) {
+            Log.i(TAG, "Full scan (force=$isForce, dbPhotos=$dbPhotoCount)")
+        }
+
         // Incremental scan: only entries new/modified since the last sync.
         val changedEntries =
             try {
                 collectJpegsFromMediaStore(
                     folderWhitelist,
-                    sinceModifiedSec = if (isForce) 0L else lastSyncSec,
+                    sinceModifiedSec = if (fullScan) 0L else lastSyncSec,
                 )
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to query MediaStore for JPEGs", t)

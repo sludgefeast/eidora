@@ -69,6 +69,7 @@ abstract class PipelineWorker(
     @OptIn(ExperimentalCoroutinesApi::class)
     override suspend fun doWork(): Result {
         val items = loadItems()
+        android.util.Log.i("PipelineWorker", "${phaseTitle()} (step $step): ${items.size} items")
         if (items.isEmpty()) return Result.success()
 
         totalCount.set(items.size)
