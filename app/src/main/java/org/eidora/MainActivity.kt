@@ -380,15 +380,12 @@ fun EidoraApp() {
                                 context,
                                 DatabaseProvider.getInstance(context),
                             )
-                        // Only re-analyze photos in the selected folders, not
-                        // every photo the DB has ever seen.
-                        val folders =
-                            org.eidora.data.settings.SettingsProvider
-                                .get(context)
-                                .getFolderWhitelist()
-                                .toList()
-                        repo.resetAllFaces(folders)
-                        SyncPipeline.enqueueForce(context)
+                        // Cancel the running chain FIRST so it can't keep writing
+                        // to rows we're about to reset, then clear all face data
+                        // and mark every photo for detection.
+                        SyncPipeline.cancelRunningSync(context)
+                        repo.resetAllForRedetection()
+                        SyncPipeline.enqueueRedetectAll(context)
                     }
                 }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
             },

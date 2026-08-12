@@ -89,6 +89,10 @@ interface PhotoDao {
         stage: Int,
     )
 
+    /** Set every photo to one stage (used by "re-analyze all"). */
+    @Query("UPDATE photos SET stage = :stage")
+    suspend fun updateAllStages(stage: Int)
+
     /**
      * Back-compat helper mirroring the old boolean flag: `true` means the photo
      * is fully processed (stage DONE), `false` resets it to the start (stage NEW)

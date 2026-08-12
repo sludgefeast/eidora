@@ -328,6 +328,33 @@ class FaceRepository(
      * thumbnails, persons and XMP face data, then marks all photos as
      * unanalyzed so the next sync re-detects everything from scratch.
      */
+    /**
+     * Like [resetEverything], but leaves photos at stage NEEDS_DETECTION rather
+     * than NEW. Used by "re-analyze all faces": since all XMP face metadata was
+     * just cleared, the triage step (which only imports existing metadata) has
+     * nothing to do, so the pipeline can start straight at detection (step 2).
+     */
+    suspend fun resetAllForRedetection() {
+        val allPhotos = photoDao.getAll()
+        val allFaces = faceDao.getAll()
+        allFaces.forEach { ThumbnailHelper.deleteThumbnail(context, it.id) }
+        faceDao.deleteAll()
+        personDao.deleteAll()
+        allPhotos.forEach { photo ->
+            try {
+                val file = File(photo.path)
+                if (file.exists()) {
+                    XmpHelper.clearFaceData(file)
+                    photoDao.updateModifiedAt(photo.id, file.lastModified())
+                }
+            } catch (t: Throwable) {
+                Log.w(tag, "XMP clear failed for ${photo.path}", t)
+            }
+        }
+        // Straight to detection: no metadata left for triage to import.
+        photoDao.updateAllStages(org.eidora.data.db.PhotoStage.NEEDS_DETECTION)
+    }
+
     private suspend fun resetEverything() {
         val allPhotos = photoDao.getAll()
 

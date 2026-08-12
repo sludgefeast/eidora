@@ -181,6 +181,11 @@ object NotificationHelper {
                 .setDeleteIntent(CancelReceiver.deleteIntent(context))
                 .setOngoing(false)
                 .setSilent(true)
+                // Hide the "when" timestamp: this is a live progress notification,
+                // not a point-in-time event. Because we only re-post it on content
+                // change (and poll slowly while paused), Android would otherwise
+                // show an ever-growing "N min ago" that looks stale.
+                .setShowWhen(false)
 
         // The remaining-time estimate goes on its own line (subText) so the file
         // name on the content line can be shown in full width and simply ellipsized

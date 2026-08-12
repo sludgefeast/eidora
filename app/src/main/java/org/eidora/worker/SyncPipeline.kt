@@ -53,6 +53,35 @@ object SyncPipeline {
             .enqueue()
     }
 
+    /**
+     * Cancels the running sync + clustering chains and clears pause state.
+     * Call before a destructive reset so no worker keeps writing to rows that
+     * are about to change underneath it.
+     */
+    fun cancelRunningSync(context: Context) {
+        val wm = WorkManager.getInstance(context)
+        wm.cancelUniqueWork(UNIQUE_SYNC_NAME)
+        wm.cancelUniqueWork(UNIQUE_CLUSTERING_NAME)
+        PauseState.setPaused(context, false)
+    }
+
+    /**
+     * Re-analyze everything: start straight at detection. The caller has already
+     * cancelled the running chain (via [cancelRunningSync]), cleared all face
+     * data and set every photo to NEEDS_DETECTION, so scan and triage would have
+     * nothing to do — we skip them and run Detection → Embedding → Clustering.
+     */
+    fun enqueueRedetectAll(context: Context) {
+        WorkManager
+            .getInstance(context)
+            .beginUniqueWork(
+                UNIQUE_SYNC_NAME,
+                ExistingWorkPolicy.REPLACE,
+                DetectionWorker.buildRequest(),
+            ).then(EmbeddingWorker.buildRequest())
+            .enqueue()
+    }
+
     fun enqueueReSyncPhoto(
         context: Context,
         photoId: String,
