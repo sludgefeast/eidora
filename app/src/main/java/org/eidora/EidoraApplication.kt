@@ -20,6 +20,14 @@ class EidoraApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Startup marker: one line per process start, carrying this process's
+        // PID. LogExporter scans for these to learn which PIDs belong to Eidora
+        // (including earlier, now-dead processes still in the log buffer), then
+        // exports everything logged by those PIDs. See LogExporter.MARKER_TAG.
+        android.util.Log.i(
+            org.eidora.util.LogExporter.MARKER_TAG,
+            "App process started (pid=${android.os.Process.myPid()})",
+        )
         createNotificationChannels()
         schedulePeriodicSync()
     }

@@ -380,17 +380,28 @@ fun EidoraApp() {
                         // thread (with a large library it would freeze the UI /
                         // trigger an ANR, which looked like "nothing happens").
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            android.util.Log.i("FaceRepository", "Re-analyze all: starting")
                             val repo =
                                 org.eidora.data.repository.FaceRepository(
                                     context,
                                     DatabaseProvider.getInstance(context),
                                 )
-                            // Cancel the running chain FIRST so it can't keep
-                            // writing to rows we're about to reset, then clear all
-                            // face data and mark every photo for detection.
+                            // Only the currently visible folders (the same
+                            // whitelist the photo grid shows), not every photo
+                            // the DB has ever seen.
+                            val folders =
+                                org.eidora.data.settings.SettingsProvider
+                                    .get(context)
+                                    .getFolderWhitelist()
+                                    .toList()
+                            // Clear pause state + clustering (NOT the sync work —
+                            // enqueueRedetectAll's REPLACE handles that), then
+                            // clear face data for the visible folders and mark
+                            // those photos for detection, then start detection.
                             SyncPipeline.cancelRunningSync(context)
-                            repo.resetAllForRedetection()
+                            repo.resetFoldersForRedetection(folders)
                             SyncPipeline.enqueueRedetectAll(context)
+                            android.util.Log.i("FaceRepository", "Re-analyze all: enqueued detection")
                         }
                     }
                 }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }

@@ -58,9 +58,16 @@ object SyncPipeline {
      * Call before a destructive reset so no worker keeps writing to rows that
      * are about to change underneath it.
      */
+    /**
+     * Clears pause state and cancels clustering before a re-analyze. Note it
+     * deliberately does NOT cancelUniqueWork(UNIQUE_SYNC_NAME): the follow-up
+     * enqueueRedetectAll uses beginUniqueWork(..., REPLACE, ...) which already
+     * replaces any running sync chain under that name. Cancelling here first
+     * raced with that REPLACE and could leave the new chain cancelled too —
+     * which is exactly why "re-analyze" appeared to do nothing.
+     */
     fun cancelRunningSync(context: Context) {
         val wm = WorkManager.getInstance(context)
-        wm.cancelUniqueWork(UNIQUE_SYNC_NAME)
         wm.cancelUniqueWork(UNIQUE_CLUSTERING_NAME)
         PauseState.setPaused(context, false)
     }

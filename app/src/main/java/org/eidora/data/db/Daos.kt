@@ -93,6 +93,13 @@ interface PhotoDao {
     @Query("UPDATE photos SET stage = :stage")
     suspend fun updateAllStages(stage: Int)
 
+    /** Set photos in the given folders to one stage (folder-scoped re-analyze). */
+    @Query("UPDATE photos SET stage = :stage WHERE folder IN (:folders)")
+    suspend fun updateStagesInFolders(
+        folders: List<String>,
+        stage: Int,
+    )
+
     /**
      * Back-compat helper mirroring the old boolean flag: `true` means the photo
      * is fully processed (stage DONE), `false` resets it to the start (stage NEW)

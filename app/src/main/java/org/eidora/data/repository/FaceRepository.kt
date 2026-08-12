@@ -334,18 +334,59 @@ class FaceRepository(
      * just cleared, the triage step (which only imports existing metadata) has
      * nothing to do, so the pipeline can start straight at detection (step 2).
      */
+    /**
+     * Folder-scoped version of [resetAllForRedetection]: only re-analyzes photos
+     * in [folders] (the currently visible/whitelisted set), leaving photos in
+     * other folders untouched. Clears their face data + XMP and marks just those
+     * photos NEEDS_DETECTION so detection re-runs on them.
+     */
+    suspend fun resetFoldersForRedetection(folders: List<String>) {
+        if (folders.isEmpty()) {
+            Log.w(tag, "resetFoldersForRedetection called with no folders; nothing to do")
+            return
+        }
+        val photos = photoDao.getInFolders(folders)
+        Log.i(tag, "resetFoldersForRedetection: ${photos.size} photos in $folders")
+        var xmpCleared = 0
+        photos.forEach { photo ->
+            try {
+                // Remove this photo's face regions + their thumbnails.
+                faceDao.findByPhotoId(photo.id).forEach { face ->
+                    ThumbnailHelper.deleteThumbnail(context, face.id)
+                }
+                faceDao.deleteByPhotoId(photo.id)
+                val file = File(photo.path)
+                if (file.exists()) {
+                    XmpHelper.clearFaceData(file)
+                    photoDao.updateModifiedAt(photo.id, file.lastModified())
+                    xmpCleared++
+                }
+            } catch (t: Throwable) {
+                Log.w(tag, "Reset failed for ${photo.path}", t)
+            }
+        }
+        // Remove any persons left without a face (orphaned by the deletions).
+        personDao.deleteOrphaned()
+        // Straight to detection: no metadata left for triage to import.
+        photoDao.updateStagesInFolders(folders, org.eidora.data.db.PhotoStage.NEEDS_DETECTION)
+        Log.i(tag, "resetFoldersForRedetection done: XMP cleared on $xmpCleared files → NEEDS_DETECTION")
+    }
+
     suspend fun resetAllForRedetection() {
         val allPhotos = photoDao.getAll()
         val allFaces = faceDao.getAll()
+        Log.i(tag, "resetAllForRedetection: ${allPhotos.size} photos, ${allFaces.size} faces to clear")
         allFaces.forEach { ThumbnailHelper.deleteThumbnail(context, it.id) }
         faceDao.deleteAll()
         personDao.deleteAll()
+        var xmpCleared = 0
         allPhotos.forEach { photo ->
             try {
                 val file = File(photo.path)
                 if (file.exists()) {
                     XmpHelper.clearFaceData(file)
                     photoDao.updateModifiedAt(photo.id, file.lastModified())
+                    xmpCleared++
                 }
             } catch (t: Throwable) {
                 Log.w(tag, "XMP clear failed for ${photo.path}", t)
@@ -353,6 +394,7 @@ class FaceRepository(
         }
         // Straight to detection: no metadata left for triage to import.
         photoDao.updateAllStages(org.eidora.data.db.PhotoStage.NEEDS_DETECTION)
+        Log.i(tag, "resetAllForRedetection done: XMP cleared on $xmpCleared files, all photos → NEEDS_DETECTION")
     }
 
     private suspend fun resetEverything() {
