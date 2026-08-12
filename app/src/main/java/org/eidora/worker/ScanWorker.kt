@@ -221,6 +221,9 @@ class ScanWorker(
             }
 
         val result = mutableListOf<WorkItemModified>()
+        var totalRows = 0
+        var filteredOut = 0
+        val sampleRelPaths = mutableListOf<String>()
         applicationContext.contentResolver
             .query(
                 uri,
@@ -233,10 +236,15 @@ class ScanWorker(
                 val relPathCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
                 val modCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
                 while (cursor.moveToNext()) {
+                    totalRows++
                     val relPath = cursor.getString(relPathCol)?.trimEnd('/') ?: ""
+                    if (sampleRelPaths.size < 10 && relPath !in sampleRelPaths) {
+                        sampleRelPaths.add(relPath)
+                    }
                     if (folderWhitelist.isNotEmpty() &&
                         !folderWhitelist.any { relPath == it || relPath.startsWith("$it/") }
                     ) {
+                        filteredOut++
                         continue
                     }
                     val path = cursor.getString(dataCol) ?: continue
@@ -244,6 +252,11 @@ class ScanWorker(
                     if (file.isFile) result.add(WorkItemModified(file, relPath, cursor.getLong(modCol)))
                 }
             }
+        Log.i(
+            TAG,
+            "MediaStore: $totalRows JPEG rows, $filteredOut filtered by whitelist " +
+                "$folderWhitelist, ${result.size} kept. Sample folders: $sampleRelPaths",
+        )
         return result
     }
 

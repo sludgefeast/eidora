@@ -375,17 +375,23 @@ fun EidoraApp() {
                 TextButton(onClick = {
                     showReanalyseAllConfirm = false
                     reanalyseScope.launch {
-                        val repo =
-                            org.eidora.data.repository.FaceRepository(
-                                context,
-                                DatabaseProvider.getInstance(context),
-                            )
-                        // Cancel the running chain FIRST so it can't keep writing
-                        // to rows we're about to reset, then clear all face data
-                        // and mark every photo for detection.
-                        SyncPipeline.cancelRunningSync(context)
-                        repo.resetAllForRedetection()
-                        SyncPipeline.enqueueRedetectAll(context)
+                        // The reset walks every photo and rewrites its XMP on
+                        // disk — heavy file I/O that must not run on the main
+                        // thread (with a large library it would freeze the UI /
+                        // trigger an ANR, which looked like "nothing happens").
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            val repo =
+                                org.eidora.data.repository.FaceRepository(
+                                    context,
+                                    DatabaseProvider.getInstance(context),
+                                )
+                            // Cancel the running chain FIRST so it can't keep
+                            // writing to rows we're about to reset, then clear all
+                            // face data and mark every photo for detection.
+                            SyncPipeline.cancelRunningSync(context)
+                            repo.resetAllForRedetection()
+                            SyncPipeline.enqueueRedetectAll(context)
+                        }
                     }
                 }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
             },
