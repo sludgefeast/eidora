@@ -73,7 +73,7 @@ class EmbeddingWorker(
                 // clustered). enqueueClustering is unique work, so this is a
                 // cheap no-op when clustering already ran.
                 SyncPipeline.enqueueClustering(applicationContext)
-                return Result.success()
+                return@withWakeLock Result.success()
             }
             Log.i(TAG, "Starting embedding run for $total faces")
 
