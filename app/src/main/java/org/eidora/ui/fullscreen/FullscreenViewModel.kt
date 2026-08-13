@@ -44,7 +44,11 @@ class FullscreenViewModel(
 
     fun redetectFaces(photoId: String) {
         viewModelScope.launch {
+            // Clear the photo's existing faces, then kick off re-detection.
+            // Without the enqueue the old faces were removed but new ones were
+            // never produced, so the photo ended up with no faces at all.
             repo.resetPhotoFaces(photoId)
+            org.eidora.worker.SyncPipeline.enqueueReSyncPhoto(getApplication(), photoId)
         }
     }
 }
