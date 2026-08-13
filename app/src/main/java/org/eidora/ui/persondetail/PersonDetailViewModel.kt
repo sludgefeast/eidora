@@ -173,14 +173,33 @@ class PersonDetailViewModel(
     }
 
     fun ignoreFace(faceId: String) {
+        removeFaceFromViewOptimistically(faceId)
         viewModelScope.launch { repo.ignoreFace(faceId) }
     }
 
     fun removeFace(faceId: String) {
+        removeFaceFromViewOptimistically(faceId)
         viewModelScope.launch { repo.removeFaceFromPerson(faceId) }
     }
 
+    /**
+     * Drops a face from the visible lists right away so the UI reacts instantly;
+     * the observed DB flow re-emits the authoritative state once the background
+     * work finishes (and restores the face if the operation failed).
+     */
+    private fun removeFaceFromViewOptimistically(faceId: String) {
+        _uiState.update {
+            it.copy(
+                unconfirmedFaces = it.unconfirmedFaces.filterNot { f -> f.faceRegion.id == faceId },
+                confirmedFaces = it.confirmedFaces.filterNot { f -> f.faceRegion.id == faceId },
+            )
+        }
+    }
+
     fun permanentlyDeleteFace(faceId: String) {
+        // Heavy cleanup (DB row, XMP rewrite, thumbnail) runs in the background;
+        // remove from the view immediately so it doesn't feel unresponsive.
+        removeFaceFromViewOptimistically(faceId)
         viewModelScope.launch { repo.permanentlyDeleteFace(faceId) }
     }
 
