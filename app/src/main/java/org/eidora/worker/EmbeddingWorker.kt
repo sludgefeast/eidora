@@ -63,7 +63,8 @@ class EmbeddingWorker(
         val model = handle.embedder
         Log.i(TAG, "Embedding model initialized on backend: ${model.backend}")
 
-        return try {
+        return withWakeLock(applicationContext, TAG) {
+            try {
             val pending: List<FaceRegionEntity> = faceDao.findWithoutEmbedding()
             val total = pending.size
             if (total == 0) {
@@ -284,6 +285,7 @@ class EmbeddingWorker(
                     .cancel(NotificationHelper.NOTIFICATION_ID_EMBEDDING)
             } catch (t: Throwable) {
                 // ignore
+            }
             }
         }
     }

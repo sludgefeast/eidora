@@ -94,13 +94,25 @@ class ScanWorker(
 
         // Register/refresh rows for changed entries. New or modified files land
         // at stage NEW so TriageWorker picks them up.
+        // Load every known photo once (one query) and match in memory, instead
+        // of a findByPath round-trip per file. With thousands of photos the
+        // per-file queries dominated the scan (≈55s for ~5600); a single bulk
+        // read plus a hash-map lookup turns that into milliseconds of DB work.
+        val existingByPath =
+            try {
+                photoDao.getAllPathsWithModified().associateBy { it.path }
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to bulk-load existing photos", t)
+                emptyMap()
+            }
+
         var registered = 0
         for (entry in changedEntries) {
             if (isStopped) break
             val path = entry.file.absolutePath
             if (path in pendingXmpPaths) continue
             try {
-                registerPhoto(entry)
+                registerPhoto(entry, existingByPath[path])
                 registered++
             } catch (t: Throwable) {
                 t.rethrowIfCancellation()
@@ -115,7 +127,7 @@ class ScanWorker(
         val deletionCheckIntervalSec = 24 * 3600L
         val isPeriodic = inputData.keyValueMap.isEmpty()
         if (isForce || isPeriodic || nowSec - lastDeletionCheck > deletionCheckIntervalSec) {
-            if (!isStopped) runDeletionCheck(prefs, nowSec)
+            if (!isStopped) runDeletionCheck(prefs, nowSec, existingByPath.keys)
         }
 
         // Record the sync timestamp so the next run scans incrementally.
@@ -124,10 +136,15 @@ class ScanWorker(
     }
 
     /** Register or refresh one photo row, resetting to NEW when new/modified. */
-    private suspend fun registerPhoto(entry: WorkItemModified) {
+    /** Register or refresh one photo row, resetting to NEW when new/modified.
+     *  [existing] is the pre-loaded DB entry for this path (null if unknown),
+     *  so no per-photo findByPath query is needed. */
+    private suspend fun registerPhoto(
+        entry: WorkItemModified,
+        existing: org.eidora.data.db.PathModified?,
+    ) {
         val path = entry.file.absolutePath
         val modifiedAt = entry.file.lastModified()
-        val existing = photoDao.findByPath(path)
         if (existing != null && existing.modifiedAt == modifiedAt && existing.stage == PhotoStage.DONE) {
             return // unchanged and already done
         }
@@ -152,16 +169,15 @@ class ScanWorker(
             photoDao.update(existing.id, modifiedAt, takenAt, stage = PhotoStage.NEW)
             photoDao.updateFolder(existing.id, entry.folder)
             analyzer.deleteFaceRegionsForPhoto(existing.id)
-        } else if (existing.stage == PhotoStage.DONE) {
-            // unchanged, done – nothing to do
-        } else {
-            // exists but not done: leave its stage so the right worker resumes it
         }
+        // else: exists, unchanged, not-yet-done → leave its stage so the right
+        // worker resumes it.
     }
 
     private suspend fun runDeletionCheck(
         prefs: SharedPreferences,
         nowSec: Long,
+        dbPaths: Set<String>,
     ) {
         Log.i(TAG, "Running deletion check")
         try {
@@ -179,7 +195,7 @@ class ScanWorker(
                     }
                 }
             if (isStopped) return
-            val dbPaths = photoDao.getAllPathsWithModified().map { it.path }.toSet()
+            // dbPaths is the set already loaded by the scan — no second query.
             for (path in (dbPaths - allMediaPaths)) {
                 if (isStopped) break
                 try {

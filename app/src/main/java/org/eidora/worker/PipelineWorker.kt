@@ -126,32 +126,34 @@ abstract class PipelineWorker(
             }
 
         try {
-            flow { items.forEach { emit(it) } }
-                .flatMapMerge(concurrency = PIPELINE_PARALLELISM) { item ->
-                    flow {
-                        powerGate.awaitOk(powerConfig, isStopped = { isStopped }) { reason ->
-                            gateBlocked.set(true)
-                            currentFile.set(reason)
+            withWakeLock(applicationContext, TAG) {
+                flow { items.forEach { emit(it) } }
+                    .flatMapMerge(concurrency = PIPELINE_PARALLELISM) { item ->
+                        flow {
+                            powerGate.awaitOk(powerConfig, isStopped = { isStopped }) { reason ->
+                                gateBlocked.set(true)
+                                currentFile.set(reason)
+                            }
+                            gateBlocked.set(false)
+                            currentFile.set(item.file.name)
+                            try {
+                                processItem(item)
+                            } catch (t: Throwable) {
+                                t.rethrowIfCancellation()
+                                Log.e(TAG, "Failed to process ${item.file.name}, skipping", t)
+                            }
+                            emit(item)
                         }
-                        gateBlocked.set(false)
-                        currentFile.set(item.file.name)
-                        try {
-                            processItem(item)
-                        } catch (t: Throwable) {
-                            t.rethrowIfCancellation()
-                            Log.e(TAG, "Failed to process ${item.file.name}, skipping", t)
-                        }
-                        emit(item)
-                    }
-                    // Heavy work (bitmap decode, ML inference, file I/O) runs on
-                    // the elastic IO pool. Without this it ran on Dispatchers.
-                    // Default (the worker's default) — the same small CPU pool the
-                    // notifier uses, so under background CPU throttling the blocked
-                    // detection threads starved the notifier: the notification
-                    // froze (same file, same ETA) and progress stalled until the
-                    // app came to the foreground. flowOn keeps them separate.
-                    .flowOn(Dispatchers.IO)
-                }.collect { doneCount.incrementAndGet() }
+                        // Heavy work (bitmap decode, ML inference, file I/O) runs on
+                        // the elastic IO pool. Without this it ran on Dispatchers.
+                        // Default (the worker's default) — the same small CPU pool the
+                        // notifier uses, so under background CPU throttling the blocked
+                        // detection threads starved the notifier: the notification
+                        // froze (same file, same ETA) and progress stalled until the
+                        // app came to the foreground. flowOn keeps them separate.
+                        .flowOn(Dispatchers.IO)
+                    }.collect { doneCount.incrementAndGet() }
+            }
         } finally {
             notifierJob.cancel()
         }
