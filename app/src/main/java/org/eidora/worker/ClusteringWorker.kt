@@ -22,6 +22,17 @@ private const val TAG = "ClusteringWorker"
 private const val MAX_EMBEDDING_WAIT_ATTEMPTS = 10
 
 /**
+ * How strongly a scattered k-nearest-neighbourhood penalises a match, as a
+ * fraction of the intra-neighbour spread. This is a *relative* factor (0..1),
+ * not an absolute distance, so it is model- and collection-independent: 0 would
+ * disable the consistency check (pure nearest-neighbour), 1 would add the full
+ * spread. A moderate value discounts lone-outlier matches without changing
+ * consistent ones. Kept conservative so it never overrides the model's tuned
+ * threshold on its own.
+ */
+private const val CONSISTENCY_PENALTY_FRACTION = 0.5f
+
+/**
  * One stored embedding of a named person, with the metadata used for weighted
  * nearest-neighbour matching. Individual embeddings are kept (rather than a
  * single centroid) so age- and lighting-related variation is preserved.
@@ -91,6 +102,12 @@ class ClusteringWorker(
 
             // ----- Phase 1: Individual matching (0-30%) -----
             val individuallyAssigned = mutableSetOf<String>()
+            // Diagnostics: collect the best k-NN distance per unknown face so we
+            // can pick the threshold from real data. Bucketed to keep the log
+            // compact; also track matched vs. just-missed near the threshold.
+            val distBuckets = IntArray(10) // 0.0-0.1, 0.1-0.2, … 0.9-1.0
+            var matchedCount = 0
+            var nearMissCount = 0 // within 0.05 above the threshold
             if (personData.isNotEmpty() && unknownFacesAll.isNotEmpty()) {
                 for ((index, face) in unknownFacesAll.withIndex()) {
                     if (isStopped) {
@@ -120,9 +137,10 @@ class ClusteringWorker(
                         val embedding = EmbeddingModel.bytesToFloatArray(face.faceRegion.embedding!!)
                         var bestId: String? = null
                         var bestDist = config.individualMatchThreshold
+                        var bestDistAny = Float.MAX_VALUE // best distance ignoring threshold, for diagnostics
                         personData.forEach { (personId, pd) ->
-                            // Weighted nearest-neighbour: find the best matching face
-                            // in this person's history, boosted by temporal proximity.
+                            // Weighted k-NN: average distance to this person's k
+                            // nearest stored faces, boosted by temporal proximity.
                             val bestFaceDist =
                                 bestDistanceToPerson(
                                     embedding,
@@ -130,9 +148,20 @@ class ClusteringWorker(
                                     pd,
                                     timeWeight,
                                 ) ?: return@forEach
+                            if (bestFaceDist < bestDistAny) bestDistAny = bestFaceDist
                             if (bestFaceDist < bestDist) {
                                 bestDist = bestFaceDist
                                 bestId = personId
+                            }
+                        }
+                        // Diagnostics: bucket the best distance to any person.
+                        if (bestDistAny != Float.MAX_VALUE) {
+                            val b = (bestDistAny * 10f).toInt().coerceIn(0, 9)
+                            distBuckets[b]++
+                            if (bestId != null) {
+                                matchedCount++
+                            } else if (bestDistAny < config.individualMatchThreshold + 0.05f) {
+                                nearMissCount++
                             }
                         }
                         bestId?.let { personId ->
@@ -155,6 +184,20 @@ class ClusteringWorker(
                     }
                 }
                 Log.i(TAG, "Individually assigned ${individuallyAssigned.size} faces to existing persons")
+                // Diagnostics for threshold tuning: distribution of the best
+                // k-NN distance to any named person, over all unknown faces.
+                // Matches happened below the threshold (${config.individualMatchThreshold});
+                // near-misses are within 0.05 above it (candidates a looser
+                // threshold would capture).
+                val histogram =
+                    (0 until 10).joinToString(" ") { b ->
+                        "${b / 10f}-${(b + 1) / 10f}:${distBuckets[b]}"
+                    }
+                Log.i(
+                    TAG,
+                    "kNN distance histogram (threshold=${config.individualMatchThreshold}): " +
+                        "$histogram | matched=$matchedCount nearMiss=$nearMissCount",
+                )
             }
             reportProgress(30, applicationContext.getString(org.eidora.R.string.notif_matching_persons_done))
 
@@ -585,13 +628,57 @@ class ClusteringWorker(
         queryTakenAt: Long?,
         person: PersonData,
         timeWeight: Float,
-    ): Float? =
-        person.faces.minOfOrNull { pf ->
-            val cosD = EmbeddingModel.cosineDistance(queryEmbedding, pf.embedding)
-            val bonus = temporalBonus(queryTakenAt, pf.takenAt, timeWeight)
-            val boost =
-                (pf.quality * if (pf.isConfirmed) 1.5f else 1.0f).coerceAtMost(1.0f)
-            cosD - bonus * boost
+    ): Float? {
+        if (person.faces.isEmpty()) return null
+        // Adjusted cosine distance to each of the person's stored faces (lower =
+        // more similar). The temporal bonus and quality/confirm boost lower the
+        // distance for close-in-time, high-quality, confirmed faces.
+        val adjusted =
+            person.faces
+                .map { pf ->
+                    val cosD = EmbeddingModel.cosineDistance(queryEmbedding, pf.embedding)
+                    val bonus = temporalBonus(queryTakenAt, pf.takenAt, timeWeight)
+                    val boost =
+                        (pf.quality * if (pf.isConfirmed) 1.5f else 1.0f).coerceAtMost(1.0f)
+                    cosD - bonus * boost
+                }.sorted()
+
+        // Primary criterion: the single nearest distance, compared against the
+        // model's established (LFW-calibrated, pairwise) threshold. Keeping the
+        // minimum here means the tuned per-model thresholds stay valid for
+        // everyone — we do NOT introduce a new absolute value that would depend
+        // on a particular collection's spread.
+        val nearest = adjusted.first()
+
+        // k-NN consistency penalty: a *relative* check that needs no calibrated
+        // constant, so it stays valid across collections and models. If the
+        // nearest face is a lone outlier — its k nearest neighbours disagree by
+        // being much farther away — the match is less trustworthy, so we nudge
+        // the effective distance up. When the k nearest are all similarly close
+        // (a consistent match), the penalty is ~0 and behaviour equals the old
+        // minimum. k adapts to history size.
+        val k = adaptiveK(person.faces.size)
+        if (k <= 1 || adjusted.size < 2) return nearest
+        val knn = adjusted.take(k)
+        val spread = (knn.last() - knn.first()).coerceAtLeast(0f)
+        // Penalty is a fraction of the intra-neighbour spread, not an absolute
+        // number: consistent neighbourhoods (small spread) barely move, scattered
+        // ones (large spread) get pushed away from a match.
+        val penalty = CONSISTENCY_PENALTY_FRACTION * spread
+        return nearest + penalty
+    }
+
+    /**
+     * Neighbour count for the k-NN consistency check, scaled to the person's
+     * history size: 1-2 faces → 1 (no check possible), 3-5 → 2, 6-10 → 3,
+     * more → 5.
+     */
+    private fun adaptiveK(historySize: Int): Int =
+        when {
+            historySize <= 2 -> 1
+            historySize <= 5 -> 2
+            historySize <= 10 -> 3
+            else -> 5
         }
 
     /**
