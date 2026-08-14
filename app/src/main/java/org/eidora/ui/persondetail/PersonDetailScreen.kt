@@ -254,6 +254,7 @@ fun PersonDetailScreen(
         bottomBar = {
             if (state.isMultiSelectActive && state.selectedFaceIds.isNotEmpty()) {
                 MultiSelectActionBar(
+                    viewMode = state.viewMode,
                     onConfirm = { viewModel.confirmSelected() },
                     onIgnore = { viewModel.ignoreSelected() },
                     onRemove = { viewModel.removeSelected() },
@@ -592,6 +593,7 @@ private fun FaceActionsSheet(
 
 @Composable
 private fun MultiSelectActionBar(
+    viewMode: PersonDetailViewMode,
     onConfirm: () -> Unit,
     onIgnore: () -> Unit,
     onRemove: () -> Unit,
@@ -607,9 +609,32 @@ private fun MultiSelectActionBar(
                     .padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_confirm)) }
-            TextButton(onClick = onIgnore) { Text(stringResource(R.string.action_ignore)) }
-            TextButton(onClick = onRemove) { Text(stringResource(R.string.action_remove_from_person)) }
+            // Same per-mode logic as the single-face action menu, so the bulk bar
+            // never offers actions that make no sense for the current view.
+
+            // Confirm: only NORMAL has a person to confirm to.
+            if (viewMode == PersonDetailViewMode.NORMAL) {
+                TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_confirm)) }
+            }
+            // Ignore: everything except the already-ignored view.
+            if (viewMode != PersonDetailViewMode.IGNORED) {
+                TextButton(onClick = onIgnore) { Text(stringResource(R.string.action_ignore)) }
+            }
+            // Remove / Unignore depending on mode; Unknown has neither.
+            when (viewMode) {
+                PersonDetailViewMode.NORMAL,
+                PersonDetailViewMode.SUGGESTION,
+                ->
+                    TextButton(onClick = onRemove) {
+                        Text(stringResource(R.string.action_remove_from_person))
+                    }
+                PersonDetailViewMode.IGNORED ->
+                    TextButton(onClick = onRemove) {
+                        Text(stringResource(R.string.action_unignore))
+                    }
+                PersonDetailViewMode.UNKNOWN -> { /* no remove/unignore */ }
+            }
+            // Redetect and Assign are available in every mode.
             TextButton(onClick = onRedetect) { Text(stringResource(R.string.action_redetect)) }
             TextButton(onClick = onAssign) { Text(stringResource(R.string.action_assign_to_person)) }
         }
