@@ -692,7 +692,14 @@ private fun DetectionStrategyButton(
     TextButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 10.dp),
+        // Keep horizontal padding: setting only vertical padding drops the
+        // button's default side padding to 0, so wrapped lines start flush at
+        // the edge and their first glyphs get clipped by the rounded corner.
+        contentPadding =
+            androidx.compose.foundation.layout.PaddingValues(
+                horizontal = 16.dp,
+                vertical = 10.dp,
+            ),
     ) {
         Text(
             text = label,
