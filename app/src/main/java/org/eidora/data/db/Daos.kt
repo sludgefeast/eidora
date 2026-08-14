@@ -89,10 +89,6 @@ interface PhotoDao {
         stage: Int,
     )
 
-    /** Set every photo to one stage (used by "re-analyze all"). */
-    @Query("UPDATE photos SET stage = :stage")
-    suspend fun updateAllStages(stage: Int)
-
     /** Set photos in the given folders to one stage (folder-scoped re-analyze). */
     @Query("UPDATE photos SET stage = :stage WHERE folder IN (:folders)")
     suspend fun updateStagesInFolders(

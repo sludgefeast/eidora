@@ -80,9 +80,6 @@
     <string name="notif_embedding_title">Analyzing found faces</string>
     <string name="notif_clustering_title">Clustering faces</string>
     <string name="notif_running">Running…</string>
-    <string name="notif_scanning">Scanning media… %1$d checked</string>
-    <string name="notif_scanning_start">Scanning media…</string>
-    <string name="notif_triaging">Checking metadata…</string>
     <string name="notif_triage_title">Checking metadata</string>
     <string name="notif_detection_title">Looking for faces</string>
     <string name="notif_done">Done</string>

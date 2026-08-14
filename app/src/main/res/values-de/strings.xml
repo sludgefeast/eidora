@@ -80,9 +80,6 @@
     <string name="notif_embedding_title">Analysiere gefundene Gesichter</string>
     <string name="notif_clustering_title">Gruppiere Gesichter</string>
     <string name="notif_running">Läuft…</string>
-    <string name="notif_scanning">Durchsuche Medien… %1$d geprüft</string>
-    <string name="notif_scanning_start">Durchsuche Medien…</string>
-    <string name="notif_triaging">Prüfe Metadaten…</string>
     <string name="notif_triage_title">Prüfe Metadaten</string>
     <string name="notif_detection_title">Schaue nach Gesichtern</string>
     <string name="notif_done">Fertig</string>
