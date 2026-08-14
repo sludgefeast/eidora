@@ -101,7 +101,7 @@ class ClusteringWorker(
                         powerGate
                             .awaitOk(powerConfig, isStopped = {
                                 isStopped
-                            }) { reason ->
+                            }) { reason, _ ->
                                 try {
                                     setForeground(
                                         NotificationHelper.clusteringForegroundInfo(
@@ -499,7 +499,7 @@ class ClusteringWorker(
         powerGate.awaitOk(
             powerConfig,
             isStopped = { isStopped },
-        ) { reason ->
+        ) { reason, _ ->
             try {
                 setForeground(
                     NotificationHelper.clusteringForegroundInfo(

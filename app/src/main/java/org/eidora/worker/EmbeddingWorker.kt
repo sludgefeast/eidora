@@ -77,6 +77,9 @@ class EmbeddingWorker(
             }
             Log.i(TAG, "Starting embedding run for $total faces")
 
+            val timer = RunTimer(TAG, "Embedding ($total faces)")
+            val pauseManual = java.util.concurrent.atomic.AtomicBoolean(false)
+
             val powerGate = PowerGate(applicationContext)
             val powerConfig =
                 try {
@@ -113,6 +116,7 @@ class EmbeddingWorker(
                 notifierScope.launch {
                     var lastTick = System.currentTimeMillis()
                     var lastPosted: Triple<Int, String, String>? = null
+                    var wasBlocked = false
                     while (isActive) {
                         val current = done.get()
                         val progress = if (total == 0) 0 else (current * 100) / total
@@ -122,6 +126,13 @@ class EmbeddingWorker(
                         // the estimate reflects actual processing speed.
                         val status = currentStatus.get()
                         val blocked = status.isNotEmpty()
+                        // Bank pause spans for the run summary.
+                        if (blocked && !wasBlocked) {
+                            timer.pauseStarted(manual = pauseManual.get())
+                        } else if (!blocked && wasBlocked) {
+                            timer.pauseEnded()
+                        }
+                        wasBlocked = blocked
                         val nowTick = System.currentTimeMillis()
                         if (blocked) etaEstimator.addPaused(nowTick - lastTick)
                         lastTick = nowTick
@@ -180,8 +191,9 @@ class EmbeddingWorker(
                             powerGate.awaitOk(
                                 powerConfig,
                                 isStopped = { isStopped },
-                            ) { reason ->
+                            ) { reason, isManual ->
                                 // Only update the shared status – the notifier handles display
+                                pauseManual.set(isManual)
                                 currentStatus.set(reason)
                             }
                             if (isStopped) return@flow
@@ -260,6 +272,7 @@ class EmbeddingWorker(
                 notifierScope.cancel()
             }
 
+            timer.finish(done.get())
             Log.i(TAG, "Embedding run finished: ${done.get()} / $total processed")
             // Chain clustering after embeddings so a first-run sync (faces come
             // from XMP metadata, then get embedded) also computes centroids and

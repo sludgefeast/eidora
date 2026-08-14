@@ -53,6 +53,7 @@ abstract class PipelineWorker(
     private val doneCount = AtomicInteger(0)
     private val totalCount = AtomicInteger(0)
     private val gateBlocked = AtomicBoolean(false)
+    private val gatePauseManual = AtomicBoolean(false)
     private val currentFile = AtomicReference("")
 
     /** The items this worker should process. */
@@ -70,13 +71,16 @@ abstract class PipelineWorker(
     @OptIn(ExperimentalCoroutinesApi::class)
     override suspend fun doWork(): Result {
         val items = loadItems()
-        android.util.Log.i("PipelineWorker", "${phaseTitle()} (step $step): ${items.size} items")
-        if (items.isEmpty()) return Result.success()
+        if (items.isEmpty()) {
+            android.util.Log.i("PipelineWorker", "${phaseTitle()} (step $step): 0 items")
+            return Result.success()
+        }
 
         totalCount.set(items.size)
         doneCount.set(0)
         currentFile.set(items.first().file.name)
 
+        val timer = RunTimer(TAG, "${phaseTitle()} (step $step, ${items.size} items)")
         val powerGate = PowerGate(applicationContext)
         val powerConfig = loadPowerConfig()
         val estimator = EtaEstimator()
@@ -86,6 +90,7 @@ abstract class PipelineWorker(
             notifierScope.launch {
                 var lastTick = System.currentTimeMillis()
                 var lastPosted: Triple<Int, String, String>? = null
+                var wasBlocked = false
                 while (isActive) {
                     val now = System.currentTimeMillis()
                     val total = totalCount.get()
@@ -93,6 +98,15 @@ abstract class PipelineWorker(
                     val progress = if (total == 0) 0 else (current * 100) / total
                     val file = currentFile.get()
                     val blocked = gateBlocked.get()
+                    // Track pause spans centrally here (the notifier sees the
+                    // single gateBlocked state), so parallel item flows can't
+                    // double-count the same pause.
+                    if (blocked && !wasBlocked) {
+                        timer.pauseStarted(manual = gatePauseManual.get())
+                    } else if (!blocked && wasBlocked) {
+                        timer.pauseEnded()
+                    }
+                    wasBlocked = blocked
                     if (blocked) estimator.addPaused(now - lastTick)
                     lastTick = now
                     val eta =
@@ -130,7 +144,8 @@ abstract class PipelineWorker(
                 flow { items.forEach { emit(it) } }
                     .flatMapMerge(concurrency = PIPELINE_PARALLELISM) { item ->
                         flow {
-                            powerGate.awaitOk(powerConfig, isStopped = { isStopped }) { reason ->
+                            powerGate.awaitOk(powerConfig, isStopped = { isStopped }) { reason, isManual ->
+                                gatePauseManual.set(isManual)
                                 gateBlocked.set(true)
                                 currentFile.set(reason)
                             }
@@ -156,6 +171,7 @@ abstract class PipelineWorker(
             }
         } finally {
             notifierJob.cancel()
+            timer.finish(doneCount.get())
         }
         return Result.success()
     }

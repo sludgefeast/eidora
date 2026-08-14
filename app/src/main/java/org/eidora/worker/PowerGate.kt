@@ -154,7 +154,7 @@ class PowerGate(
     suspend fun awaitOk(
         config: org.eidora.data.settings.PowerConfig,
         isStopped: () -> Boolean = { false },
-        onWait: suspend (String) -> Unit,
+        onWait: suspend (reason: String, isManual: Boolean) -> Unit,
     ) {
         // Once this call has blocked at least once, the stricter resume
         // thresholds apply until the gate opens again.
@@ -165,7 +165,7 @@ class PowerGate(
             if (isStopped()) return
             // Manual pause takes precedence over power conditions
             if (PauseState.isPaused(context)) {
-                onWait(context.getString(org.eidora.R.string.powergate_paused))
+                onWait(context.getString(org.eidora.R.string.powergate_paused), true)
                 waits++
                 delay(backoffDelayMs(waits))
                 continue
@@ -178,7 +178,7 @@ class PowerGate(
             // Log only the first block and then occasionally - a pause can last
             // for many minutes and would otherwise flood the log.
             if (waits == 0 || waits % 20 == 0) Log.i(TAG, reason)
-            onWait(reason)
+            onWait(reason, false)
             waits++
             delay(backoffDelayMs(waits))
         }
