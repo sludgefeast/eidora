@@ -33,6 +33,18 @@ private const val MAX_EMBEDDING_WAIT_ATTEMPTS = 10
 private const val CONSISTENCY_PENALTY_FRACTION = 0.5f
 
 /**
+ * How far above the (strict) auto-assign threshold a face may still be offered
+ * as an unconfirmed *suggestion* for a named person, as a fraction of that
+ * threshold. This is a relative margin, not a new calibrated absolute value, so
+ * it stays model- and collection-independent: faces below the auto threshold are
+ * assigned and confirmed; faces between it and (threshold × (1 + margin)) are
+ * assigned but left unconfirmed for the user to accept or reject; faces beyond
+ * that stay unknown. A modest margin recovers borderline faces (profiles, poor
+ * lighting) as reviewable suggestions without ever auto-assigning them.
+ */
+private const val SUGGEST_THRESHOLD_MARGIN = 0.25f
+
+/**
  * One stored embedding of a named person, with the metadata used for weighted
  * nearest-neighbour matching. Individual embeddings are kept (rather than a
  * single centroid) so age- and lighting-related variation is preserved.
@@ -46,6 +58,7 @@ private class PersonEmbedding(
 
 /** All stored embeddings of one named person. */
 private class PersonData(
+    val name: String?,
     val faces: List<PersonEmbedding>,
 )
 
@@ -135,12 +148,17 @@ class ClusteringWorker(
                     }
                     try {
                         val embedding = EmbeddingModel.bytesToFloatArray(face.faceRegion.embedding!!)
-                        var bestId: String? = null
-                        var bestDist = config.individualMatchThreshold
+                        val autoThreshold = config.individualMatchThreshold
+                        val suggestThreshold = autoThreshold * (1f + SUGGEST_THRESHOLD_MARGIN)
+                        var bestId: String? = null // best within auto threshold
+                        var bestName: String? = null
+                        var bestDist = autoThreshold
+                        var suggestId: String? = null // best within suggest threshold
+                        var suggestDist = suggestThreshold
                         var bestDistAny = Float.MAX_VALUE // best distance ignoring threshold, for diagnostics
                         personData.forEach { (personId, pd) ->
-                            // Weighted k-NN: average distance to this person's k
-                            // nearest stored faces, boosted by temporal proximity.
+                            // Weighted k-NN: nearest distance to this person's faces,
+                            // boosted by temporal proximity, with a consistency penalty.
                             val bestFaceDist =
                                 bestDistanceToPerson(
                                     embedding,
@@ -152,6 +170,12 @@ class ClusteringWorker(
                             if (bestFaceDist < bestDist) {
                                 bestDist = bestFaceDist
                                 bestId = personId
+                                bestName = pd.name
+                            }
+                            // Track the best candidate in the wider suggestion band.
+                            if (bestFaceDist < suggestDist) {
+                                suggestDist = bestFaceDist
+                                suggestId = personId
                             }
                         }
                         // Diagnostics: bucket the best distance to any person.
@@ -160,14 +184,30 @@ class ClusteringWorker(
                             distBuckets[b]++
                             if (bestId != null) {
                                 matchedCount++
-                            } else if (bestDistAny < config.individualMatchThreshold + 0.05f) {
+                            } else if (suggestId != null) {
                                 nearMissCount++
                             }
                         }
-                        bestId?.let { personId ->
-                            faceDao.updatePersonId(face.faceRegion.id, personId)
-                            individuallyAssigned.add(face.faceRegion.id)
-                        }
+                        val matchedId = bestId
+                        val matchedName = bestName
+                        val suggestedId = suggestId
+                        val assigned =
+                            when {
+                                // Below the strict threshold: assign AND confirm.
+                                matchedId != null -> {
+                                    faceDao.updatePersonAndName(face.faceRegion.id, matchedId, matchedName)
+                                    true
+                                }
+                                // In the suggestion band: assign but leave unconfirmed,
+                                // so it shows up in that person's PersonDetail for the
+                                // user to accept or reject (name stays null).
+                                suggestedId != null -> {
+                                    faceDao.updatePersonId(face.faceRegion.id, suggestedId)
+                                    true
+                                }
+                                else -> false
+                            }
+                        if (assigned) individuallyAssigned.add(face.faceRegion.id)
                     } catch (t: Throwable) {
                         Log.w(TAG, "Individual match failed for face ${face.faceRegion.id}", t)
                     }
@@ -186,17 +226,19 @@ class ClusteringWorker(
                 Log.i(TAG, "Individually assigned ${individuallyAssigned.size} faces to existing persons")
                 // Diagnostics for threshold tuning: distribution of the best
                 // k-NN distance to any named person, over all unknown faces.
-                // Matches happened below the threshold (${config.individualMatchThreshold});
-                // near-misses are within 0.05 above it (candidates a looser
-                // threshold would capture).
+                // autoMatched = assigned+confirmed below the auto threshold;
+                // suggested = assigned as unconfirmed suggestions in the band
+                // between the auto and suggest thresholds.
                 val histogram =
                     (0 until 10).joinToString(" ") { b ->
                         "${b / 10f}-${(b + 1) / 10f}:${distBuckets[b]}"
                     }
+                val suggestThr = config.individualMatchThreshold * (1f + SUGGEST_THRESHOLD_MARGIN)
                 Log.i(
                     TAG,
-                    "kNN distance histogram (threshold=${config.individualMatchThreshold}): " +
-                        "$histogram | matched=$matchedCount nearMiss=$nearMissCount",
+                    "kNN distance histogram (auto=${config.individualMatchThreshold}, " +
+                        "suggest=$suggestThr): $histogram | " +
+                        "autoMatched=$matchedCount suggested=$nearMissCount",
                 )
             }
             reportProgress(30, applicationContext.getString(org.eidora.R.string.notif_matching_persons_done))
@@ -438,14 +480,16 @@ class ClusteringWorker(
                 } else {
                     person.id to
                         PersonData(
-                            allFaces.map {
-                                PersonEmbedding(
-                                    embedding = EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!),
-                                    takenAt = it.photoTakenAt,
-                                    quality = it.faceRegion.qualityScore ?: 0.5f,
-                                    isConfirmed = it.faceRegion.name != null,
-                                )
-                            },
+                            name = person.name,
+                            faces =
+                                allFaces.map {
+                                    PersonEmbedding(
+                                        embedding = EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!),
+                                        takenAt = it.photoTakenAt,
+                                        quality = it.faceRegion.qualityScore ?: 0.5f,
+                                        isConfirmed = it.faceRegion.name != null,
+                                    )
+                                },
                         )
                 }
             }.toMap()
