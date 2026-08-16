@@ -25,17 +25,69 @@ object SyncPipeline {
         if (isClusteringRunning(context)) {
             EidoraLog.i("SyncPipeline", "Clustering active, sync will wait")
         }
+        // Normally KEEP: don't disturb a chain that's already running or queued.
+        // But a fresh install / update can leave an ORPHANED unique chain behind
+        // — WorkManager reports it as present (so KEEP silently ignores our new
+        // request), yet its later stages can't run because their prerequisites no
+        // longer exist ("Prerequisite … doesn't exist; not enqueuing"). Detect
+        // that stuck state and replace the chain once; otherwise keep.
+        val policy =
+            if (isChainOrphaned(context)) {
+                EidoraLog.w("SyncPipeline", "Orphaned sync chain detected; replacing it")
+                ExistingWorkPolicy.REPLACE
+            } else {
+                ExistingWorkPolicy.KEEP
+            }
         WorkManager
             .getInstance(context)
             .beginUniqueWork(
                 UNIQUE_SYNC_NAME,
-                ExistingWorkPolicy.KEEP,
+                policy,
                 ScanWorker.buildRequest(),
             ).then(TriageWorker.buildRequest())
             .then(DetectionWorker.buildRequest())
             .then(EmbeddingWorker.buildRequest())
             .enqueue()
     }
+
+    /**
+     * True when the unique sync chain is orphaned — the reinstall/force-stop
+     * artefact seen in practice. Signature from real logs: the head stage (scan)
+     * is ENQUEUED, but the follow-up stages' WorkSpecs are gone ("Prerequisite …
+     * doesn't exist; not enqueuing"), so nothing ever runs. A HEALTHY freshly
+     * enqueued chain has the head ENQUEUED *and* its followers BLOCKED (waiting);
+     * an orphaned one has an enqueued/pending head with NO blocked followers and
+     * nothing running. That "head present, body missing" shape is the reliable
+     * tell — more so than counting stages, since WorkManager keeps SUCCEEDED
+     * infos around for a while. Best-effort and synchronous; any failure returns
+     * false so we fall back to the safe KEEP behaviour.
+     */
+    private fun isChainOrphaned(context: Context): Boolean =
+        try {
+            val infos =
+                WorkManager
+                    .getInstance(context)
+                    .getWorkInfosForUniqueWork(UNIQUE_SYNC_NAME)
+                    .get()
+            when {
+                infos.isNullOrEmpty() -> false // no chain: KEEP will create one
+                infos.any { it.state == WorkInfo.State.RUNNING } -> false // healthy
+                else -> {
+                    val pendingHead =
+                        infos.any {
+                            it.state == WorkInfo.State.ENQUEUED
+                        }
+                    val hasBlockedFollowers =
+                        infos.any { it.state == WorkInfo.State.BLOCKED }
+                    // Head pending but no blocked followers and nothing running →
+                    // the body was lost: orphaned.
+                    pendingHead && !hasBlockedFollowers
+                }
+            }
+        } catch (t: Throwable) {
+            EidoraLog.w("SyncPipeline", "Orphan check failed, keeping chain", t)
+            false
+        }
 
     fun enqueueForce(context: Context) {
         context

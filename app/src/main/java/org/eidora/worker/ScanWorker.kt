@@ -240,6 +240,8 @@ class ScanWorker(
         var totalRows = 0
         var filteredOut = 0
         val sampleRelPaths = mutableListOf<String>()
+        EidoraLog.i(TAG, "MediaStore query starting (sinceModifiedSec=$sinceModifiedSec)…")
+        val queryStartMs = System.currentTimeMillis()
         applicationContext.contentResolver
             .query(
                 uri,
@@ -248,11 +250,27 @@ class ScanWorker(
                 selectionArgs,
                 "${MediaStore.Images.Media.DATE_MODIFIED} DESC",
             )?.use { cursor ->
+                EidoraLog.i(
+                    TAG,
+                    "MediaStore query returned in " +
+                        "${System.currentTimeMillis() - queryStartMs}ms, " +
+                        "cursor rows=${cursor.count}",
+                )
                 val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
                 val relPathCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
                 val modCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
                 while (cursor.moveToNext()) {
                     totalRows++
+                    // Progress ping every 2000 rows so a slow walk is visible in
+                    // the log instead of looking like a silent hang, and so we can
+                    // see how long the MediaStore walk takes on large libraries.
+                    if (totalRows % 2000 == 0) {
+                        EidoraLog.i(
+                            TAG,
+                            "MediaStore walk: $totalRows rows so far " +
+                                "(${System.currentTimeMillis() - queryStartMs}ms), kept ${result.size}",
+                        )
+                    }
                     val relPath = cursor.getString(relPathCol)?.trimEnd('/') ?: ""
                     if (sampleRelPaths.size < 10 && relPath !in sampleRelPaths) {
                         sampleRelPaths.add(relPath)
@@ -264,9 +282,19 @@ class ScanWorker(
                         continue
                     }
                     val path = cursor.getString(dataCol) ?: continue
-                    val file = File(path)
-                    if (file.isFile) result.add(WorkItemModified(file, relPath, cursor.getLong(modCol)))
+                    // Trust the MediaStore index rather than stat-ing every row
+                    // with File.isFile: on a large library that was one
+                    // filesystem access per photo (tens of thousands), which
+                    // dominated the scan. Rare stale entries (a file deleted
+                    // outside MediaStore before its index caught up) are cleaned
+                    // up by the periodic deletion check instead.
+                    result.add(WorkItemModified(File(path), relPath, cursor.getLong(modCol)))
                 }
+            } ?: run {
+                // A null cursor means the query itself failed — most often a
+                // missing media permission. Make that explicit instead of a
+                // silent empty scan.
+                EidoraLog.e(TAG, "MediaStore query returned null cursor (permission problem?)")
             }
         EidoraLog.i(
             TAG,
