@@ -209,6 +209,22 @@ class EmbeddingModel private constructor(
         }
 
         /**
+         * Mean cosine distance of a cluster's members to their own centroid — the
+         * cluster's internal spread (a tight cluster has a small spread). Used
+         * together with the distance to the nearest *other* cluster to judge how
+         * "pure" a cluster is, in a silhouette-like way. This is a relative
+         * measure and needs no calibrated threshold, so it is model- and
+         * collection-independent.
+         */
+        fun clusterSpread(embeddings: List<FloatArray>): Float {
+            if (embeddings.size < 2) return 0f
+            val centroid = centroid(embeddings)
+            var sum = 0f
+            embeddings.forEach { sum += cosineDistance(it, centroid) }
+            return sum / embeddings.size
+        }
+
+        /**
          * Picks the representative face for a person: the one whose embedding is
          * closest to the person's weighted centroid. Returns the index into
          * [embeddingsWithWeights], or -1 if the list is empty.

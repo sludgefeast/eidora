@@ -45,6 +45,27 @@ private const val CONSISTENCY_PENALTY_FRACTION = 0.5f
 private const val SUGGEST_THRESHOLD_MARGIN = 0.25f
 
 /**
+ * Maximum silhouette-like ratio (internal spread ÷ distance to nearest other
+ * cluster) for a cluster to count as "pure". Below this, the cluster is much
+ * tighter than its separation from other clusters, so it's unlikely to mix two
+ * people. Relative and threshold-free w.r.t. absolute distances.
+ */
+private const val PURITY_RATIO_MAX = 0.6f
+
+/**
+ * Fraction of currently-unknown faces the largest pure clusters should cover as
+ * suggestions in one run. The rest wait for later runs. Relative, so it scales
+ * with library size and with each round's progress.
+ */
+private const val SUGGEST_COVERAGE = 0.5f
+
+/**
+ * Safety cap: above this many clusters the O(n²) purity check is skipped (all
+ * eligible clusters treated as pure) to avoid a slow pass on the device.
+ */
+private const val MAX_CLUSTERS_FOR_PURITY = 4000
+
+/**
  * One stored embedding of a named person, with the metadata used for weighted
  * nearest-neighbour matching. Individual embeddings are kept (rather than a
  * single centroid) so age- and lighting-related variation is preserved.
@@ -324,11 +345,95 @@ class ClusteringWorker(
 
             val clusterGroups = clusterResults.groupBy { it.clusterId }
             val totalClusters = clusterGroups.size
-            clusterGroups.entries.forEachIndexed { index, (_, members) ->
+
+            // ----- Cluster pre-selection: only surface large AND pure clusters -----
+            // Iterative approach: rather than turning every cluster above
+            // minClusterSize into a suggestion (which produced thousands of small,
+            // often-mixed suggestions), we surface only the clusters that are both
+            // large and internally consistent. The rest wait for later runs, when
+            // more confirmed persons let Phase 1 absorb their faces. All criteria
+            // are relative, so this stays valid for any collection and model.
+            val eligible =
+                clusterGroups.entries.filter { (_, m) -> m.size >= config.minClusterSize }
+            val skippedBelowMin = clusterGroups.size - eligible.size
+
+            // Embedding + centroid per eligible cluster (centroid computed once).
+            data class ClusterInfo(
+                val clusterId: Int,
+                val size: Int,
+                val centroid: FloatArray,
+                val spread: Float,
+            )
+            val infos =
+                eligible.mapNotNull { (clusterId, members) ->
+                    val embs =
+                        members.mapNotNull { r -> candidates.find { it.first == r.faceRegionId }?.second }
+                    if (embs.size < config.minClusterSize) return@mapNotNull null
+                    ClusterInfo(
+                        clusterId = clusterId,
+                        size = embs.size,
+                        centroid = EmbeddingModel.centroid(embs),
+                        spread = EmbeddingModel.clusterSpread(embs),
+                    )
+                }
+
+            // Purity via a silhouette-like ratio: a cluster is pure when its
+            // internal spread (a) is small relative to the distance to the nearest
+            // OTHER cluster's centroid (b). ratio = a / b; low ratio = well
+            // separated = pure. This is threshold-free (no calibrated constant).
+            // O(clusters²) on centroids only; capped for safety on huge counts.
+            val pureClusterIds: Set<Int> =
+                if (infos.size > MAX_CLUSTERS_FOR_PURITY) {
+                    Log.w(TAG, "Too many clusters (${infos.size}) for purity check; skipping it")
+                    infos.map { it.clusterId }.toSet()
+                } else {
+                    infos
+                        .filter { ci ->
+                            if (ci.spread <= 1e-6f) return@filter true // single-tight cluster
+                            var nearestOther = Float.MAX_VALUE
+                            infos.forEach { other ->
+                                if (other.clusterId != ci.clusterId) {
+                                    val d = EmbeddingModel.cosineDistance(ci.centroid, other.centroid)
+                                    if (d < nearestOther) nearestOther = d
+                                }
+                            }
+                            if (nearestOther == Float.MAX_VALUE) return@filter true // only one cluster
+                            (ci.spread / nearestOther) < PURITY_RATIO_MAX
+                        }.map { it.clusterId }
+                        .toSet()
+                }
+
+            // Top-N by size covering SUGGEST_COVERAGE of unknown faces: sort pure
+            // clusters largest-first, accumulate until we've covered that fraction
+            // of the currently-unknown faces. Only these become suggestions this
+            // run; the rest wait. Coverage is relative, so it scales with library
+            // size and shrinks the effective min size as unknowns decrease.
+            val unknownTotal = unknownFacesAll.size.coerceAtLeast(1)
+            val coverageTarget = (unknownTotal * SUGGEST_COVERAGE).toInt().coerceAtLeast(1)
+            val selectedIds = mutableSetOf<Int>()
+            var covered = 0
+            infos
+                .filter { it.clusterId in pureClusterIds }
+                .sortedByDescending { it.size }
+                .forEach { ci ->
+                    if (covered < coverageTarget) {
+                        selectedIds.add(ci.clusterId)
+                        covered += ci.size
+                    }
+                }
+            Log.i(
+                TAG,
+                "Cluster selection: ${infos.size} eligible, ${pureClusterIds.size} pure, " +
+                    "${selectedIds.size} selected covering $covered/$unknownTotal unknown " +
+                    "(target ${(SUGGEST_COVERAGE * 100).toInt()}%)",
+            )
+
+            clusterGroups.entries.forEachIndexed { index, (clusterId, members) ->
                 if (members.isEmpty()) return@forEachIndexed
 
-                if (members.size < config.minClusterSize) {
-                    Log.d(TAG, "Skipping cluster below minimum size: ${members.size} < ${config.minClusterSize}")
+                // Only process clusters selected this run (large + pure + within
+                // the coverage target). The others wait for a later run.
+                if (clusterId !in selectedIds) {
                     return@forEachIndexed
                 }
 
@@ -425,6 +530,14 @@ class ClusteringWorker(
                         index + 1,
                         totalClusters,
                     ),
+                )
+            }
+
+            if (skippedBelowMin > 0) {
+                Log.i(
+                    TAG,
+                    "Skipped $skippedBelowMin clusters below minimum size " +
+                        "(${config.minClusterSize}) — mostly singletons that didn't group",
                 )
             }
 
