@@ -4,7 +4,7 @@
 package org.eidora.worker
 
 import android.content.Context
-import android.util.Log
+import org.eidora.util.EidoraLog
 import androidx.work.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -29,7 +29,7 @@ class XmpWriteWorker(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!org.eidora.util.PermissionChecker.hasWorkerPermissions(applicationContext)) {
-            Log.w(TAG, "Missing media/all-files permission – aborting XMP write")
+            EidoraLog.w(TAG, "Missing media/all-files permission – aborting XMP write")
             return Result.failure()
         }
         val db = DatabaseProvider.getInstance(applicationContext)
@@ -40,12 +40,12 @@ class XmpWriteWorker(
             try {
                 photoDao.getPendingXmpWrites()
             } catch (t: Throwable) {
-                Log.e(TAG, "Failed to load pending XMP writes", t)
+                EidoraLog.e(TAG, "Failed to load pending XMP writes", t)
                 return Result.retry()
             }
 
         if (pending.isEmpty()) return Result.success()
-        Log.i(TAG, "Writing XMP for ${pending.size} photos")
+        EidoraLog.i(TAG, "Writing XMP for ${pending.size} photos")
 
         coroutineScope {
             pending.chunked(PARALLELISM).forEach { batch ->
@@ -78,9 +78,9 @@ class XmpWriteWorker(
                                     arrayOf("image/jpeg"),
                                     null,
                                 )
-                                Log.d(TAG, "XMP written for ${file.name}")
+                                EidoraLog.d(TAG, "XMP written for ${file.name}")
                             } catch (t: Throwable) {
-                                Log.e(TAG, "XMP write failed for ${photo.path}", t)
+                                EidoraLog.e(TAG, "XMP write failed for ${photo.path}", t)
                                 // Leave pending_xmp_write = true so next run retries
                             }
                         }

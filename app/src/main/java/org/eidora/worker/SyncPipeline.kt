@@ -3,6 +3,8 @@
 
 package org.eidora.worker
 
+import org.eidora.util.EidoraLog
+
 import android.content.Context
 import android.util.Log
 import androidx.work.ExistingWorkPolicy
@@ -21,7 +23,7 @@ object SyncPipeline {
 
     fun enqueue(context: Context) {
         if (isClusteringRunning(context)) {
-            android.util.Log.i("SyncPipeline", "Clustering active, sync will wait")
+            EidoraLog.i("SyncPipeline", "Clustering active, sync will wait")
         }
         WorkManager
             .getInstance(context)

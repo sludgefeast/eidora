@@ -5,7 +5,7 @@ package org.eidora.ml
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.util.Log
+import org.eidora.util.EidoraLog
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.tensorflow.lite.Interpreter
@@ -55,7 +55,7 @@ class ScrfdDetector private constructor(
 
     init {
         scaleOutputs = resolveOutputIndices()
-        Log.i(TAG, "SCRFD initialized on $backend, outputs: $scaleOutputs")
+        EidoraLog.i(TAG, "SCRFD initialized on $backend, outputs: $scaleOutputs")
     }
 
     /** Legacy construction: loads SCRFD from filesDir by fixed filename. */
@@ -92,7 +92,7 @@ class ScrfdDetector private constructor(
 
         for (i in 0 until interpreter.outputTensorCount) {
             val shape = interpreter.getOutputTensor(i).shape()
-            Log.i(TAG, "Output tensor $i shape: ${shape.contentToString()}")
+            EidoraLog.i(TAG, "Output tensor $i shape: ${shape.contentToString()}")
             // Accept both [1, n, c] (batched) and [n, c] (non-batched) layouts
             val (n, c) =
                 when {

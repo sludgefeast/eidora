@@ -3,6 +3,8 @@
 
 package org.eidora
 
+import org.eidora.util.EidoraLog
+
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -173,7 +175,7 @@ fun EidoraApp() {
                 SyncPipeline.enqueue(context)
                 pipelineEnqueued = true
             } catch (t: Throwable) {
-                android.util.Log.e("FACES", "SyncPipeline failed", t)
+                EidoraLog.e("FACES", "SyncPipeline failed", t)
             }
         }
     }
@@ -380,7 +382,7 @@ fun EidoraApp() {
                         // thread (with a large library it would freeze the UI /
                         // trigger an ANR, which looked like "nothing happens").
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            android.util.Log.i("FaceRepository", "Re-analyze all: starting")
+                            EidoraLog.i("FaceRepository", "Re-analyze all: starting")
                             val repo =
                                 org.eidora.data.repository.FaceRepository(
                                     context,
@@ -401,7 +403,7 @@ fun EidoraApp() {
                             SyncPipeline.cancelRunningSync(context)
                             repo.resetFoldersForRedetection(folders)
                             SyncPipeline.enqueueRedetectAll(context)
-                            android.util.Log.i("FaceRepository", "Re-analyze all: enqueued detection")
+                            EidoraLog.i("FaceRepository", "Re-analyze all: enqueued detection")
                         }
                     }
                 }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }

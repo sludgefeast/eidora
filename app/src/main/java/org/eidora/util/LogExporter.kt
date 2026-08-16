@@ -54,11 +54,31 @@ object LogExporter {
         val header = buildHeader(context, range)
         val body =
             try {
-                readLogcat(range)
+                readLogcat(context, range)
             } catch (t: Throwable) {
                 "Failed to read logcat: ${t.message}"
             }
-        return header + "\n" + body
+        // Append Eidora's own persisted log (survives logcat eviction). logcat
+        // above still carries framework messages and crashes; this section
+        // guarantees the app's own diagnostics are present regardless of buffer
+        // pressure. Two sources, one exported file.
+        val persisted =
+            try {
+                EidoraLog.readPersisted()
+            } catch (t: Throwable) {
+                ""
+            }
+        val persistedSection =
+            if (persisted.isBlank()) {
+                ""
+            } else {
+                "\n\n" +
+                    "============================================================\n" +
+                    "Eidora persistent log (survives logcat eviction)\n" +
+                    "============================================================\n" +
+                    persisted
+            }
+        return header + "\n" + body + persistedSection
     }
 
     private fun buildHeader(
@@ -86,8 +106,14 @@ object LogExporter {
         }
     }
 
-    private fun readLogcat(range: Range): String {
-        val command = mutableListOf("logcat", "-d", "-v", "threadtime")
+    private fun readLogcat(
+        context: Context,
+        range: Range,
+    ): String {
+        // Read the main, system and crash buffers (not just the default main
+        // one), so framework messages and crashes about our process are captured
+        // too. -d dumps and exits; threadtime gives the PID column we filter on.
+        val command = mutableListOf("logcat", "-d", "-b", "main,system,crash", "-v", "threadtime")
         range.hours?.let { hours ->
             val since = Date(System.currentTimeMillis() - hours * 3600_000L)
             command += listOf("-t", SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US).format(since))
@@ -95,18 +121,23 @@ object LogExporter {
         val raw = runLogcat(command)
         if (raw.isBlank()) return "(no matching log entries in this range)"
 
-        // Figure out which PIDs belong to this app. Every process logs one
-        // startup marker (EidoraApplication.onCreate → tag MARKER_TAG) carrying
-        // its own PID, so scanning for that tag yields every Eidora process in
-        // the buffer — including earlier, now-dead ones from before a restart or
-        // crash. The current PID is added too, in case this process's own marker
-        // has already rolled out of the buffer.
+        // Figure out which PIDs belong to this app. Two independent signals, so a
+        // process is found even when one of them is missing:
+        //   1. The startup marker (EidoraApplication.onCreate → MARKER_TAG) names
+        //      its own PID — reliable, but rolls out of the ring buffer on a
+        //      long-running session.
+        //   2. Any line mentioning our package name (crash headers, process
+        //      starts, ANRs, framework messages) — survives even when the marker
+        //      is gone, which was why long clustering runs exported no worker
+        //      lines: the marker had aged out and only the marker was checked.
+        // The current PID is always included too.
         //
         // We filter in Kotlin rather than with logcat --pid because logcat only
         // honours a single --pid, so several processes can't be requested at once.
+        val pkg = context.packageName
         val ourPids = mutableSetOf(android.os.Process.myPid())
         raw.lineSequence().forEach { line ->
-            if (line.contains(MARKER_TAG)) {
+            if (line.contains(MARKER_TAG) || line.contains(pkg)) {
                 pidOf(line)?.let { ourPids += it }
             }
         }

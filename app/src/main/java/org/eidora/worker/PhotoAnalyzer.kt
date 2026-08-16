@@ -4,7 +4,7 @@
 package org.eidora.worker
 
 import android.content.Context
-import android.util.Log
+import org.eidora.util.EidoraLog
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.db.FaceRegionEntity
 import org.eidora.data.db.PersonEntity
@@ -47,11 +47,11 @@ class PhotoAnalyzer(
         detector?.let { return it }
         val d = org.eidora.ml.container.SelectedModelResolver.openDetector(context)
         if (d == null) {
-            Log.e(TAG, "Failed to initialize detector from selected container")
+            EidoraLog.e(TAG, "Failed to initialize detector from selected container")
             return null
         }
         detector = d
-        Log.i(TAG, "Detector initialized on backend: ${d.backend}")
+        EidoraLog.i(TAG, "Detector initialized on backend: ${d.backend}")
         return d
     }
 
@@ -72,7 +72,7 @@ class PhotoAnalyzer(
             try {
                 FileUtil.readTakenAt(file)
             } catch (t: Throwable) {
-                Log.w(TAG, "Could not read takenAt for ${file.name}")
+                EidoraLog.w(TAG, "Could not read takenAt for ${file.name}")
                 null
             }
 
@@ -111,7 +111,7 @@ class PhotoAnalyzer(
             try {
                 XmpHelper.readFaceRegions(file)
             } catch (t: Throwable) {
-                Log.e(TAG, "XMP read failed for ${file.name}", t)
+                EidoraLog.e(TAG, "XMP read failed for ${file.name}", t)
                 emptyList()
             }
 
@@ -140,7 +140,7 @@ class PhotoAnalyzer(
                 ThumbnailHelper.createThumbnail(context, file, xmpRegion.coords, faceId)
             } catch (t: Throwable) {
                 t.rethrowIfCancellation()
-                Log.e(TAG, "Failed to import XMP region", t)
+                EidoraLog.e(TAG, "Failed to import XMP region", t)
             }
         }
         photoDao.updateStage(photoId, PhotoStage.DONE)
@@ -148,7 +148,7 @@ class PhotoAnalyzer(
             refreshPersonTags(file, photoId)
         } catch (t: Throwable) {
             t.rethrowIfCancellation()
-            Log.e(TAG, "Failed to refresh person tags for ${file.name}", t)
+            EidoraLog.e(TAG, "Failed to refresh person tags for ${file.name}", t)
         }
         return PhotoStage.DONE
     }
@@ -170,7 +170,7 @@ class PhotoAnalyzer(
         if (det == null) {
             // Models not ready. Leave the photo at its current stage so it is
             // retried once models are present.
-            Log.w(TAG, "Detector not available, deferring ${file.name}")
+            EidoraLog.w(TAG, "Detector not available, deferring ${file.name}")
             return
         }
 
@@ -178,12 +178,12 @@ class PhotoAnalyzer(
             try {
                 BitmapLoader.loadOrientedBitmap(file, maxSize = 2048)
             } catch (t: Throwable) {
-                Log.e(TAG, "Failed to load bitmap for ${file.name}", t)
+                EidoraLog.e(TAG, "Failed to load bitmap for ${file.name}", t)
                 photoDao.updateStage(photoId, PhotoStage.DONE)
                 return
             }
         if (bitmap == null) {
-            Log.w(TAG, "Bitmap decode returned null for ${file.name}")
+            EidoraLog.w(TAG, "Bitmap decode returned null for ${file.name}")
             photoDao.updateStage(photoId, PhotoStage.DONE)
             return
         }
@@ -192,7 +192,7 @@ class PhotoAnalyzer(
             try {
                 det.detect(bitmap)
             } catch (t: Throwable) {
-                Log.e(TAG, "Detection failed for ${file.name}", t)
+                EidoraLog.e(TAG, "Detection failed for ${file.name}", t)
                 photoDao.updateStage(photoId, PhotoStage.DONE)
                 bitmap.recycle()
                 return
@@ -228,7 +228,7 @@ class PhotoAnalyzer(
                     ThumbnailHelper.createThumbnail(context, file, coords, faceId)
                     xmpRegions.add(XmpFaceRegion(name = null, coords = coords))
                 } catch (t: Throwable) {
-                    Log.e(TAG, "Failed to process face in ${file.name}", t)
+                    EidoraLog.e(TAG, "Failed to process face in ${file.name}", t)
                 }
             }
 
@@ -252,7 +252,7 @@ class PhotoAnalyzer(
                     }
                     photoDao.updateModifiedAt(photoId, file.lastModified())
                 } catch (t: Throwable) {
-                    Log.e(TAG, "Failed to write XMP regions to ${file.name}", t)
+                    EidoraLog.e(TAG, "Failed to write XMP regions to ${file.name}", t)
                 }
             }
         }

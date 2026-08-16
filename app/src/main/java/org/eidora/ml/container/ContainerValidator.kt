@@ -3,7 +3,7 @@
 
 package org.eidora.ml.container
 
-import android.util.Log
+import org.eidora.util.EidoraLog
 import org.tensorflow.lite.Interpreter
 import java.io.File
 import java.nio.channels.FileChannel
@@ -42,7 +42,7 @@ object ContainerValidator {
                 try {
                     checkModel(file, model)
                 } catch (t: Throwable) {
-                    Log.e(TAG, "Validation error for ${model.id}", t)
+                    EidoraLog.e(TAG, "Validation error for ${model.id}", t)
                     return Result.Failed("could not load ${model.id}: ${t.message}")
                 }
             if (result is Result.Failed) return result

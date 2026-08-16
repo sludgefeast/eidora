@@ -4,7 +4,7 @@
 package org.eidora.worker
 
 import android.content.Context
-import android.util.Log
+import org.eidora.util.EidoraLog
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
@@ -72,7 +72,7 @@ abstract class PipelineWorker(
     override suspend fun doWork(): Result {
         val items = loadItems()
         if (items.isEmpty()) {
-            android.util.Log.i("PipelineWorker", "${phaseTitle()} (step $step): 0 items")
+            EidoraLog.i("PipelineWorker", "${phaseTitle()} (step $step): 0 items")
             return Result.success()
         }
 
@@ -155,7 +155,7 @@ abstract class PipelineWorker(
                                 processItem(item)
                             } catch (t: Throwable) {
                                 t.rethrowIfCancellation()
-                                Log.e(TAG, "Failed to process ${item.file.name}, skipping", t)
+                                EidoraLog.e(TAG, "Failed to process ${item.file.name}, skipping", t)
                             }
                             emit(item)
                         }

@@ -6,7 +6,7 @@ package org.eidora.worker
 import android.content.Context
 import android.content.SharedPreferences
 import android.provider.MediaStore
-import android.util.Log
+import org.eidora.util.EidoraLog
 import androidx.work.CoroutineWorker
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
@@ -39,14 +39,14 @@ class ScanWorker(
     private val analyzer by lazy { PhotoAnalyzer(applicationContext) }
 
     override suspend fun doWork(): Result {
-        Log.i(TAG, "ScanWorker started (force=${inputData.getBoolean(KEY_FORCE, false)})")
+        EidoraLog.i(TAG, "ScanWorker started (force=${inputData.getBoolean(KEY_FORCE, false)})")
         val folderWhitelist =
             try {
                 SettingsProvider.get(applicationContext).getFolderWhitelist()
             } catch (c: kotlinx.coroutines.CancellationException) {
                 throw c
             } catch (t: Throwable) {
-                Log.w(TAG, "Failed to load folder whitelist, using defaults", t)
+                EidoraLog.w(TAG, "Failed to load folder whitelist, using defaults", t)
                 SettingsRepository.DEFAULT_FOLDER_WHITELIST
             }
 
@@ -68,7 +68,7 @@ class ScanWorker(
             }
         val fullScan = isForce || dbPhotoCount == 0
         if (fullScan) {
-            Log.i(TAG, "Full scan (force=$isForce, dbPhotos=$dbPhotoCount)")
+            EidoraLog.i(TAG, "Full scan (force=$isForce, dbPhotos=$dbPhotoCount)")
         }
 
         // Incremental scan: only entries new/modified since the last sync.
@@ -79,7 +79,7 @@ class ScanWorker(
                     sinceModifiedSec = if (fullScan) 0L else lastSyncSec,
                 )
             } catch (t: Throwable) {
-                Log.e(TAG, "Failed to query MediaStore for JPEGs", t)
+                EidoraLog.e(TAG, "Failed to query MediaStore for JPEGs", t)
                 return Result.failure()
             }
 
@@ -102,7 +102,7 @@ class ScanWorker(
             try {
                 photoDao.getAllPathsWithModified().associateBy { it.path }
             } catch (t: Throwable) {
-                Log.e(TAG, "Failed to bulk-load existing photos", t)
+                EidoraLog.e(TAG, "Failed to bulk-load existing photos", t)
                 emptyMap()
             }
 
@@ -116,10 +116,10 @@ class ScanWorker(
                 registered++
             } catch (t: Throwable) {
                 t.rethrowIfCancellation()
-                Log.e(TAG, "Failed to register ${entry.file.name}", t)
+                EidoraLog.e(TAG, "Failed to register ${entry.file.name}", t)
             }
         }
-        Log.i(TAG, "Scan registered/refreshed $registered of ${changedEntries.size} entries")
+        EidoraLog.i(TAG, "Scan registered/refreshed $registered of ${changedEntries.size} entries")
 
         // Deletion check: periodically (or on force) remove DB rows whose files
         // are gone from disk.
@@ -179,7 +179,7 @@ class ScanWorker(
         nowSec: Long,
         dbPaths: Set<String>,
     ) {
-        Log.i(TAG, "Running deletion check")
+        EidoraLog.i(TAG, "Running deletion check")
         try {
             val allMediaPaths = mutableSetOf<String>()
             val uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
@@ -201,13 +201,13 @@ class ScanWorker(
                 try {
                     analyzer.deletePhoto(path)
                 } catch (t: Throwable) {
-                    Log.e(TAG, "Failed to delete photo $path", t)
+                    EidoraLog.e(TAG, "Failed to delete photo $path", t)
                 }
             }
             prefs.edit().putLong("last_deletion_check_sec", nowSec).apply()
         } catch (t: Throwable) {
             if (t is kotlinx.coroutines.CancellationException) throw t
-            Log.e(TAG, "Deletion check failed", t)
+            EidoraLog.e(TAG, "Deletion check failed", t)
         }
     }
 
@@ -268,7 +268,7 @@ class ScanWorker(
                     if (file.isFile) result.add(WorkItemModified(file, relPath, cursor.getLong(modCol)))
                 }
             }
-        Log.i(
+        EidoraLog.i(
             TAG,
             "MediaStore: $totalRows JPEG rows, $filteredOut filtered by whitelist " +
                 "$folderWhitelist, ${result.size} kept. Sample folders: $sampleRelPaths",

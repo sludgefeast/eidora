@@ -3,7 +3,7 @@
 
 package org.eidora.util
 
-import android.util.Log
+import org.eidora.util.EidoraLog
 import androidx.exifinterface.media.ExifInterface
 import com.ashampoo.xmp.XMPMeta
 import com.ashampoo.xmp.XMPMetaFactory
@@ -39,7 +39,7 @@ object XmpHelper {
             XMPMetaFactory.schemaRegistry.registerNamespace(NS_DIGIKAM, "digiKam")
             XMPMetaFactory.schemaRegistry.registerNamespace(NS_LR, "lr")
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to register XMP namespaces", t)
+            EidoraLog.e(TAG, "Failed to register XMP namespaces", t)
         }
     }
 
@@ -74,7 +74,7 @@ object XmpHelper {
                 String(s.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
             }
         } catch (t: Throwable) {
-            Log.w(TAG, "Could not read raw XMP bytes, falling back to string API", t)
+            EidoraLog.w(TAG, "Could not read raw XMP bytes, falling back to string API", t)
             exif.getAttribute(ExifInterface.TAG_XMP)
         }
     }
@@ -98,7 +98,7 @@ object XmpHelper {
         val utf8Bytes = serialized.toByteArray(Charsets.UTF_8)
         val roundTripped = String(utf8Bytes, Charsets.UTF_8)
         if (roundTripped != serialized) {
-            Log.w(TAG, "XMP UTF-8 round-trip mismatch – data may be corrupted")
+            EidoraLog.w(TAG, "XMP UTF-8 round-trip mismatch – data may be corrupted")
         }
         exif.setAttribute(ExifInterface.TAG_XMP, serialized)
     }
@@ -138,12 +138,12 @@ object XmpHelper {
                         ),
                     )
                 } catch (t: Throwable) {
-                    Log.w(TAG, "Failed to parse region $i in ${file.name}, skipping", t)
+                    EidoraLog.w(TAG, "Failed to parse region $i in ${file.name}, skipping", t)
                 }
             }
             regions
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to read face regions from ${file.name}", t)
+            EidoraLog.e(TAG, "Failed to read face regions from ${file.name}", t)
             emptyList()
         }
     }
@@ -205,7 +205,7 @@ object XmpHelper {
                         xmp.setProperty(NS_MWG_RS, "$item/mwg-rs:Area/stArea:h", region.coords.h.toString(), emptyOpts)
                         xmp.setProperty(NS_MWG_RS, "$item/mwg-rs:Area/stArea:unit", "normalized", emptyOpts)
                     } catch (t: Throwable) {
-                        Log.w(TAG, "Failed to write region $index, skipping", t)
+                        EidoraLog.w(TAG, "Failed to write region $index, skipping", t)
                     }
                 }
             }
@@ -214,13 +214,13 @@ object XmpHelper {
             try {
                 writePersonTags(xmp, confirmedNames)
             } catch (t: Throwable) {
-                Log.e(TAG, "Failed to write person tags", t)
+                EidoraLog.e(TAG, "Failed to write person tags", t)
             }
 
             writeXmpString(exif, xmp)
             exif.saveAttributes()
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to write face regions to ${file.name}", t)
+            EidoraLog.e(TAG, "Failed to write face regions to ${file.name}", t)
         }
     }
 
@@ -236,12 +236,12 @@ object XmpHelper {
             try {
                 clearPeopleSubjects(xmp)
             } catch (t: Throwable) {
-                Log.w(TAG, "clearPeopleSubjects failed", t)
+                EidoraLog.w(TAG, "clearPeopleSubjects failed", t)
             }
             writeXmpString(exif, xmp)
             exif.saveAttributes()
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to clear face data from ${file.name}", t)
+            EidoraLog.e(TAG, "Failed to clear face data from ${file.name}", t)
         }
     }
 

@@ -3,7 +3,7 @@
 
 package org.eidora.ml.container
 
-import android.util.Log
+import org.eidora.util.EidoraLog
 import org.json.JSONArray
 import java.net.HttpURLConnection
 import java.net.URL
@@ -89,7 +89,7 @@ object ContainerUpdateChecker {
             }
             best
         } catch (t: Throwable) {
-            Log.w(TAG, "Update check failed", t)
+            EidoraLog.w(TAG, "Update check failed", t)
             null
         }
     }
@@ -139,12 +139,12 @@ object ContainerUpdateChecker {
             }
             conn.connect()
             if (conn.responseCode !in 200..299) {
-                Log.w(TAG, "Releases API HTTP ${conn.responseCode}")
+                EidoraLog.w(TAG, "Releases API HTTP ${conn.responseCode}")
                 return null
             }
             conn.inputStream.bufferedReader().use { it.readText() }
         } catch (t: Throwable) {
-            Log.w(TAG, "Releases API fetch failed", t)
+            EidoraLog.w(TAG, "Releases API fetch failed", t)
             null
         } finally {
             conn?.disconnect()

@@ -4,7 +4,7 @@
 package org.eidora.ml.container
 
 import android.content.Context
-import android.util.Log
+import org.eidora.util.EidoraLog
 import org.eidora.data.settings.SettingsProvider
 import org.eidora.ml.EmbeddingModel
 import org.eidora.ml.FaceDetector
@@ -29,10 +29,10 @@ object SelectedModelResolver {
             resolve(context, ContainerManifest.TASK_DETECTION) ?: return null
         return try {
             ContainerModelRunner.openDetector(context, container.dir, model).also {
-                Log.i(TAG, "Detector: ${container.id}/${model.id}")
+                EidoraLog.i(TAG, "Detector: ${container.id}/${model.id}")
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to open detector ${container.id}/${model.id}", t)
+            EidoraLog.e(TAG, "Failed to open detector ${container.id}/${model.id}", t)
             null
         }
     }
@@ -43,10 +43,10 @@ object SelectedModelResolver {
             resolve(context, ContainerManifest.TASK_EMBEDDING) ?: return null
         return try {
             val embedder = ContainerModelRunner.openEmbedder(context, container.dir, model)
-            Log.i(TAG, "Embedder: ${container.id}/${model.id}")
+            EidoraLog.i(TAG, "Embedder: ${container.id}/${model.id}")
             EmbedderHandle(embedder, model.clustering, container.id, model.id)
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to open embedder ${container.id}/${model.id}", t)
+            EidoraLog.e(TAG, "Failed to open embedder ${container.id}/${model.id}", t)
             null
         }
     }
@@ -84,7 +84,7 @@ object SelectedModelResolver {
                 it.id == selected.modelId && it.task == task
             }
             if (c != null && m != null) return c to m
-            Log.w(TAG, "Stored $task selection ${selected.containerId}/${selected.modelId} " +
+            EidoraLog.w(TAG, "Stored $task selection ${selected.containerId}/${selected.modelId} " +
                 "not found; falling back to free container")
         }
 

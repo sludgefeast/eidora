@@ -3,6 +3,8 @@
 
 package org.eidora.worker
 
+import org.eidora.util.EidoraLog
+
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -20,7 +22,7 @@ import kotlinx.coroutines.CancellationException
  * ```
  * } catch (t: Throwable) {
  *     t.rethrowIfCancellation()
- *     Log.w(TAG, "…", t)
+ *     EidoraLog.w(TAG, "…", t)
  * }
  * ```
  */

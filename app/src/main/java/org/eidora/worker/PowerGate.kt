@@ -8,7 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.PowerManager
-import android.util.Log
+import org.eidora.util.EidoraLog
 import kotlinx.coroutines.delay
 
 private const val TAG = "PowerGate"
@@ -177,7 +177,7 @@ class PowerGate(
             val reason = (result as PowerGateResult.Blocked).reason
             // Log only the first block and then occasionally - a pause can last
             // for many minutes and would otherwise flood the log.
-            if (waits == 0 || waits % 20 == 0) Log.i(TAG, reason)
+            if (waits == 0 || waits % 20 == 0) EidoraLog.i(TAG, reason)
             onWait(reason, false)
             waits++
             delay(backoffDelayMs(waits))

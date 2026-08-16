@@ -3,6 +3,8 @@
 
 package org.eidora.ui.fullscreen
 
+import org.eidora.util.EidoraLog
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -142,7 +144,7 @@ fun FullscreenPhotoScreen(
                         coil.memory.MemoryCache.Key(file.absolutePath),
                     )
                 } catch (t: Throwable) {
-                    android.util.Log.e("FullscreenPhoto", "Failed to save rotation", t)
+                    EidoraLog.e("FullscreenPhoto", "Failed to save rotation", t)
                 }
             }
             // Bump imageKey to force Coil to reload the file. The visual

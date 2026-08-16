@@ -4,7 +4,7 @@
 package org.eidora.worker
 
 import android.content.Context
-import android.util.Log
+import org.eidora.util.EidoraLog
 import androidx.work.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,7 +40,7 @@ class EmbeddingWorker(
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     override suspend fun doWork(): Result {
         if (!org.eidora.util.PermissionChecker.hasWorkerPermissions(applicationContext)) {
-            Log.w(TAG, "Missing media/all-files permission – aborting embedding calculation")
+            EidoraLog.w(TAG, "Missing media/all-files permission – aborting embedding calculation")
             return Result.failure()
         }
         val db = DatabaseProvider.getInstance(applicationContext)
@@ -50,18 +50,18 @@ class EmbeddingWorker(
         // The free container is downloaded only after explicit user consent. If
         // it isn't present yet, end quietly – the UI prompts for the download.
         if (!org.eidora.ml.container.ContainerDownloader.isFreeContainerReady(applicationContext)) {
-            Log.i(TAG, "Model container not ready yet – skipping embedding run")
+            EidoraLog.i(TAG, "Model container not ready yet – skipping embedding run")
             return Result.success()
         }
 
         val handle =
             org.eidora.ml.container.SelectedModelResolver.openEmbedder(applicationContext)
         if (handle == null) {
-            Log.e(TAG, "Failed to initialize embedding model from selected container")
+            EidoraLog.e(TAG, "Failed to initialize embedding model from selected container")
             return Result.failure()
         }
         val model = handle.embedder
-        Log.i(TAG, "Embedding model initialized on backend: ${model.backend}")
+        EidoraLog.i(TAG, "Embedding model initialized on backend: ${model.backend}")
 
         return withWakeLock(applicationContext, TAG) {
             try {
@@ -75,7 +75,7 @@ class EmbeddingWorker(
                 SyncPipeline.enqueueClustering(applicationContext)
                 return@withWakeLock Result.success()
             }
-            Log.i(TAG, "Starting embedding run for $total faces")
+            EidoraLog.i(TAG, "Starting embedding run for $total faces")
 
             val timer = RunTimer(TAG, "Embedding ($total faces)")
             val pauseManual = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -206,13 +206,13 @@ class EmbeddingWorker(
                                     val coords = face.regionJson.toFaceRegionCoords()
                                     ThumbnailHelper.cropForEmbedding(photoFile, coords)
                                 } catch (t: Throwable) {
-                                    Log.e(TAG, "Failed to prepare face ${face.id}, marking failed", t)
+                                    EidoraLog.e(TAG, "Failed to prepare face ${face.id}, marking failed", t)
                                     // Permanent failure: mark it so clustering stops
                                     // waiting for this face's embedding.
                                     try {
                                         faceDao.markEmbeddingFailed(face.id)
                                     } catch (inner: Throwable) {
-                                        Log.w(TAG, "Could not mark face ${face.id} failed", inner)
+                                        EidoraLog.w(TAG, "Could not mark face ${face.id} failed", inner)
                                     }
                                     null
                                 }
@@ -239,14 +239,14 @@ class EmbeddingWorker(
                                 val blended = prev * 0.667f + refined * 0.333f
                                 faceDao.updateQualityScore(face.id, blended)
                             } catch (t: Throwable) {
-                                Log.w(TAG, "Quality score refinement failed for ${face.id}", t)
+                                EidoraLog.w(TAG, "Quality score refinement failed for ${face.id}", t)
                             }
                         } catch (t: Throwable) {
-                            Log.e(TAG, "Failed embedding for face ${face.id}, marking failed", t)
+                            EidoraLog.e(TAG, "Failed embedding for face ${face.id}, marking failed", t)
                             try {
                                 faceDao.markEmbeddingFailed(face.id)
                             } catch (inner: Throwable) {
-                                Log.w(TAG, "Could not mark face ${face.id} failed", inner)
+                                EidoraLog.w(TAG, "Could not mark face ${face.id} failed", inner)
                             }
                         } finally {
                             bitmap.recycle()
@@ -256,7 +256,7 @@ class EmbeddingWorker(
                         // log (every item would flood the ring buffer; every 500
                         // keeps a readable trail across a long run).
                         if (current % 500 == 0) {
-                            Log.i(TAG, "Embeddings progress: $current / $total")
+                            EidoraLog.i(TAG, "Embeddings progress: $current / $total")
                         }
                         setProgress(
                             workDataOf(
@@ -273,7 +273,7 @@ class EmbeddingWorker(
             }
 
             timer.finish(done.get())
-            Log.i(TAG, "Embedding run finished: ${done.get()} / $total processed")
+            EidoraLog.i(TAG, "Embedding run finished: ${done.get()} / $total processed")
             // Chain clustering after embeddings so a first-run sync (faces come
             // from XMP metadata, then get embedded) also computes centroids and
             // representative faces. The WorkManager chain ends at embedding, and
@@ -284,13 +284,13 @@ class EmbeddingWorker(
             Result.success()
         } catch (t: Throwable) {
             t.rethrowIfCancellation()
-            Log.e(TAG, "Unhandled error in EmbeddingWorker", t)
+            EidoraLog.e(TAG, "Unhandled error in EmbeddingWorker", t)
             Result.failure()
         } finally {
             try {
                 model.close()
             } catch (t: Throwable) {
-                Log.w(TAG, "Error closing model", t)
+                EidoraLog.w(TAG, "Error closing model", t)
             }
             try {
                 androidx.core.app.NotificationManagerCompat

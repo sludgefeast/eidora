@@ -4,7 +4,7 @@
 package org.eidora.ml.container
 
 import android.content.Context
-import android.util.Log
+import org.eidora.util.EidoraLog
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -221,7 +221,7 @@ object ContainerDownloader {
             if (expectedSha256 != null) {
                 val actual = sha256Hex(tmpZip)
                 if (!actual.equals(expectedSha256, ignoreCase = true)) {
-                    Log.e(TAG, "Container hash mismatch: expected $expectedSha256, got $actual")
+                    EidoraLog.e(TAG, "Container hash mismatch: expected $expectedSha256, got $actual")
                     return Result.HashMismatch
                 }
             }
@@ -247,7 +247,7 @@ object ContainerDownloader {
                 return Result.Invalid("could not unpack container: ${e.message}")
             }
 
-            Log.i(TAG, "Container '${manifest.container.id}' unpacked to $dir")
+            EidoraLog.i(TAG, "Container '${manifest.container.id}' unpacked to $dir")
             return Result.Success(manifest, dir)
         } finally {
             tmpZip.delete()
@@ -291,7 +291,7 @@ object ContainerDownloader {
             }
             FetchOutcome.Ok
         } catch (t: Throwable) {
-            Log.e(TAG, "Container download failed", t)
+            EidoraLog.e(TAG, "Container download failed", t)
             FetchOutcome.Network(t.message ?: "network error")
         }
     }

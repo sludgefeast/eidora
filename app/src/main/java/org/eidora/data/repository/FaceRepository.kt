@@ -4,7 +4,7 @@
 package org.eidora.data.repository
 
 import android.content.Context
-import android.util.Log
+import org.eidora.util.EidoraLog
 import kotlinx.coroutines.flow.Flow
 import org.eidora.data.db.*
 import org.eidora.ml.EmbeddingModel
@@ -291,11 +291,11 @@ class FaceRepository(
      */
     suspend fun resetFoldersForRedetection(folders: List<String>) {
         if (folders.isEmpty()) {
-            Log.w(tag, "resetFoldersForRedetection called with no folders; nothing to do")
+            EidoraLog.w(tag, "resetFoldersForRedetection called with no folders; nothing to do")
             return
         }
         val photos = photoDao.getInFolders(folders)
-        Log.i(tag, "resetFoldersForRedetection: ${photos.size} photos in $folders")
+        EidoraLog.i(tag, "resetFoldersForRedetection: ${photos.size} photos in $folders")
         var xmpCleared = 0
         photos.forEach { photo ->
             try {
@@ -311,14 +311,14 @@ class FaceRepository(
                     xmpCleared++
                 }
             } catch (t: Throwable) {
-                Log.w(tag, "Reset failed for ${photo.path}", t)
+                EidoraLog.w(tag, "Reset failed for ${photo.path}", t)
             }
         }
         // Remove any persons left without a face (orphaned by the deletions).
         personDao.deleteOrphaned()
         // Straight to detection: no metadata left for triage to import.
         photoDao.updateStagesInFolders(folders, org.eidora.data.db.PhotoStage.NEEDS_DETECTION)
-        Log.i(tag, "resetFoldersForRedetection done: XMP cleared on $xmpCleared files → NEEDS_DETECTION")
+        EidoraLog.i(tag, "resetFoldersForRedetection done: XMP cleared on $xmpCleared files → NEEDS_DETECTION")
     }
 
     private suspend fun resetEverything() {
@@ -341,7 +341,7 @@ class FaceRepository(
                     photoDao.updateModifiedAt(photo.id, file.lastModified())
                 }
             } catch (t: Throwable) {
-                Log.w(tag, "XMP clear failed for ${photo.path}", t)
+                EidoraLog.w(tag, "XMP clear failed for ${photo.path}", t)
             }
             photoDao.updateAnalyzed(photo.id, false)
         }

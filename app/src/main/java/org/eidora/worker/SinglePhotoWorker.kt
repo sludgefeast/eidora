@@ -4,7 +4,7 @@
 package org.eidora.worker
 
 import android.content.Context
-import android.util.Log
+import org.eidora.util.EidoraLog
 import androidx.work.CoroutineWorker
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
@@ -35,7 +35,7 @@ class SinglePhotoWorker(
             try {
                 photoDao.findById(photoId)
             } catch (t: Throwable) {
-                Log.e(TAG, "Failed to find photo $photoId", t)
+                EidoraLog.e(TAG, "Failed to find photo $photoId", t)
                 return Result.failure()
             } ?: return Result.success()
 
@@ -46,7 +46,7 @@ class SinglePhotoWorker(
                 photoDao.deleteById(photoId)
                 personDao.deleteOrphaned()
             } catch (t: Throwable) {
-                Log.e(TAG, "Failed to delete missing photo", t)
+                EidoraLog.e(TAG, "Failed to delete missing photo", t)
             }
             return Result.success()
         }
@@ -62,7 +62,7 @@ class SinglePhotoWorker(
             }
         } catch (t: Throwable) {
             t.rethrowIfCancellation()
-            Log.e(TAG, "Failed to re-sync ${file.name}", t)
+            EidoraLog.e(TAG, "Failed to re-sync ${file.name}", t)
         }
         return Result.success()
     }

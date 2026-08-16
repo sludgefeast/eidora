@@ -5,7 +5,7 @@ package org.eidora.worker
 
 import android.content.Context
 import android.os.PowerManager
-import android.util.Log
+import org.eidora.util.EidoraLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -49,12 +49,12 @@ suspend fun <T> withWakeLock(
                 try {
                     wakeLock.acquire(RENEW_TIMEOUT_MS)
                 } catch (t: Throwable) {
-                    Log.w(tag, "Wake lock acquire failed", t)
+                    EidoraLog.w(tag, "Wake lock acquire failed", t)
                 }
                 delay(RENEW_INTERVAL_MS)
             }
         }
-    Log.i(tag, "Wake lock acquired")
+    EidoraLog.i(tag, "Wake lock acquired")
 
     try {
         return block()
@@ -65,9 +65,9 @@ suspend fun <T> withWakeLock(
             while (wakeLock.isHeld) {
                 wakeLock.release()
             }
-            Log.i(tag, "Wake lock released")
+            EidoraLog.i(tag, "Wake lock released")
         } catch (t: Throwable) {
-            Log.w(tag, "Wake lock release failed", t)
+            EidoraLog.w(tag, "Wake lock release failed", t)
         }
     }
 }

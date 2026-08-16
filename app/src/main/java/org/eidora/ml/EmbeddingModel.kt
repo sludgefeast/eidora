@@ -5,7 +5,7 @@ package org.eidora.ml
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.util.Log
+import org.eidora.util.EidoraLog
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.tensorflow.lite.Interpreter
@@ -57,7 +57,7 @@ class EmbeddingModel private constructor(
     val backend: String = loaded.backend
 
     init {
-        Log.i(TAG, "Embedding model '$label' initialized on $backend " +
+        EidoraLog.i(TAG, "Embedding model '$label' initialized on $backend " +
             "(input $inputSize, dim $embeddingDim)")
     }
 

@@ -4,7 +4,7 @@
 package org.eidora.worker
 
 import android.content.Context
-import android.util.Log
+import org.eidora.util.EidoraLog
 import androidx.work.*
 import androidx.work.WorkInfo
 import org.eidora.data.db.DatabaseProvider
@@ -89,7 +89,7 @@ class ClusteringWorker(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!org.eidora.util.PermissionChecker.hasWorkerPermissions(applicationContext)) {
-            Log.w(TAG, "Missing media/all-files permission – aborting clustering")
+            EidoraLog.w(TAG, "Missing media/all-files permission – aborting clustering")
             return Result.failure()
         }
         val db = DatabaseProvider.getInstance(applicationContext)
@@ -118,12 +118,12 @@ class ClusteringWorker(
                 // embedding phase can't make clustering retry forever. Faces
                 // whose embedding failed permanently are already excluded by
                 // findWithoutEmbedding (embedding_failed = 1).
-                Log.w(TAG, "${pendingEmbeddings.size} faces still missing embeddings (attempt $runAttemptCount)")
+                EidoraLog.w(TAG, "${pendingEmbeddings.size} faces still missing embeddings (attempt $runAttemptCount)")
                 if (runAttemptCount < MAX_EMBEDDING_WAIT_ATTEMPTS) {
                     SyncPipeline.enqueue(applicationContext)
                     return Result.retry()
                 }
-                Log.w(TAG, "Proceeding with clustering despite ${pendingEmbeddings.size} missing embeddings")
+                EidoraLog.w(TAG, "Proceeding with clustering despite ${pendingEmbeddings.size} missing embeddings")
             }
 
             val timeWeight = config.timeWeight
@@ -145,7 +145,7 @@ class ClusteringWorker(
             if (personData.isNotEmpty() && unknownFacesAll.isNotEmpty()) {
                 for ((index, face) in unknownFacesAll.withIndex()) {
                     if (isStopped) {
-                        Log.i(TAG, "Clustering was cancelled at index $index, exiting")
+                        EidoraLog.i(TAG, "Clustering was cancelled at index $index, exiting")
                         return Result.failure()
                     }
                     if (index % 50 == 0 && index > 0) {
@@ -230,7 +230,7 @@ class ClusteringWorker(
                             }
                         if (assigned) individuallyAssigned.add(face.faceRegion.id)
                     } catch (t: Throwable) {
-                        Log.w(TAG, "Individual match failed for face ${face.faceRegion.id}", t)
+                        EidoraLog.w(TAG, "Individual match failed for face ${face.faceRegion.id}", t)
                     }
                     if (index % 10 == 0) {
                         val phaseProgress = (index * 30) / unknownFacesAll.size
@@ -244,7 +244,7 @@ class ClusteringWorker(
                         )
                     }
                 }
-                Log.i(TAG, "Individually assigned ${individuallyAssigned.size} faces to existing persons")
+                EidoraLog.i(TAG, "Individually assigned ${individuallyAssigned.size} faces to existing persons")
                 // Diagnostics for threshold tuning: distribution of the best
                 // k-NN distance to any named person, over all unknown faces.
                 // autoMatched = assigned+confirmed below the auto threshold;
@@ -255,7 +255,7 @@ class ClusteringWorker(
                         "${b / 10f}-${(b + 1) / 10f}:${distBuckets[b]}"
                     }
                 val suggestThr = config.individualMatchThreshold * (1f + SUGGEST_THRESHOLD_MARGIN)
-                Log.i(
+                EidoraLog.i(
                     TAG,
                     "kNN distance histogram (auto=${config.individualMatchThreshold}, " +
                         "suggest=$suggestThr): $histogram | " +
@@ -290,7 +290,7 @@ class ClusteringWorker(
                 } catch (
                     t: Throwable,
                 ) {
-                    Log.e(TAG, "Failed to recompute centroids", t)
+                    EidoraLog.e(TAG, "Failed to recompute centroids", t)
                 }
                 reportProgress(100, applicationContext.getString(org.eidora.R.string.notif_done))
                 return Result.success()
@@ -302,7 +302,7 @@ class ClusteringWorker(
                 try {
                     ChineseWhispers.cluster(candidates, config.edgeThreshold, candidateTakenAt, timeWeight)
                 } catch (t: Throwable) {
-                    Log.e(TAG, "Clustering algorithm failed", t)
+                    EidoraLog.e(TAG, "Clustering algorithm failed", t)
                     return Result.failure()
                 }
             reportProgress(40, applicationContext.getString(org.eidora.R.string.notif_grouping_done))
@@ -338,10 +338,10 @@ class ClusteringWorker(
                         }
                     }
                 } catch (t: Throwable) {
-                    Log.w(TAG, "Failed to load existing suggestions", t)
+                    EidoraLog.w(TAG, "Failed to load existing suggestions", t)
                     emptyList()
                 }
-            Log.i(TAG, "Loaded ${existingSuggestions.size} existing suggestions for merge check")
+            EidoraLog.i(TAG, "Loaded ${existingSuggestions.size} existing suggestions for merge check")
 
             val clusterGroups = clusterResults.groupBy { it.clusterId }
             val totalClusters = clusterGroups.size
@@ -384,7 +384,7 @@ class ClusteringWorker(
             // O(clusters²) on centroids only; capped for safety on huge counts.
             val pureClusterIds: Set<Int> =
                 if (infos.size > MAX_CLUSTERS_FOR_PURITY) {
-                    Log.w(TAG, "Too many clusters (${infos.size}) for purity check; skipping it")
+                    EidoraLog.w(TAG, "Too many clusters (${infos.size}) for purity check; skipping it")
                     infos.map { it.clusterId }.toSet()
                 } else {
                     infos
@@ -421,7 +421,7 @@ class ClusteringWorker(
                         covered += ci.size
                     }
                 }
-            Log.i(
+            EidoraLog.i(
                 TAG,
                 "Cluster selection: ${infos.size} eligible, ${pureClusterIds.size} pure, " +
                     "${selectedIds.size} selected covering $covered/$unknownTotal unknown " +
@@ -473,7 +473,7 @@ class ClusteringWorker(
                                 bestPerson = personDao.findById(personId)
                             }
                         } catch (t: Throwable) {
-                            Log.w(TAG, "Error comparing person $personId", t)
+                            EidoraLog.w(TAG, "Error comparing person $personId", t)
                         }
                     }
 
@@ -499,7 +499,7 @@ class ClusteringWorker(
                                         bestSuggestion = sd.person
                                     }
                                 } catch (t: Throwable) {
-                                    Log.w(TAG, "Error comparing suggestion ${sd.person.id}", t)
+                                    EidoraLog.w(TAG, "Error comparing suggestion ${sd.person.id}", t)
                                 }
                             }
                             bestSuggestion ?: run {
@@ -515,11 +515,11 @@ class ClusteringWorker(
                         } catch (
                             t: Throwable,
                         ) {
-                            Log.w(TAG, "Failed to assign face ${result.faceRegionId}", t)
+                            EidoraLog.w(TAG, "Failed to assign face ${result.faceRegionId}", t)
                         }
                     }
                 } catch (t: Throwable) {
-                    Log.e(TAG, "Failed to process cluster, skipping", t)
+                    EidoraLog.e(TAG, "Failed to process cluster, skipping", t)
                 }
 
                 val phaseProgress = 40 + ((index + 1) * 40) / totalClusters.coerceAtLeast(1)
@@ -534,7 +534,7 @@ class ClusteringWorker(
             }
 
             if (skippedBelowMin > 0) {
-                Log.i(
+                EidoraLog.i(
                     TAG,
                     "Skipped $skippedBelowMin clusters below minimum size " +
                         "(${config.minClusterSize}) — mostly singletons that didn't group",
@@ -551,14 +551,14 @@ class ClusteringWorker(
                     )
                 }
             } catch (t: Throwable) {
-                Log.e(TAG, "Failed to recompute centroids", t)
+                EidoraLog.e(TAG, "Failed to recompute centroids", t)
             }
 
             reportProgress(100, applicationContext.getString(org.eidora.R.string.notif_done))
             return Result.success()
         } catch (t: Throwable) {
             t.rethrowIfCancellation()
-            Log.e(TAG, "Unhandled error in ClusteringWorker", t)
+            EidoraLog.e(TAG, "Unhandled error in ClusteringWorker", t)
             return Result.failure()
         } finally {
             try {
@@ -625,7 +625,7 @@ class ClusteringWorker(
             if (!syncRunning) return true
             if (!waited) {
                 waited = true
-                Log.i(TAG, "Sync is active – clustering waiting")
+                EidoraLog.i(TAG, "Sync is active – clustering waiting")
                 try {
                     setForeground(
                         NotificationHelper.clusteringForegroundInfo(
@@ -654,11 +654,11 @@ class ClusteringWorker(
         if (!rejectSuggestions && !removeUnconfirmed) return
         val repo = org.eidora.data.repository.FaceRepository(applicationContext, db)
         if (rejectSuggestions) {
-            Log.i(TAG, "Pre-clustering: rejecting all suggestions")
+            EidoraLog.i(TAG, "Pre-clustering: rejecting all suggestions")
             repo.rejectAllSuggestions()
         }
         if (removeUnconfirmed) {
-            Log.i(TAG, "Pre-clustering: removing unconfirmed faces from persons")
+            EidoraLog.i(TAG, "Pre-clustering: removing unconfirmed faces from persons")
             personDao.getAll().forEach { person -> repo.removeUnconfirmedFaces(person.id) }
         }
     }
@@ -668,7 +668,7 @@ class ClusteringWorker(
             org.eidora.data.settings.SettingsProvider.get(applicationContext).getClusteringConfig()
         } catch (t: Throwable) {
             t.rethrowIfCancellation()
-            Log.w(TAG, "Failed to load clustering config, using defaults", t)
+            EidoraLog.w(TAG, "Failed to load clustering config, using defaults", t)
             org.eidora.data.settings.ClusteringConfig(
                 edgeThreshold = 0.30f,
                 clusterMatchThreshold = 0.30f,
@@ -765,7 +765,7 @@ class ClusteringWorker(
                     personDao.updateRepresentativeFace(person.id, representative?.id)
                 }
             } catch (t: Throwable) {
-                Log.w(TAG, "Failed to recompute centroid for person ${person.id}", t)
+                EidoraLog.w(TAG, "Failed to recompute centroid for person ${person.id}", t)
             }
             onProgress(((index + 1) * 100) / persons.size.coerceAtLeast(1))
         }

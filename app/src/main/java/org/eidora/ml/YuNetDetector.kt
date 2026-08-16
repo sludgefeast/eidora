@@ -5,7 +5,7 @@ package org.eidora.ml
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.util.Log
+import org.eidora.util.EidoraLog
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.tensorflow.lite.Interpreter
@@ -60,7 +60,7 @@ class YuNetDetector private constructor(
 
     init {
         strideOutputs = resolveOutputIndices()
-        Log.i(TAG, "YuNet initialized on $backend, outputs: $strideOutputs")
+        EidoraLog.i(TAG, "YuNet initialized on $backend, outputs: $strideOutputs")
     }
 
     /** Legacy construction: loads the free YuNet from filesDir by spec filename. */

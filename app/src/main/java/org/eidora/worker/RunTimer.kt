@@ -3,7 +3,7 @@
 
 package org.eidora.worker
 
-import android.util.Log
+import org.eidora.util.EidoraLog
 import java.util.UUID
 
 /**
@@ -33,7 +33,7 @@ class RunTimer(
     private var pauseIsManual = false
 
     init {
-        Log.i(tag, "[$runId] $label started")
+        EidoraLog.i(tag, "[$runId] $label started")
     }
 
     /** Mark the beginning of a pause. [manual] true = user pause, false = PowerGate. */
@@ -66,7 +66,7 @@ class RunTimer(
         val totalMs = System.currentTimeMillis() - startedAtMs
         val pausedMs = manualPausedMs + powerPausedMs
         val netMs = (totalMs - pausedMs).coerceAtLeast(0)
-        Log.i(
+        EidoraLog.i(
             tag,
             "[$runId] $label finished: $itemsProcessed items in ${fmt(netMs)} net " +
                 "(total ${fmt(totalMs)}, paused ${fmt(pausedMs)} = " +

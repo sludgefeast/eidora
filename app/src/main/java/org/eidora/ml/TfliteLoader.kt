@@ -3,7 +3,7 @@
 
 package org.eidora.ml
 
-import android.util.Log
+import org.eidora.util.EidoraLog
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
@@ -58,7 +58,7 @@ object TfliteLoader {
             val options = Interpreter.Options().addDelegate(delegate)
             Pair(Interpreter(buffer, options), delegate)
         } catch (t: Throwable) {
-            Log.w(TAG, "GPU delegate init failed, falling back to CPU", t)
+            EidoraLog.w(TAG, "GPU delegate init failed, falling back to CPU", t)
             null
         }
     }

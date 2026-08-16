@@ -4,7 +4,7 @@
 package org.eidora.ml.container
 
 import android.content.Context
-import android.util.Log
+import org.eidora.util.EidoraLog
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
@@ -53,7 +53,7 @@ object ContainerStore {
                     try {
                         manifestFile.inputStream().use { ContainerManifestParser.parse(it) }
                     } catch (t: Throwable) {
-                        Log.w(TAG, "Skipping unreadable container in ${dir.name}: ${t.message}")
+                        EidoraLog.w(TAG, "Skipping unreadable container in ${dir.name}: ${t.message}")
                         return@mapNotNull null
                     }
                 InstalledContainer(
@@ -144,7 +144,7 @@ object ContainerStore {
                 }
             }
 
-            Log.i(TAG, "Imported container '${manifest.container.id}'")
+            EidoraLog.i(TAG, "Imported container '${manifest.container.id}'")
             return ImportResult.Success(
                 InstalledContainer(
                     id = manifest.container.id,
@@ -164,7 +164,7 @@ object ContainerStore {
      */
     fun deleteContainer(context: Context, containerId: String): Boolean {
         if (containerId == ContainerDownloader.FREE_CONTAINER_ID) {
-            Log.w(TAG, "Refusing to delete the protected free container")
+            EidoraLog.w(TAG, "Refusing to delete the protected free container")
             return false
         }
         val dir = ContainerDownloader.containerDir(context, containerId)
@@ -180,7 +180,7 @@ object ContainerStore {
      */
     fun deleteModel(context: Context, containerId: String, modelId: String): Boolean {
         if (containerId == ContainerDownloader.FREE_CONTAINER_ID) {
-            Log.w(TAG, "Refusing to modify the protected free container")
+            EidoraLog.w(TAG, "Refusing to modify the protected free container")
             return false
         }
         val dir = ContainerDownloader.containerDir(context, containerId)
@@ -191,7 +191,7 @@ object ContainerStore {
             try {
                 manifestFile.inputStream().use { ContainerManifestParser.parse(it) }
             } catch (t: Throwable) {
-                Log.w(TAG, "Cannot parse manifest to delete model: ${t.message}")
+                EidoraLog.w(TAG, "Cannot parse manifest to delete model: ${t.message}")
                 return false
             }
 
@@ -233,7 +233,7 @@ object ContainerStore {
             manifestFile.writer().use { yaml.dump(root, it) }
             true
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to rewrite manifest", t)
+            EidoraLog.e(TAG, "Failed to rewrite manifest", t)
             false
         }
     }
