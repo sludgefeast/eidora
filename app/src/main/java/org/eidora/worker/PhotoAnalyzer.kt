@@ -11,6 +11,7 @@ import org.eidora.data.db.PersonEntity
 import org.eidora.data.db.PhotoEntity
 import org.eidora.data.db.PhotoStage
 import org.eidora.domain.model.FaceRegionCoords
+import org.eidora.ml.DetectedFace
 import org.eidora.ml.FaceDetector
 import org.eidora.util.BitmapLoader
 import org.eidora.util.FaceQuality
@@ -121,23 +122,71 @@ class PhotoAnalyzer(
             return PhotoStage.NEEDS_DETECTION
         }
 
+        // XMP regions carry only a box, no landmarks — but alignment needs the
+        // five landmarks. Detect the whole image once and later match each XMP
+        // box to the detected face it overlaps most, borrowing its landmarks
+        // (Weg A/C). If our detector doesn't find a given face, that region
+        // simply stays landmark-less and falls back to the un-aligned crop.
+        val detectedForLandmarks: List<DetectedFace> =
+            try {
+                val det = ensureDetector()
+                val bmp = BitmapLoader.loadOrientedBitmap(file, maxSize = 2048)
+                if (det != null && bmp != null) {
+                    val faces = det.detect(bmp)
+                    val w = bmp.width.toFloat()
+                    val h = bmp.height.toFloat()
+                    bmp.recycle()
+                    // Precompute each detected face's normalized box + landmarks.
+                    faces.map { f ->
+                        f.copy(
+                            xMin = f.xMin / w,
+                            yMin = f.yMin / h,
+                            width = f.width / w,
+                            height = f.height / h,
+                            landmarks =
+                                f.landmarks?.let { lm ->
+                                    FloatArray(lm.size) { i ->
+                                        if (i % 2 == 0) lm[i] / w else lm[i] / h
+                                    }
+                                },
+                        )
+                    }
+                } else {
+                    emptyList()
+                }
+            } catch (t: Throwable) {
+                t.rethrowIfCancellation()
+                EidoraLog.w(TAG, "XMP landmark detection failed for ${file.name}", t)
+                emptyList()
+            }
+
         xmpRegions.forEach { xmpRegion ->
             try {
                 val faceId = UUID.randomUUID().toString()
                 val person = xmpRegion.name?.let { name -> findOrCreatePerson(name) }
-                val qualityScore = FaceQuality.computeFast(xmpRegion.coords, rotationRad = null)
+                // Borrow landmarks from the detected face overlapping this XMP box
+                // most (if any passes a minimum overlap), so it can be aligned.
+                val matchedLandmarks =
+                    bestOverlapLandmarks(xmpRegion.coords, detectedForLandmarks)
+                val coords =
+                    if (matchedLandmarks != null) {
+                        xmpRegion.coords.copy(landmarks = matchedLandmarks)
+                    } else {
+                        xmpRegion.coords
+                    }
+                val qualityScore = FaceQuality.computeFast(coords, rotationRad = null)
                 faceDao.insert(
                     FaceRegionEntity(
                         id = faceId,
                         photoId = photoId,
                         personId = person?.id,
                         name = xmpRegion.name,
-                        regionJson = xmpRegion.coords.toJson(),
+                        regionJson = coords.toJson(),
                         ignored = false,
                         qualityScore = qualityScore,
                     ),
                 )
-                ThumbnailHelper.createThumbnail(context, file, xmpRegion.coords, faceId)
+                ThumbnailHelper.createThumbnail(context, file, coords, faceId)
             } catch (t: Throwable) {
                 t.rethrowIfCancellation()
                 EidoraLog.e(TAG, "Failed to import XMP region", t)
@@ -211,6 +260,14 @@ class PhotoAnalyzer(
                             y = (face.yMin + face.height / 2f) / srcH,
                             w = face.width / srcW,
                             h = face.height / srcH,
+                            // Normalize the detector's source-pixel landmarks to
+                            // [0..1] so they survive resize/rotation like the box.
+                            landmarks =
+                                face.landmarks?.let { lm ->
+                                    List(lm.size) { idx ->
+                                        if (idx % 2 == 0) lm[idx] / srcW else lm[idx] / srcH
+                                    }
+                                },
                         )
                     val faceId = UUID.randomUUID().toString()
                     val qualityScore = FaceQuality.computeFast(coords, face.rotationRadians)
@@ -293,7 +350,54 @@ class PhotoAnalyzer(
         faceDao.deleteByPhotoId(photoId)
     }
 
+    /**
+     * Returns the landmarks of the detected face whose box overlaps [xmpBox]
+     * most (by IoU), provided the overlap clears a minimum and that face has
+     * landmarks. Both boxes are normalized; FaceRegionCoords stores x,y as the
+     * CENTER, so convert to edges first. Returns null when nothing overlaps well
+     * enough — the region then stays landmark-less and uses the un-aligned crop.
+     */
+    private fun bestOverlapLandmarks(
+        xmpBox: FaceRegionCoords,
+        detected: List<DetectedFace>,
+    ): List<Float>? {
+        if (detected.isEmpty()) return null
+        val aL = xmpBox.x - xmpBox.w / 2f
+        val aT = xmpBox.y - xmpBox.h / 2f
+        val aR = xmpBox.x + xmpBox.w / 2f
+        val aB = xmpBox.y + xmpBox.h / 2f
+        var bestIou = MIN_XMP_OVERLAP
+        var bestLm: List<Float>? = null
+        detected.forEach { d ->
+            val lm = d.landmarks ?: return@forEach
+            // Detected face box is normalized with xMin/yMin as the top-left.
+            val bL = d.xMin
+            val bT = d.yMin
+            val bR = d.xMin + d.width
+            val bB = d.yMin + d.height
+            val interL = maxOf(aL, bL)
+            val interT = maxOf(aT, bT)
+            val interR = minOf(aR, bR)
+            val interB = minOf(aB, bB)
+            val iw = interR - interL
+            val ih = interB - interT
+            if (iw <= 0f || ih <= 0f) return@forEach
+            val inter = iw * ih
+            val union = xmpBox.w * xmpBox.h + d.width * d.height - inter
+            val iou = if (union <= 0f) 0f else inter / union
+            if (iou > bestIou) {
+                bestIou = iou
+                bestLm = lm.toList()
+            }
+        }
+        return bestLm
+    }
+
     companion object {
         private const val TAG = "PhotoAnalyzer"
+
+        // Minimum IoU for an XMP box to adopt a detected face's landmarks. Below
+        // this the match is too weak to trust, and the region stays un-aligned.
+        private const val MIN_XMP_OVERLAP = 0.3f
     }
 }

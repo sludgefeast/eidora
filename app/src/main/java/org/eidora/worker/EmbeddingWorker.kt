@@ -204,7 +204,7 @@ class EmbeddingWorker(
                                     val photoFile = File(photo.path)
                                     if (!photoFile.exists()) return@flow
                                     val coords = face.regionJson.toFaceRegionCoords()
-                                    ThumbnailHelper.cropForEmbedding(photoFile, coords)
+                                    ThumbnailHelper.alignForEmbedding(photoFile, coords)
                                 } catch (t: Throwable) {
                                     EidoraLog.e(TAG, "Failed to prepare face ${face.id}, marking failed", t)
                                     // Permanent failure: mark it so clustering stops

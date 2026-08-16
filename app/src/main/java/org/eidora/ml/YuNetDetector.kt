@@ -263,6 +263,7 @@ class YuNetDetector private constructor(
         val clsBuf = outputs.getValue(idx.cls)
         val objBuf = outputs.getValue(idx.obj)
         val bboxBuf = outputs.getValue(idx.bbox)
+        val kpsBuf = outputs.getValue(idx.kps)
 
         for (row in 0 until grid) {
             for (colIdx in 0 until grid) {
@@ -296,6 +297,18 @@ class YuNetDetector private constructor(
                 val hClamped = min(hSrc, srcH - yMin)
                 if (wClamped <= 1f || hClamped <= 1f) continue
 
+                // Decode the 5 landmarks (right eye, left eye, nose, right
+                // mouth, left mouth). YuNet stores each as an offset from the
+                // cell origin in stride units; map to letterbox then to source
+                // pixels with the same transform as the bbox.
+                val lm = FloatArray(10)
+                for (k in 0 until 5) {
+                    val lxCell = (colIdx + floatAt(kpsBuf, cell, k * 2, 10)) * stride
+                    val lyCell = (row + floatAt(kpsBuf, cell, k * 2 + 1, 10)) * stride
+                    lm[k * 2] = ((lxCell - dx) / scale).coerceIn(0f, srcW.toFloat())
+                    lm[k * 2 + 1] = ((lyCell - dy) / scale).coerceIn(0f, srcH.toFloat())
+                }
+
                 out.add(
                     DetectedFace(
                         xMin = xMin,
@@ -304,6 +317,7 @@ class YuNetDetector private constructor(
                         height = hClamped,
                         rotationRadians = 0f, // YuNet does not output roll
                         score = score,
+                        landmarks = lm,
                     ),
                 )
             }

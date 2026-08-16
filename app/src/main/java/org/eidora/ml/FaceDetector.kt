@@ -23,7 +23,46 @@ data class DetectedFace(
     val height: Float,
     val rotationRadians: Float,
     val score: Float,
-)
+    /**
+     * Five facial landmarks in source-image pixel coordinates, 10 floats:
+     * x0,y0,…,x4,y4 in order right eye, left eye, nose, right mouth, left mouth.
+     * Null when the detector doesn't provide them. Used to align the face to the
+     * embedder's canonical template before computing its embedding.
+     */
+    val landmarks: FloatArray? = null,
+) {
+    // Data class with a FloatArray needs explicit equals/hashCode so faces
+    // compare by landmark contents, not array identity.
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is DetectedFace) return false
+        return xMin == other.xMin &&
+            yMin == other.yMin &&
+            width == other.width &&
+            height == other.height &&
+            rotationRadians == other.rotationRadians &&
+            score == other.score &&
+            landmarks.contentEqualsNullable(other.landmarks)
+    }
+
+    override fun hashCode(): Int {
+        var result = xMin.hashCode()
+        result = 31 * result + yMin.hashCode()
+        result = 31 * result + width.hashCode()
+        result = 31 * result + height.hashCode()
+        result = 31 * result + rotationRadians.hashCode()
+        result = 31 * result + score.hashCode()
+        result = 31 * result + (landmarks?.contentHashCode() ?: 0)
+        return result
+    }
+}
+
+private fun FloatArray?.contentEqualsNullable(other: FloatArray?): Boolean =
+    when {
+        this == null && other == null -> true
+        this == null || other == null -> false
+        else -> this.contentEquals(other)
+    }
 
 /**
  * Common interface for face detectors. Both SCRFD and YuNet implement this, so

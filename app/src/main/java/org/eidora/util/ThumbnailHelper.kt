@@ -10,11 +10,18 @@ import android.graphics.Matrix
 import android.graphics.RectF
 import androidx.exifinterface.media.ExifInterface
 import org.eidora.domain.model.FaceRegionCoords
+import org.eidora.ml.FaceAligner
 import java.io.File
 
 object ThumbnailHelper {
     private const val THUMBNAIL_SIZE = 128
     private const val PADDING_FACTOR = 0.10f
+
+    // Aligned faces are produced at the embedder's canonical template size
+    // (both ArcFace and SFace use 112×112). computeEmbedding scales its input to
+    // the model's inputSize anyway, but aligning straight to 112 keeps the
+    // canonical geometry exact.
+    private const val ALIGN_OUTPUT_SIZE = 112
 
     fun thumbnailFile(
         context: Context,
@@ -186,6 +193,43 @@ object ThumbnailHelper {
      * Crops the face region WITHOUT padding, scaled square crop for the embedding model input.
      * Coords are in the rotated (visually correct) image space.
      */
+    /**
+     * Produces an aligned 112×112 face bitmap for embedding when landmarks are
+     * present, using [FaceAligner] to warp the five landmarks onto the embedder's
+     * canonical template. This is what makes embeddings of the same person at
+     * different head poses land close together. Falls back to [cropForEmbedding]
+     * when there are no landmarks (older regions, XMP imports) so nothing breaks;
+     * such faces just keep the previous, un-aligned behaviour.
+     */
+    fun alignForEmbedding(
+        photoFile: File,
+        coords: FaceRegionCoords,
+    ): Bitmap? {
+        val lm = coords.landmarks
+        if (lm == null || lm.size < 10) {
+            // No landmarks — cannot align; fall back to the plain crop.
+            return cropForEmbedding(photoFile, coords)
+        }
+        return try {
+            val original = loadRotatedBitmap(photoFile) ?: return null
+            val imgW = original.width.toFloat()
+            val imgH = original.height.toFloat()
+            // Landmarks are stored normalized to the (already-rotated) image, in
+            // the same orientation as loadRotatedBitmap returns, so scale them
+            // straight to pixels.
+            val lmPixels =
+                FloatArray(10) { idx ->
+                    if (idx % 2 == 0) lm[idx] * imgW else lm[idx] * imgH
+                }
+            val aligned = FaceAligner.align(original, lmPixels, ALIGN_OUTPUT_SIZE)
+            original.recycle()
+            // If alignment failed (degenerate landmarks), fall back to the crop.
+            aligned ?: cropForEmbedding(photoFile, coords)
+        } catch (e: Exception) {
+            cropForEmbedding(photoFile, coords)
+        }
+    }
+
     fun cropForEmbedding(
         photoFile: File,
         coords: FaceRegionCoords,

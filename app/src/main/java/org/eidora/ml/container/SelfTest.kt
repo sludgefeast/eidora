@@ -7,6 +7,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import org.eidora.ml.DetectedFace
 import org.eidora.ml.EmbeddingModel
+import org.eidora.domain.model.FaceRegionCoords
 import org.eidora.util.BitmapLoader
 import org.eidora.util.ThumbnailHelper
 import org.eidora.util.XmpHelper
@@ -35,7 +36,6 @@ object SelfTest {
     private const val ASSET_DIR = "selftest"
 
     /** One face crop from metadata, tagged with the person's name. */
-    private data class NamedCrop(val person: String, val bitmap: Bitmap)
 
     // ---- Detection ---------------------------------------------------------
 
@@ -68,6 +68,11 @@ object SelfTest {
         val edge: Float?,
         val clusterMatch: Float?,
         val individualMatch: Float?,
+        // Aligned-embedding spread for the side-by-side comparison. Null when no
+        // faces could be aligned (e.g. no detector or no landmark matches).
+        val alignedSameMax: Float? = null,
+        val alignedDiffMin: Float? = null,
+        val alignedPairCount: Int = 0,
     ) {
         private val same get() = pairs.filter { it.samePerson }
         private val diff get() = pairs.filter { !it.samePerson }
@@ -80,6 +85,14 @@ object SelfTest {
             get() {
                 val s = sameMax
                 val d = diffMin
+                return s != null && d != null && d > s
+            }
+
+        /** Whether aligned embeddings separate same/different better than plain. */
+        val alignedLooksReasonable: Boolean
+            get() {
+                val s = alignedSameMax
+                val d = alignedDiffMin
                 return s != null && d != null && d > s
             }
     }
@@ -124,32 +137,90 @@ object SelfTest {
         context: Context,
         embedder: EmbeddingModel,
         clustering: ContainerManifest.Clustering?,
+        detector: org.eidora.ml.FaceDetector?,
     ): EmbeddingResult {
-        // Crop every named face from every photo, straight from its metadata.
-        val crops = mutableListOf<NamedCrop>()
+        // For each named face we build TWO crops: the plain box crop (un-aligned,
+        // the old behaviour) and, when we can recover landmarks by detecting the
+        // photo and matching the XMP box, a landmark-aligned crop. Comparing the
+        // same/different distance spread of both shows whether alignment actually
+        // tightens same-person embeddings.
+        data class DualCrop(
+            val person: String,
+            val plain: Bitmap,
+            val aligned: Bitmap?,
+        )
+        val crops = mutableListOf<DualCrop>()
         for (name in listPhotos(context)) {
             val file = stageAsset(context, name)
+            // Detect once for landmark recovery (normalized boxes + landmarks).
+            val detected: List<org.eidora.ml.DetectedFace> =
+                try {
+                    val bmp = org.eidora.util.BitmapLoader.loadOrientedBitmap(file, maxSize = 2048)
+                    if (detector != null && bmp != null) {
+                        val faces = detector.detect(bmp)
+                        val w = bmp.width.toFloat()
+                        val h = bmp.height.toFloat()
+                        bmp.recycle()
+                        faces.map { f ->
+                            f.copy(
+                                xMin = f.xMin / w,
+                                yMin = f.yMin / h,
+                                width = f.width / w,
+                                height = f.height / h,
+                                landmarks =
+                                    f.landmarks?.let { lm ->
+                                        FloatArray(lm.size) { i ->
+                                            if (i % 2 == 0) lm[i] / w else lm[i] / h
+                                        }
+                                    },
+                            )
+                        }
+                    } else {
+                        emptyList()
+                    }
+                } catch (t: Throwable) {
+                    emptyList()
+                }
             for (region in XmpHelper.readFaceRegions(file)) {
                 val person = region.name ?: continue
-                val crop = ThumbnailHelper.cropForEmbedding(file, region.coords) ?: continue
-                crops.add(NamedCrop(person, crop))
+                val plain = ThumbnailHelper.cropForEmbedding(file, region.coords) ?: continue
+                // Attach landmarks from the best-overlapping detected face, then
+                // align. If no match, aligned stays null (shown as "n/a").
+                val lm = bestOverlapLandmarksForTest(region.coords, detected)
+                val aligned =
+                    if (lm != null) {
+                        ThumbnailHelper.alignForEmbedding(file, region.coords.copy(landmarks = lm))
+                    } else {
+                        null
+                    }
+                crops.add(DualCrop(person, plain, aligned))
             }
         }
 
-        // Embed each crop, keeping the crop bitmap for display.
+        // Embed both variants. For pairs, use the plain crops for the thumbnails
+        // and compute distance for whichever variant we're reporting.
         val embedded =
-            crops.map { Triple(it.person, it.bitmap, embedder.computeEmbedding(it.bitmap)) }
+            crops.map { c ->
+                val ePlain = embedder.computeEmbedding(c.plain)
+                val eAligned = c.aligned?.let { embedder.computeEmbedding(it) }
+                Triple(c.person, c.plain, Pair(ePlain, eAligned))
+            }
 
-        // All distinct pairs, labelled same/different by person name, each
-        // carrying both face thumbnails.
         val pairs = mutableListOf<Pair2>()
+        val alignedDists = mutableListOf<Triple<Boolean, Float, Float>>() // same, plainDist, alignedDist
         for (i in embedded.indices) {
             for (j in i + 1 until embedded.size) {
                 val (pi, bi, ei) = embedded[i]
                 val (pj, bj, ej) = embedded[j]
                 val same = pi == pj
-                val dist = EmbeddingModel.cosineDistance(ei, ej)
-                pairs.add(Pair2(pi, pj, bi, bj, dist, same))
+                val distPlain = EmbeddingModel.cosineDistance(ei.first, ej.first)
+                pairs.add(Pair2(pi, pj, bi, bj, distPlain, same))
+                // Aligned distance only when BOTH faces have an aligned embedding.
+                val ea = ei.second
+                val eaj = ej.second
+                if (ea != null && eaj != null) {
+                    alignedDists.add(Triple(same, distPlain, EmbeddingModel.cosineDistance(ea, eaj)))
+                }
             }
         }
 
@@ -160,11 +231,53 @@ object SelfTest {
                 compareByDescending<Pair2> { it.samePerson }.thenBy { it.distance },
             )
 
+        // Aligned same/different spread, for the side-by-side comparison.
+        val alignedSame = alignedDists.filter { it.first }.map { it.third }
+        val alignedDiff = alignedDists.filter { !it.first }.map { it.third }
+
         return EmbeddingResult(
             pairs = sorted,
             edge = clustering?.edge,
             clusterMatch = clustering?.clusterMatch,
             individualMatch = clustering?.individualMatch,
+            alignedSameMax = alignedSame.maxOrNull(),
+            alignedDiffMin = alignedDiff.minOrNull(),
+            alignedPairCount = alignedDists.size,
         )
+    }
+
+    /**
+     * Landmarks of the detected face overlapping [xmpBox] most (IoU ≥ 0.3), or
+     * null. Mirror of PhotoAnalyzer.bestOverlapLandmarks for the self-test.
+     */
+    private fun bestOverlapLandmarksForTest(
+        xmpBox: FaceRegionCoords,
+        detected: List<org.eidora.ml.DetectedFace>,
+    ): List<Float>? {
+        if (detected.isEmpty()) return null
+        val aL = xmpBox.x - xmpBox.w / 2f
+        val aT = xmpBox.y - xmpBox.h / 2f
+        val aR = xmpBox.x + xmpBox.w / 2f
+        val aB = xmpBox.y + xmpBox.h / 2f
+        var bestIou = 0.3f
+        var bestLm: List<Float>? = null
+        detected.forEach { d ->
+            val lm = d.landmarks ?: return@forEach
+            val interL = maxOf(aL, d.xMin)
+            val interT = maxOf(aT, d.yMin)
+            val interR = minOf(aR, d.xMin + d.width)
+            val interB = minOf(aB, d.yMin + d.height)
+            val iw = interR - interL
+            val ih = interB - interT
+            if (iw <= 0f || ih <= 0f) return@forEach
+            val inter = iw * ih
+            val union = xmpBox.w * xmpBox.h + d.width * d.height - inter
+            val iou = if (union <= 0f) 0f else inter / union
+            if (iou > bestIou) {
+                bestIou = iou
+                bestLm = lm.toList()
+            }
+        }
+        return bestLm
     }
 }

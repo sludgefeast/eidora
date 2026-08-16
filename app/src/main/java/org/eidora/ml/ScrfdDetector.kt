@@ -201,11 +201,18 @@ class ScrfdDetector private constructor(
             val x2 = cx + bbox[i][2] * stride
             val y2 = cy + bbox[i][3] * stride
 
-            // Landmarks: right eye, left eye, nose, right mouth, left mouth
-            val rightEyeX = cx + kps[i][0] * stride
-            val rightEyeY = cy + kps[i][1] * stride
-            val leftEyeX = cx + kps[i][2] * stride
-            val leftEyeY = cy + kps[i][3] * stride
+            // Landmarks: right eye, left eye, nose, right mouth, left mouth.
+            // Decode all five (10 values) in INPUT_SIZE space; the first two
+            // (eyes) also drive the rotation estimate below.
+            val lmInput = FloatArray(10)
+            for (k in 0 until 5) {
+                lmInput[k * 2] = cx + kps[i][k * 2] * stride
+                lmInput[k * 2 + 1] = cy + kps[i][k * 2 + 1] * stride
+            }
+            val rightEyeX = lmInput[0]
+            val rightEyeY = lmInput[1]
+            val leftEyeX = lmInput[2]
+            val leftEyeY = lmInput[3]
 
             val rotation =
                 kotlin.math
@@ -226,6 +233,13 @@ class ScrfdDetector private constructor(
             val px2 = (x2 * sx).coerceIn(0f, srcW.toFloat())
             val py2 = (y2 * sy).coerceIn(0f, srcH.toFloat())
 
+            // Map landmarks to source pixels with the same scale factors.
+            val lmSource = FloatArray(10)
+            for (k in 0 until 5) {
+                lmSource[k * 2] = (lmInput[k * 2] * sx).coerceIn(0f, srcW.toFloat())
+                lmSource[k * 2 + 1] = (lmInput[k * 2 + 1] * sy).coerceIn(0f, srcH.toFloat())
+            }
+
             out.add(
                 DetectedFace(
                     xMin = px1,
@@ -234,6 +248,7 @@ class ScrfdDetector private constructor(
                     height = py2 - py1,
                     rotationRadians = rotation,
                     score = score,
+                    landmarks = lmSource,
                 ),
             )
         }

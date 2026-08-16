@@ -151,12 +151,29 @@ private suspend fun runTest(
         }
         else -> {
             val embedder = ContainerModelRunner.openEmbedder(context, container.dir, model)
+            // Also open a detector so the embedding test can recover landmarks and
+            // compare aligned vs. un-aligned embeddings. The detector needs the
+            // container's DETECTION model (not this embedding model). Best-effort:
+            // if none is available, the test still runs the un-aligned comparison.
+            val detectionModel =
+                container.manifest.models.firstOrNull {
+                    it.task == ContainerManifest.TASK_DETECTION
+                }
+            val detector =
+                detectionModel?.let {
+                    try {
+                        ContainerModelRunner.openDetector(context, container.dir, it)
+                    } catch (t: Throwable) {
+                        null
+                    }
+                }
             try {
                 TestState.Embedding(
-                    SelfTest.runEmbedding(context, embedder, model.clustering),
+                    SelfTest.runEmbedding(context, embedder, model.clustering, detector),
                 )
             } finally {
                 embedder.close()
+                detector?.close()
             }
         }
     }
@@ -311,6 +328,40 @@ private fun EmbeddingView(result: SelfTest.EmbeddingResult) {
     } else {
         Text(
             stringResource(R.string.selftest_thresholds_none),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    Spacer(Modifier.height(12.dp))
+    // Side-by-side: un-aligned vs. aligned same/different spread. A smaller
+    // same-max and a larger gap to diff-min means alignment tightened
+    // same-person embeddings — the whole point of the change.
+    Text(
+        "Un-aligned:  same≤ ${result.sameMax?.let { "%.3f".format(it) } ?: "—"}   " +
+            "diff≥ ${result.diffMin?.let { "%.3f".format(it) } ?: "—"}",
+        style = MaterialTheme.typography.bodySmall,
+        fontFamily = FontFamily.Monospace,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (result.alignedPairCount > 0) {
+        Text(
+            "Aligned:     same≤ ${result.alignedSameMax?.let { "%.3f".format(it) } ?: "—"}   " +
+                "diff≥ ${result.alignedDiffMin?.let { "%.3f".format(it) } ?: "—"}   " +
+                "(${result.alignedPairCount} pairs)",
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.SemiBold,
+            color =
+                if (result.alignedLooksReasonable) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+        )
+    } else {
+        Text(
+            "Aligned: no landmark matches (detector found no matching faces)",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
