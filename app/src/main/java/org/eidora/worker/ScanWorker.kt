@@ -275,7 +275,13 @@ class ScanWorker(
                     if (sampleRelPaths.size < 10 && relPath !in sampleRelPaths) {
                         sampleRelPaths.add(relPath)
                     }
-                    if (folderWhitelist.isNotEmpty() &&
+                    // Whitelist semantics: only photos inside a whitelisted
+                    // folder are analyzed. An EMPTY whitelist means nothing is
+                    // selected, so nothing is analyzed (previously an empty
+                    // whitelist let everything through). The folder wizard forces
+                    // at least one selection, so a normally-set-up install always
+                    // has a non-empty whitelist.
+                    if (folderWhitelist.isEmpty() ||
                         !folderWhitelist.any { relPath == it || relPath.startsWith("$it/") }
                     ) {
                         filteredOut++

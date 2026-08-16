@@ -76,6 +76,18 @@ fun SettingsScreen(
                 modifier = Modifier.padding(bottom = 8.dp),
             )
 
+            // With no folder selected nothing is analyzed (empty whitelist = none).
+            // Unlike the setup wizard, settings allows an empty selection, so warn
+            // the user rather than silently analyzing nothing.
+            if (state.folderWhitelist.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.settings_folders_empty_warning),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+
             val context = androidx.compose.ui.platform.LocalContext.current
             LaunchedEffect(Unit) { viewModel.loadAvailableFolders(context) }
 

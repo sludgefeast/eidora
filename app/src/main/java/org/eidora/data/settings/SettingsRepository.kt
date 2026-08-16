@@ -137,12 +137,19 @@ class SettingsRepository(
     /**
      * Folders (MediaStore RELATIVE_PATH) included in syncing.
      * Stored as newline-separated list.
-     * null / empty = only DEFAULT_FOLDER_WHITELIST (first-run default).
+     * KEY absent (never set) = DEFAULT_FOLDER_WHITELIST (first-run default).
+     * KEY present but empty = explicitly no folders → nothing is analyzed.
      */
     val folderWhitelist: Flow<Set<String>> =
         context.dataStore.data.map { prefs ->
-            prefs[KEY_FOLDER_WHITELIST]?.split("\n")?.filter { it.isNotBlank() }?.toSet()
-                ?: DEFAULT_FOLDER_WHITELIST
+            val raw = prefs[KEY_FOLDER_WHITELIST]
+            if (raw == null) {
+                // Never set: first-run default.
+                DEFAULT_FOLDER_WHITELIST
+            } else {
+                // Explicitly set (possibly to empty = deselected everything).
+                raw.split("\n").filter { it.isNotBlank() }.toSet()
+            }
         }
 
     suspend fun getFolderWhitelist(): Set<String> = folderWhitelist.first()

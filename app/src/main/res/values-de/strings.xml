@@ -119,6 +119,7 @@
     <string name="setting_min_cluster_size_hint">Höher = nur große Gruppen werden als Vorschläge angezeigt (weniger, aber zuverlässigere Vorschläge). Niedriger = auch kleine Gruppen werden als Vorschläge angezeigt.</string>
     <string name="setting_time_weight_hint">Steuert wie stark die Zeit das Matching beeinflusst. Höher = zeitlich nahe Fotos einer Person werden beim Matching bevorzugt, weit entfernte seltener verknüpft (hilft bei Geschwistern und Alterung). Auf 0 setzen um den Zeitfaktor zu ignorieren.</string>
     <string name="settings_folders_description">Wähle welche Ordner beim Sync berücksichtigt werden. Nur markierte Ordner werden analysiert. Standardmäßig ist nur der Kamera-Ordner ausgewählt.</string>
+    <string name="settings_folders_empty_warning">Keine Ordner ausgewählt — es wird nichts analysiert. Wähle mindestens einen Ordner, um Fotos zu analysieren.</string>
     <string name="folder_category_camera">Kamera</string>
     <string name="folder_category_common">Fotos &amp; Downloads</string>
     <string name="folder_category_apps">Apps</string>
