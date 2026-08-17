@@ -25,6 +25,7 @@ data class SettingsUiState(
             individualMatchThreshold = org.eidora.ml.EmbeddingModelSpec.DEFAULT.defaultThresholds.individualMatch,
             minClusterSize = SettingsRepository.DEFAULT_MIN_CLUSTER_SIZE,
             timeWeight = SettingsRepository.DEFAULT_TIME_WEIGHT,
+            suggestMargin = SettingsRepository.DEFAULT_SUGGEST_MARGIN,
         ),
     val powerConfig: PowerConfig =
         PowerConfig(

@@ -35,14 +35,13 @@ private const val CONSISTENCY_PENALTY_FRACTION = 0.5f
 /**
  * How far above the (strict) auto-assign threshold a face may still be offered
  * as an unconfirmed *suggestion* for a named person, as a fraction of that
- * threshold. This is a relative margin, not a new calibrated absolute value, so
- * it stays model- and collection-independent: faces below the auto threshold are
- * assigned and confirmed; faces between it and (threshold × (1 + margin)) are
- * assigned but left unconfirmed for the user to accept or reject; faces beyond
- * that stay unknown. A modest margin recovers borderline faces (profiles, poor
- * lighting) as reviewable suggestions without ever auto-assigning them.
+ * threshold, is now a user-adjustable setting: ClusteringConfig.suggestMargin
+ * (default DEFAULT_SUGGEST_MARGIN = 0.10). It stays a relative margin, not a
+ * calibrated absolute, so it remains model- and collection-independent. At 0.25
+ * the suggest threshold reached deep into the uncertain band (e.g. SFace auto
+ * 0.64 → suggest 0.80) and mixed faces; 0.10 keeps suggestions just past the
+ * auto threshold (→ ~0.70 for SFace) for cleaner groups.
  */
-private const val SUGGEST_THRESHOLD_MARGIN = 0.25f
 
 /**
  * Maximum silhouette-like ratio (internal spread ÷ distance to nearest other
@@ -170,7 +169,7 @@ class ClusteringWorker(
                     try {
                         val embedding = EmbeddingModel.bytesToFloatArray(face.faceRegion.embedding!!)
                         val autoThreshold = config.individualMatchThreshold
-                        val suggestThreshold = autoThreshold * (1f + SUGGEST_THRESHOLD_MARGIN)
+                        val suggestThreshold = autoThreshold * (1f + config.suggestMargin)
                         var bestId: String? = null // best within auto threshold
                         var bestName: String? = null
                         var bestDist = autoThreshold
@@ -254,7 +253,7 @@ class ClusteringWorker(
                     (0 until 10).joinToString(" ") { b ->
                         "${b / 10f}-${(b + 1) / 10f}:${distBuckets[b]}"
                     }
-                val suggestThr = config.individualMatchThreshold * (1f + SUGGEST_THRESHOLD_MARGIN)
+                val suggestThr = config.individualMatchThreshold * (1f + config.suggestMargin)
                 EidoraLog.i(
                     TAG,
                     "kNN distance histogram (auto=${config.individualMatchThreshold}, " +
@@ -675,6 +674,7 @@ class ClusteringWorker(
                 individualMatchThreshold = 0.25f,
                 minClusterSize = 2,
                 timeWeight = 1.0f,
+                suggestMargin = 0.10f,
             )
         }
 

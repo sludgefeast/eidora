@@ -282,6 +282,14 @@ fun SettingsScreen(
                 default = SettingsRepository.DEFAULT_TIME_WEIGHT,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(timeWeight = it)) },
             )
+            FloatSetting(
+                label = stringResource(R.string.setting_suggest_margin),
+                description = stringResource(R.string.setting_suggest_margin_description),
+                hint = stringResource(R.string.setting_suggest_margin_hint),
+                value = cfg.suggestMargin,
+                default = SettingsRepository.DEFAULT_SUGGEST_MARGIN,
+                onValueChange = { viewModel.setClusteringConfig(cfg.copy(suggestMargin = it)) },
+            )
 
             // Section: confirmation behaviour
             SectionHeader(stringResource(R.string.settings_confirm_title))

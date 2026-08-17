@@ -20,6 +20,7 @@ private val KEY_CLUSTER_MATCH_THRESHOLD = floatPreferencesKey("cluster_match_thr
 private val KEY_INDIVIDUAL_MATCH_THRESHOLD = floatPreferencesKey("individual_match_threshold")
 private val KEY_MIN_CLUSTER_SIZE = intPreferencesKey("min_cluster_size")
 private val KEY_TIME_WEIGHT = floatPreferencesKey("clustering_time_weight")
+private val KEY_SUGGEST_MARGIN = floatPreferencesKey("clustering_suggest_margin")
 private val KEY_MIN_BATTERY_PERCENT = intPreferencesKey("min_battery_percent")
 private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius")
 private val KEY_RESUME_BATTERY_PERCENT = intPreferencesKey("resume_battery_percent")
@@ -48,6 +49,7 @@ data class ClusteringConfig(
     val individualMatchThreshold: Float,
     val minClusterSize: Int,
     val timeWeight: Float,
+    val suggestMargin: Float,
 )
 
 /**
@@ -91,6 +93,7 @@ class SettingsRepository(
                 individualMatchThreshold = prefs[KEY_INDIVIDUAL_MATCH_THRESHOLD] ?: t.individualMatch,
                 minClusterSize = prefs[KEY_MIN_CLUSTER_SIZE] ?: DEFAULT_MIN_CLUSTER_SIZE,
                 timeWeight = prefs[KEY_TIME_WEIGHT] ?: DEFAULT_TIME_WEIGHT,
+                suggestMargin = prefs[KEY_SUGGEST_MARGIN] ?: DEFAULT_SUGGEST_MARGIN,
             )
         }
 
@@ -103,6 +106,7 @@ class SettingsRepository(
             prefs[KEY_INDIVIDUAL_MATCH_THRESHOLD] = config.individualMatchThreshold
             prefs[KEY_MIN_CLUSTER_SIZE] = config.minClusterSize
             prefs[KEY_TIME_WEIGHT] = config.timeWeight
+            prefs[KEY_SUGGEST_MARGIN] = config.suggestMargin
         }
     }
 
@@ -295,6 +299,12 @@ class SettingsRepository(
         // EmbeddingModelSpec.defaultThresholds (see clusteringConfig above).
         const val DEFAULT_MIN_CLUSTER_SIZE = 2
         const val DEFAULT_TIME_WEIGHT = 1.0f
+
+        // Suggest-threshold margin over the model's auto (individual-match)
+        // threshold: suggest = auto × (1 + margin). Keeps suggestions just past
+        // the confident band; higher recovers more borderline faces but mixes
+        // more. See ClusteringWorker for the rationale behind the 0.10 default.
+        const val DEFAULT_SUGGEST_MARGIN = 0.10f
 
         // Manual assignment confirms faces by default; naming a suggestion
         // does not auto-confirm all its faces (they stay suggestions);

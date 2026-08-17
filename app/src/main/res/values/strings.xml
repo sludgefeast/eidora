@@ -100,6 +100,8 @@
     <string name="permission_required_label">Required</string>
     <string name="permission_files">File access</string>
     <string name="setting_time_weight">Temporal weight</string>
+    <string name="setting_suggest_margin">Suggestion margin</string>
+    <string name="setting_suggest_margin_description">How far past the auto-assign threshold a face may still be offered as an unconfirmed suggestion, as a fraction of that threshold. 0.10 = suggestions stay close to confident matches; higher recovers more borderline faces but mixes more.</string>
     <string name="setting_time_weight_description">How strongly the time between photos influences clustering. 0 = ignore time, 1 = default (half-life 3 years), 2 = strong influence. Helps separate siblings and track ageing.</string>
     <string name="action_delete_face">Delete face (false positive)</string>
     <string name="delete_face_confirm_message">This face will be permanently deleted and will not be detected again during the next sync. Use this to remove false positive detections.</string>
@@ -118,6 +120,7 @@
     <string name="setting_individual_match_threshold_hint">Higher = single faces are assigned to existing persons more easily. Lower = only very close matches are assigned (more faces land in Unknown).</string>
     <string name="setting_min_cluster_size_hint">Higher = only large groups become suggestions (fewer but more reliable). Lower = even small groups of faces become suggestions.</string>
     <string name="setting_time_weight_hint">Controls how strongly time influences matching. Higher = temporally close photos of a person are preferred for matching, and photos far apart are less likely to be linked (helps with siblings and ageing). Set to 0 to ignore time completely.</string>
+    <string name="setting_suggest_margin_hint">Faces just beyond the auto-assign threshold become unconfirmed suggestions you can accept or reject. This margin is a fraction of that threshold: 0.10 means suggestions reach 10% past it. Lower for cleaner but fewer suggestions, higher to recover more borderline faces at the cost of more mixing.</string>
     <string name="settings_folders_description">Select which folders are included in the sync. Only checked folders will be analysed. Only the Camera folder is selected by default.</string>
     <string name="settings_folders_empty_warning">No folders selected — nothing will be analysed. Select at least one folder to analyse photos.</string>
     <string name="folder_category_camera">Camera</string>

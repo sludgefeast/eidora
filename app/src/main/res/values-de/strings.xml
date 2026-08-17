@@ -100,6 +100,8 @@
     <string name="permission_required_label">Erforderlich</string>
     <string name="permission_files">Dateizugriff</string>
     <string name="setting_time_weight">Zeitlicher Einfluss</string>
+    <string name="setting_suggest_margin">Vorschlags-Spielraum</string>
+    <string name="setting_suggest_margin_description">Wie weit über der Auto-Zuordnungsschwelle ein Gesicht noch als unbestätigter Vorschlag angeboten wird, als Anteil dieser Schwelle. 0,10 = Vorschläge bleiben nah an sicheren Treffern; höher fängt mehr Grenzfälle ein, vermischt aber mehr.</string>
     <string name="setting_time_weight_description">Wie stark der zeitliche Abstand zwischen Fotos das Clustering beeinflusst. 0 = Zeit ignorieren, 1 = Standard (Halbwertszeit 3 Jahre), 2 = starker Einfluss. Hilft Geschwister zu trennen und Alterung zu berücksichtigen.</string>
     <string name="action_delete_face">Gesicht löschen (Falsch-Positiv)</string>
     <string name="delete_face_confirm_message">Dieses Gesicht wird dauerhaft gelöscht und beim nächsten Sync nicht erneut erkannt. Verwende diese Aktion um falsch erkannte Gesichter zu entfernen.</string>
@@ -118,6 +120,7 @@
     <string name="setting_individual_match_threshold_hint">Höher = einzelne Gesichter werden leichter bestehenden Personen zugeordnet. Niedriger = nur sehr enge Treffer werden zugeordnet (mehr Gesichter landen in Unbekannt).</string>
     <string name="setting_min_cluster_size_hint">Höher = nur große Gruppen werden als Vorschläge angezeigt (weniger, aber zuverlässigere Vorschläge). Niedriger = auch kleine Gruppen werden als Vorschläge angezeigt.</string>
     <string name="setting_time_weight_hint">Steuert wie stark die Zeit das Matching beeinflusst. Höher = zeitlich nahe Fotos einer Person werden beim Matching bevorzugt, weit entfernte seltener verknüpft (hilft bei Geschwistern und Alterung). Auf 0 setzen um den Zeitfaktor zu ignorieren.</string>
+    <string name="setting_suggest_margin_hint">Gesichter knapp über der Auto-Zuordnungsschwelle werden zu unbestätigten Vorschlägen, die du annehmen oder ablehnen kannst. Dieser Spielraum ist ein Anteil der Schwelle: 0,10 bedeutet, Vorschläge reichen 10 % darüber hinaus. Niedriger für sauberere, aber weniger Vorschläge; höher, um mehr Grenzfälle einzufangen — auf Kosten von mehr Vermischung.</string>
     <string name="settings_folders_description">Wähle welche Ordner beim Sync berücksichtigt werden. Nur markierte Ordner werden analysiert. Standardmäßig ist nur der Kamera-Ordner ausgewählt.</string>
     <string name="settings_folders_empty_warning">Keine Ordner ausgewählt — es wird nichts analysiert. Wähle mindestens einen Ordner, um Fotos zu analysieren.</string>
     <string name="folder_category_camera">Kamera</string>
