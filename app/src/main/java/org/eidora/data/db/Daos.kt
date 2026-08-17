@@ -3,6 +3,7 @@
 
 package org.eidora.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Embedded
 import androidx.room.Insert
