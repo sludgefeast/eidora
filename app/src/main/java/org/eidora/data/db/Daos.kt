@@ -441,7 +441,7 @@ interface FaceRegionDao {
 
     @Query(
         """
-        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson,
+        SELECT f.id, f.photoId, f.personId, f.name,
                f.ignored, f.quality_score, f.embedding_failed,
                ph.takenAt AS photoTakenAt
         FROM face_regions f
@@ -450,6 +450,7 @@ interface FaceRegionDao {
         ORDER BY 
             CASE WHEN f.name IS NULL THEN 0 ELSE 1 END ASC,
             ph.takenAt DESC
+        LIMIT 10000
     """,
     )
     fun observeByPersonId(
@@ -459,26 +460,28 @@ interface FaceRegionDao {
 
     @Query(
         """
-        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson,
+        SELECT f.id, f.photoId, f.personId, f.name,
                f.ignored, f.quality_score, f.embedding_failed,
                ph.takenAt AS photoTakenAt
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
         WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding_failed = 0 AND ph.folder IN (:folders)
         ORDER BY ph.takenAt DESC
+        LIMIT 10000
     """,
     )
     fun observeUnknown(folders: List<String>): Flow<List<FaceRegionWithPhoto>>
 
     @Query(
         """
-        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson,
+        SELECT f.id, f.photoId, f.personId, f.name,
                f.ignored, f.quality_score, f.embedding_failed,
                ph.takenAt AS photoTakenAt
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
         WHERE f.ignored = 1 AND ph.folder IN (:folders)
         ORDER BY ph.takenAt DESC
+        LIMIT 10000
     """,
     )
     fun observeIgnored(folders: List<String>): Flow<List<FaceRegionWithPhoto>>
@@ -546,7 +549,6 @@ data class FaceRegionWithPhoto(
     val photoId: String,
     val personId: String?,
     val name: String?,
-    val regionJson: String,
     val ignored: Boolean,
     @ColumnInfo(name = "quality_score") val qualityScore: Float?,
     @ColumnInfo(name = "embedding_failed") val embeddingFailed: Boolean,
@@ -554,12 +556,16 @@ data class FaceRegionWithPhoto(
 )
 
 /**
- * Rebuilds a FaceRegionEntity (with embedding = null) from the lightweight
- * projection so existing call sites that read face.faceRegion.id / .name /
- * .ignored / .photoId / .qualityScore keep working unchanged. Defined as an
- * extension property, NOT a member, so Room's KSP processor does not mistake it
- * for a column to map (a member `val faceRegion: FaceRegionEntity` made Room try
- * to resolve FaceRegionEntity as a result type and fail).
+ * Rebuilds a FaceRegionEntity from the lightweight projection so existing call
+ * sites that read face.faceRegion.id / .name / .ignored / .photoId /
+ * .qualityScore keep working unchanged. Defined as an extension property, NOT a
+ * member, so Room's KSP processor does not mistake it for a column to map.
+ *
+ * embedding and regionJson are set to empty/null: this projection deliberately
+ * omits both (embedding is a large blob, regionJson a large string) to keep the
+ * SQLite CursorWindow small enough for people with thousands of faces. No
+ * FaceRegionWithPhoto consumer reads them; the fullscreen editor uses
+ * FaceRegionEntity via a per-photo query instead.
  */
 val FaceRegionWithPhoto.faceRegion: FaceRegionEntity
     get() =
@@ -568,7 +574,7 @@ val FaceRegionWithPhoto.faceRegion: FaceRegionEntity
             photoId = photoId,
             personId = personId,
             name = name,
-            regionJson = regionJson,
+            regionJson = "",
             embedding = null,
             ignored = ignored,
             qualityScore = qualityScore,
