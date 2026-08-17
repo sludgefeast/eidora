@@ -3,6 +3,7 @@
 
 package org.eidora.ui.settings
 
+import org.eidora.util.EidoraLog
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -61,6 +62,7 @@ class SettingsViewModel(
                 try {
                     faceRepo.cleanupFoldersNotIn(folders)
                 } catch (t: Throwable) {
+                    EidoraLog.d("SettingsViewModel", "faceRepo.cleanupFoldersNotIn(folders) failed: ${t.message}")
                     0
                 }
             onDone(removed)
@@ -210,6 +212,7 @@ class SettingsViewModel(
             try {
                 faceRepo.resetForDetectionModelChange(strategy)
             } catch (t: Throwable) {
+                EidoraLog.d("SettingsViewModel", "faceRepo.resetForDetectionModelChange( failed: ${t.message}")
                 // best-effort; the pipeline still re-runs below where needed
             }
             when (strategy) {
@@ -287,6 +290,7 @@ class SettingsViewModel(
             try {
                 faceRepo.resetForEmbeddingModelChange(strategy)
             } catch (t: Throwable) {
+                EidoraLog.d("SettingsViewModel", "faceRepo.resetForEmbeddingModelChange( failed: ${t.message}")
                 // best-effort; the pipeline still re-runs below when needed
             }
             // Keeping embeddings needs no re-run — everything downstream is
@@ -308,6 +312,7 @@ class SettingsViewModel(
             try {
                 faceRepo.splitPersonsByVisibility(folders.toList())
             } catch (t: Throwable) {
+                EidoraLog.d("SettingsViewModel", "faceRepo.splitPersonsByVisibility(fold failed: ${t.message}")
                 // best-effort; UI stays consistent via folder-filtered queries
             }
             // A running sync/clustering pass is working on the old folder set –

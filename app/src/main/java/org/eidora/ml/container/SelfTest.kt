@@ -5,6 +5,7 @@ package org.eidora.ml.container
 
 import android.content.Context
 import android.graphics.Bitmap
+import org.eidora.util.EidoraLog
 import org.eidora.ml.DetectedFace
 import org.eidora.ml.EmbeddingModel
 import org.eidora.domain.model.FaceRegionCoords
@@ -179,6 +180,7 @@ object SelfTest {
                         emptyList()
                     }
                 } catch (t: Throwable) {
+                    EidoraLog.w("SelfTest", "fallback after error: ${t.message}")
                     emptyList()
                 }
             for (region in XmpHelper.readFaceRegions(file)) {

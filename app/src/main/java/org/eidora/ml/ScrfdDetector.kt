@@ -305,12 +305,12 @@ class ScrfdDetector private constructor(
         try {
             interpreter.close()
         } catch (t: Throwable) {
-            // ignore
+            EidoraLog.d(TAG, "interpreter.close() failed: ${t.message}")
         }
         try {
             gpuDelegate?.close()
         } catch (t: Throwable) {
-            // ignore
+            EidoraLog.d(TAG, "gpuDelegate?.close() failed: ${t.message}")
         }
     }
 }

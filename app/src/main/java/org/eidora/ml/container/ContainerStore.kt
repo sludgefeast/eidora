@@ -101,8 +101,10 @@ object ContainerStore {
                 try {
                     readManifestFromZip(tmp)
                 } catch (e: ContainerManifestParser.ManifestException) {
+                    EidoraLog.w("ContainerStore", "invalid container: ${e.message}", e)
                     return ImportResult.Invalid(e.message ?: "invalid manifest")
                 } catch (t: Throwable) {
+                    EidoraLog.w(TAG, "fallback after error: ${t.message}")
                     return ImportResult.Invalid("could not read manifest: ${t.message}")
                 }
 
@@ -116,6 +118,7 @@ object ContainerStore {
             try {
                 unpackInto(tmp, dir, manifest)
             } catch (t: Throwable) {
+                EidoraLog.w("ContainerStore", "invalid container: ${t.message}", t)
                 dir.deleteRecursively()
                 return ImportResult.Invalid("could not unpack container: ${t.message}")
             }

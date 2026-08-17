@@ -229,17 +229,42 @@ object XmpHelper {
             val exif = ExifInterface(file.absolutePath)
             val xmpString = readXmpString(exif) ?: return
             val xmp: XMPMeta = XMPMetaFactory.parseFromString(xmpString)
-            xmp.deleteProperty(NS_MWG_RS, "mwg-rs:Regions")
-            xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
-            xmp.deleteProperty(NS_DIGIKAM, "digiKam:TagsList")
-            xmp.deleteProperty(NS_LR, "lr:hierarchicalSubject")
+            // Diagnostics: was there actually a region block to remove, and does
+            // the write below stick? Reappearing persons after a reinstall mean
+            // mwg-rs:Regions survived in the file, so log what we found and
+            // whether the save succeeds.
+            val regionsBefore = xmp.countArrayItems(NS_MWG_RS, "mwg-rs:Regions/mwg-rs:RegionList")
+            // IMPORTANT: clear person names from dc:subject FIRST, while
+            // digiKam:TagsList still exists — clearPeopleSubjects identifies which
+            // dc:subject entries are person names by matching them against
+            // TagsList. If we delete TagsList first (as the code used to), that
+            // match set is empty and person names are left behind in dc:subject,
+            // so they reappear on the next import / reinstall. This was the leak.
             try {
                 clearPeopleSubjects(xmp)
             } catch (t: Throwable) {
                 EidoraLog.w(TAG, "clearPeopleSubjects failed", t)
             }
+            xmp.deleteProperty(NS_MWG_RS, "mwg-rs:Regions")
+            xmp.deleteProperty(NS_IPTC_EXT, "Iptc4xmpExt:PersonInImage")
+            xmp.deleteProperty(NS_DIGIKAM, "digiKam:TagsList")
+            xmp.deleteProperty(NS_LR, "lr:hierarchicalSubject")
             writeXmpString(exif, xmp)
             exif.saveAttributes()
+            // Verify the regions are actually gone from the file on disk.
+            val verify = ExifInterface(file.absolutePath)
+            val vXmp = readXmpString(verify)?.let { XMPMetaFactory.parseFromString(it) }
+            val regionsAfter =
+                vXmp?.countArrayItems(NS_MWG_RS, "mwg-rs:Regions/mwg-rs:RegionList") ?: 0
+            if (regionsAfter > 0) {
+                EidoraLog.e(
+                    TAG,
+                    "clearFaceData: regions NOT removed from ${file.name} " +
+                        "(before=$regionsBefore, after=$regionsAfter) — write did not stick",
+                )
+            } else if (regionsBefore > 0) {
+                EidoraLog.i(TAG, "clearFaceData: removed $regionsBefore regions from ${file.name}")
+            }
         } catch (t: Throwable) {
             EidoraLog.e(TAG, "Failed to clear face data from ${file.name}", t)
         }
@@ -297,7 +322,7 @@ object XmpHelper {
                 }
             }
         } catch (t: Throwable) {
-            // TagsList may not exist yet
+            EidoraLog.d(TAG, "TagsList may not exist yet: ${t.message}")
         }
 
         if (personNames.isEmpty()) return

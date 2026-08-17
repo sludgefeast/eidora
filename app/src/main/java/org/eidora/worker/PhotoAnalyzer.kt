@@ -344,7 +344,7 @@ class PhotoAnalyzer(
             try {
                 ThumbnailHelper.deleteThumbnail(context, it.id)
             } catch (t: Throwable) {
-                // ignore
+                EidoraLog.d(TAG, "ThumbnailHelper.deleteThumbnail(contexti failed: ${t.message}")
             }
         }
         faceDao.deleteByPhotoId(photoId)

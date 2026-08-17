@@ -19,6 +19,7 @@ object FileUtil {
             val sdf = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US)
             sdf.parse(dateStr)?.time
         } catch (e: Exception) {
+            EidoraLog.d("FileUtil", "fallback after error: ${e.message}")
             null
         }
     }

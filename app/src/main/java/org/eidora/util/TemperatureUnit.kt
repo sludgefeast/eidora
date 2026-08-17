@@ -30,6 +30,7 @@ object TemperatureUnit {
                         context.resources.configuration.locales[0],
                     )
                 } catch (t: Throwable) {
+                    EidoraLog.d("TemperatureUnit", "fallback after error: ${t.message}")
                     null
                 }
             if (pref != null) {

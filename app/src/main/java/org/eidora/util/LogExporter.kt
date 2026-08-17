@@ -56,6 +56,7 @@ object LogExporter {
             try {
                 readLogcat(context, range)
             } catch (t: Throwable) {
+                EidoraLog.w("LogExporter", "readLogcat(contextrange) failed: ${t.message}")
                 "Failed to read logcat: ${t.message}"
             }
         // Append Eidora's own persisted log (survives logcat eviction). logcat
@@ -66,6 +67,7 @@ object LogExporter {
             try {
                 EidoraLog.readPersisted()
             } catch (t: Throwable) {
+                EidoraLog.w("LogExporter", "EidoraLog.readPersisted() failed: ${t.message}")
                 ""
             }
         val persistedSection =
@@ -91,6 +93,7 @@ object LogExporter {
                     .getPackageInfo(context.packageName, 0)
                     .versionName
             } catch (t: Throwable) {
+                EidoraLog.w("LogExporter", ".versionName failed: ${t.message}")
                 "unknown"
             }
         val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())

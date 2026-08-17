@@ -396,11 +396,12 @@ fun EidoraApp() {
                                     .get(context)
                                     .getFolderWhitelist()
                                     .toList()
-                            // Clear pause state + clustering (NOT the sync work —
-                            // enqueueRedetectAll's REPLACE handles that), then
-                            // clear face data for the visible folders and mark
-                            // those photos for detection, then start detection.
-                            SyncPipeline.cancelRunningSync(context)
+                            // Fully stop the running sync + clustering and WAIT
+                            // until workers have stopped, THEN clear face data,
+                            // THEN start detection. Waiting first prevents a
+                            // still-running triage pass from re-importing XMP
+                            // persons the reset is deleting.
+                            SyncPipeline.cancelAndAwaitSync(context)
                             repo.resetFoldersForRedetection(folders)
                             SyncPipeline.enqueueRedetectAll(context)
                             EidoraLog.i("FaceRepository", "Re-analyze all: enqueued detection")

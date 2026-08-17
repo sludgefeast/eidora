@@ -5,6 +5,7 @@ package org.eidora.ml
 
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import org.eidora.util.EidoraLog
 
 /**
  * Aligns a face to the canonical position ArcFace / SFace expect, using the five
@@ -69,6 +70,7 @@ object FaceAligner {
                     }
                 }
         } catch (t: Throwable) {
+            EidoraLog.w("FaceAligner", "fallback after error: ${t.message}")
             null
         }
     }

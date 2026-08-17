@@ -137,6 +137,18 @@ interface PhotoDao {
         folder: String,
     )
 
+    /**
+     * Normalizes photos stored under a subfolder of [root] (folder = "root/…") to
+     * [root] itself, so folder-scoped queries that match the whitelist exactly
+     * also cover subfolders. One-off repair for photos scanned before folder
+     * normalization existed. Uses a GLOB-safe LIKE with the '/' separator.
+     */
+    @Query(
+        "UPDATE photos SET folder = :root " +
+            "WHERE folder = :root OR folder LIKE :root || '/%'",
+    )
+    suspend fun normalizeFolderToRoot(root: String)
+
     @Query("DELETE FROM photos WHERE folder NOT IN (:folders)")
     suspend fun deleteNotInFolders(folders: List<String>)
 }

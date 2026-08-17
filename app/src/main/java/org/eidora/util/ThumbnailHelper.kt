@@ -73,6 +73,7 @@ object ThumbnailHelper {
                     ExifInterface.ORIENTATION_NORMAL,
                 )
             } catch (e: Exception) {
+                EidoraLog.d("ThumbnailHelper", "fallback after error: ${e.message}")
                 ExifInterface.ORIENTATION_NORMAL
             }
         val degrees =
@@ -154,6 +155,7 @@ object ThumbnailHelper {
             original.recycle()
             true
         } catch (e: Exception) {
+            EidoraLog.d("ThumbnailHelper", "fallback after error: ${e.message}")
             false
         }
     }
@@ -226,6 +228,7 @@ object ThumbnailHelper {
             // If alignment failed (degenerate landmarks), fall back to the crop.
             aligned ?: cropForEmbedding(photoFile, coords)
         } catch (e: Exception) {
+            EidoraLog.d("ThumbnailHelper", "fallback after error: ${e.message}")
             cropForEmbedding(photoFile, coords)
         }
     }
@@ -255,6 +258,7 @@ object ThumbnailHelper {
             original.recycle()
             scaled
         } catch (e: Exception) {
+            EidoraLog.d("ThumbnailHelper", "fallback after error: ${e.message}")
             null
         }
     }

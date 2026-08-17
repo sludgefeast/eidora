@@ -3,6 +3,7 @@
 
 package org.eidora
 
+import org.eidora.util.EidoraLog
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -31,6 +32,7 @@ class EidoraApplication : Application() {
             try {
                 Runtime.getRuntime().exec(arrayOf("logcat", "-G", "8M")).waitFor()
             } catch (t: Throwable) {
+                EidoraLog.w("EidoraApplication", "Runtime.getRuntime().exec(arrayOf(logc failed: ${t.message}")
                 // Not critical — export still works with the default buffer.
             }
         }.start()

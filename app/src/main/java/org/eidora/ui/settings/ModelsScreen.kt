@@ -3,6 +3,7 @@
 
 package org.eidora.ui.settings
 
+import org.eidora.util.EidoraLog
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -182,6 +183,7 @@ fun ModelsScreen(
                                 Intent(Intent.ACTION_VIEW, Uri.parse(MODELS_README_URL)),
                             )
                         } catch (t: Throwable) {
+                            EidoraLog.w("ModelsScreen", ") failed: ${t.message}")
                             toast(R.string.about_no_browser)
                         }
                     },

@@ -163,7 +163,7 @@ class ClusteringWorker(
                                         ),
                                     )
                                 } catch (t: Throwable) {
-                                    // ignore
+                                    EidoraLog.w(TAG, ") failed: ${t.message}")
                                 }
                             }
                     }
@@ -566,7 +566,7 @@ class ClusteringWorker(
                     .from(applicationContext)
                     .cancel(NotificationHelper.NOTIFICATION_ID_CLUSTERING)
             } catch (t: Throwable) {
-                // ignore
+                EidoraLog.w(TAG, ".cancel(NotificationHelper.NOTIFICATION_ failed: ${t.message}")
             }
         }
     }
@@ -636,7 +636,7 @@ class ClusteringWorker(
                         ),
                     )
                 } catch (t: Throwable) {
-                    // ignore
+                    EidoraLog.w(TAG, ") failed: ${t.message}")
                 }
             }
             if (isStopped) return false
@@ -711,7 +711,7 @@ class ClusteringWorker(
                     ),
                 )
             } catch (t: Throwable) {
-                // ignore
+                EidoraLog.w(TAG, ") failed: ${t.message}")
             }
         }
     }
@@ -736,7 +736,7 @@ class ClusteringWorker(
                 ),
             )
         } catch (t: Throwable) {
-            // ignore
+            EidoraLog.w(TAG, ") failed: ${t.message}")
         }
     }
 

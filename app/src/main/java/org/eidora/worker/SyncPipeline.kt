@@ -16,6 +16,12 @@ object SyncPipeline {
     const val UNIQUE_CLUSTERING_NAME = "eidora-clustering"
     const val PERIODIC_SYNC_NAME = "eidora-periodic-sync"
 
+    // Bounded wait for workers to stop after a cancel, before a destructive
+    // reset. ~20 × 100ms = 2s max, enough for a worker to unwind without
+    // hanging the caller if one is stuck.
+    private const val CANCEL_WAIT_MAX_TRIES = 20
+    private const val CANCEL_WAIT_INTERVAL_MS = 100L
+
     // -----------------------------------------------------------------------
     // Sync (Photo → Embedding). The model container is downloaded separately on
     // first run (see ContainerDownloader), not as part of this chain.
@@ -108,21 +114,56 @@ object SyncPipeline {
     }
 
     /**
-     * Cancels the running sync + clustering chains and clears pause state.
-     * Call before a destructive reset so no worker keeps writing to rows that
-     * are about to change underneath it.
-     */
-    /**
-     * Clears pause state and cancels clustering before a re-analyze. Note it
-     * deliberately does NOT cancelUniqueWork(UNIQUE_SYNC_NAME): the follow-up
-     * enqueueRedetectAll uses beginUniqueWork(..., REPLACE, ...) which already
-     * replaces any running sync chain under that name. Cancelling here first
-     * raced with that REPLACE and could leave the new chain cancelled too —
-     * which is exactly why "re-analyze" appeared to do nothing.
+     * Cancels the clustering chain and clears pause state, but deliberately does
+     * NOT touch the sync chain. Used where a follow-up beginUniqueWork(REPLACE)
+     * will take over the sync chain itself; cancelling it here first would race
+     * with that REPLACE and could leave the new chain cancelled too.
      */
     fun cancelRunningSync(context: Context) {
         val wm = WorkManager.getInstance(context)
         wm.cancelUniqueWork(UNIQUE_CLUSTERING_NAME)
+        PauseState.setPaused(context, false)
+    }
+
+    /**
+     * Fully stops ALL background work (sync chain + clustering) and BLOCKS until
+     * the workers have actually stopped, then clears pause state. Use before a
+     * destructive reset that runs *before* re-enqueuing (e.g. re-analyze): the
+     * deletion must not overlap a still-running triage/detection pass, or that
+     * pass re-imports XMP persons the reset just deleted. Because we wait here
+     * and only re-enqueue AFTER the reset, there's no race with a REPLACE.
+     * Best-effort bounded wait so a stuck worker can't hang the caller.
+     */
+    fun cancelAndAwaitSync(context: Context) {
+        val wm = WorkManager.getInstance(context)
+        try {
+            // cancelUniqueWork returns an Operation; .result.get() blocks until
+            // the cancellation has been processed by WorkManager.
+            wm.cancelUniqueWork(UNIQUE_SYNC_NAME).result.get()
+            wm.cancelUniqueWork(UNIQUE_CLUSTERING_NAME).result.get()
+        } catch (t: Throwable) {
+            EidoraLog.w("SyncPipeline", "cancel operation failed", t)
+        }
+        // A cancelled CoroutineWorker still needs a moment to unwind. Poll until
+        // neither chain has a RUNNING stage, up to a bounded number of tries.
+        try {
+            var tries = 0
+            while (tries < CANCEL_WAIT_MAX_TRIES) {
+                val running =
+                    (
+                        wm.getWorkInfosForUniqueWork(UNIQUE_SYNC_NAME).get().orEmpty() +
+                            wm.getWorkInfosForUniqueWork(UNIQUE_CLUSTERING_NAME).get().orEmpty()
+                    ).any { it.state == WorkInfo.State.RUNNING }
+                if (!running) break
+                Thread.sleep(CANCEL_WAIT_INTERVAL_MS)
+                tries++
+            }
+            if (tries >= CANCEL_WAIT_MAX_TRIES) {
+                EidoraLog.w("SyncPipeline", "Workers still running after wait; proceeding anyway")
+            }
+        } catch (t: Throwable) {
+            EidoraLog.w("SyncPipeline", "wait-for-stop failed", t)
+        }
         PauseState.setPaused(context, false)
     }
 

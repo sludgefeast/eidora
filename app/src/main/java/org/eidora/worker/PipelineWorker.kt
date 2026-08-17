@@ -132,7 +132,7 @@ abstract class PipelineWorker(
                             )
                             lastPosted = posted
                         } catch (t: Throwable) {
-                            // ignore
+                            EidoraLog.w(TAG, "posted failed: ${t.message}")
                         }
                     }
                     delay(if (blocked) IDLE_NOTIFIER_INTERVAL_MS else ACTIVE_NOTIFIER_INTERVAL_MS)
@@ -180,6 +180,7 @@ abstract class PipelineWorker(
         try {
             SettingsProvider.get(applicationContext).getPowerConfig()
         } catch (t: Throwable) {
+            EidoraLog.w(TAG, "fallback after error: ${t.message}")
             PowerConfig(
                 minBatteryPercent = SettingsRepository.DEFAULT_MIN_BATTERY_PERCENT,
                 maxBatteryTempCelsius = SettingsRepository.DEFAULT_MAX_BATTERY_TEMP,

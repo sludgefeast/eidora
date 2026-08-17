@@ -170,7 +170,7 @@ class EmbeddingWorker(
                                 )
                                 lastPosted = posted
                             } catch (t: Throwable) {
-                                // ignore
+                                EidoraLog.w(TAG, "posted failed: ${t.message}")
                             }
                         }
                         // Back off while blocked - nothing changes during a pause.
@@ -297,7 +297,7 @@ class EmbeddingWorker(
                     .from(applicationContext)
                     .cancel(NotificationHelper.NOTIFICATION_ID_EMBEDDING)
             } catch (t: Throwable) {
-                // ignore
+                EidoraLog.w(TAG, ".cancel(NotificationHelper.NOTIFICATION_ failed: ${t.message}")
             }
             }
         }

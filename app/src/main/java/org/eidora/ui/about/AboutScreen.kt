@@ -3,6 +3,7 @@
 
 package org.eidora.ui.about
 
+import org.eidora.util.EidoraLog
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -85,6 +86,7 @@ fun AboutScreen(onBack: () -> Unit) {
                             }
                             true
                         } catch (t: Throwable) {
+                            EidoraLog.w("AboutScreen", "true failed: ${t.message}")
                             false
                         }
                     }
@@ -196,6 +198,7 @@ fun AboutScreen(onBack: () -> Unit) {
                             try {
                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)))
                             } catch (t: Throwable) {
+                                EidoraLog.w("AboutScreen", "context.startActivity(Intent(Intent.AC failed: ${t.message}")
                                 Toast
                                     .makeText(context, R.string.about_no_browser, Toast.LENGTH_SHORT)
                                     .show()
@@ -211,6 +214,7 @@ fun AboutScreen(onBack: () -> Unit) {
                             try {
                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DONATE_URL)))
                             } catch (t: Throwable) {
+                                EidoraLog.w("AboutScreen", "context.startActivity(Intent(Intent.AC failed: ${t.message}")
                                 Toast
                                     .makeText(context, R.string.about_no_browser, Toast.LENGTH_SHORT)
                                     .show()

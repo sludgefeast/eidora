@@ -141,12 +141,12 @@ class EmbeddingModel private constructor(
         try {
             interpreter.close()
         } catch (t: Throwable) {
-            // ignore
+            EidoraLog.d(TAG, "interpreter.close() failed during close: ${t.message}")
         }
         try {
             gpuDelegate?.close()
         } catch (t: Throwable) {
-            // ignore
+            EidoraLog.d(TAG, "gpuDelegate.close() failed during close: ${t.message}")
         }
     }
 

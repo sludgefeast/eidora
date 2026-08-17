@@ -294,6 +294,12 @@ class FaceRepository(
             EidoraLog.w(tag, "resetFoldersForRedetection called with no folders; nothing to do")
             return
         }
+        // Normalize any photos stored under a subfolder of a whitelist root to
+        // that root first, so getInFolders (exact match) also catches photos in
+        // subfolders. Without this, subfolder photos scanned before folder
+        // normalization keep their full path as `folder` and are skipped by the
+        // reset — leaving their XMP person data behind to reappear on reinstall.
+        folders.forEach { root -> photoDao.normalizeFolderToRoot(root) }
         val photos = photoDao.getInFolders(folders)
         EidoraLog.i(tag, "resetFoldersForRedetection: ${photos.size} photos in $folders")
         var xmpCleared = 0
@@ -400,6 +406,7 @@ class FaceRepository(
             try {
                 ThumbnailHelper.deleteThumbnail(context, faceId)
             } catch (t: Throwable) {
+                EidoraLog.d("FaceRepository", "fallback after error: ${t.message}")
                 // best-effort; a missing file is fine
             }
         }

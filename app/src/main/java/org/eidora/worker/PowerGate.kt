@@ -54,6 +54,7 @@ class PowerGate(
                 val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
                 if (android.os.Build.VERSION.SDK_INT >= 29) pm.currentThermalStatus else 0
             } catch (t: Throwable) {
+                EidoraLog.d(TAG, "fallback after error: ${t.message}")
                 0
             }
 

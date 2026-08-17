@@ -41,6 +41,7 @@ object BitmapLoader {
             try {
                 ExifInterface(file.absolutePath)
             } catch (t: Throwable) {
+                EidoraLog.d("BitmapLoader", "fallback after error: ${t.message}")
                 null
             }
         val orientation =
@@ -93,6 +94,7 @@ object BitmapLoader {
                     )
                 } ?: ExifInterface.ORIENTATION_NORMAL
             } catch (t: Throwable) {
+                EidoraLog.d("BitmapLoader", "fallback after error: ${t.message}")
                 ExifInterface.ORIENTATION_NORMAL
             }
 

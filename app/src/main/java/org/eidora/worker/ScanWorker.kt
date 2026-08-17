@@ -64,6 +64,7 @@ class ScanWorker(
                     photoDao.countByStage(PhotoStage.NEEDS_DETECTION) +
                     photoDao.countByStage(PhotoStage.DONE)
             } catch (t: Throwable) {
+                EidoraLog.d(TAG, "fallback after error: ${t.message}")
                 0
             }
         val fullScan = isForce || dbPhotoCount == 0
@@ -89,6 +90,7 @@ class ScanWorker(
             try {
                 photoDao.getPendingXmpWrites().map { it.path }.toSet()
             } catch (t: Throwable) {
+                EidoraLog.w(TAG, "photoDao.getPendingXmpWrites().mapit.p failed: ${t.message}")
                 emptySet<String>()
             }
 
@@ -152,6 +154,7 @@ class ScanWorker(
             try {
                 FileUtil.readTakenAt(entry.file)
             } catch (t: Throwable) {
+                EidoraLog.d(TAG, "fallback after error: ${t.message}")
                 null
             }
         if (existing == null) {
@@ -281,9 +284,20 @@ class ScanWorker(
                     // whitelist let everything through). The folder wizard forces
                     // at least one selection, so a normally-set-up install always
                     // has a non-empty whitelist.
-                    if (folderWhitelist.isEmpty() ||
-                        !folderWhitelist.any { relPath == it || relPath.startsWith("$it/") }
-                    ) {
+                    //
+                    // Find the whitelist root this photo belongs to (exact folder
+                    // or an ancestor of it). We store THAT root as the photo's
+                    // `folder`, not the raw relative path: every folder-scoped
+                    // query in the app uses `folder IN (:whitelist)` with exact
+                    // matching, so a photo in a SUBFOLDER (e.g. DCIM/Camera/2024)
+                    // must be recorded under its whitelist root (DCIM/Camera) or
+                    // those queries — including the re-analyze reset — would skip
+                    // it, leaving its XMP person data behind.
+                    val matchedRoot =
+                        folderWhitelist.firstOrNull {
+                            relPath == it || relPath.startsWith("$it/")
+                        }
+                    if (folderWhitelist.isEmpty() || matchedRoot == null) {
                         filteredOut++
                         continue
                     }
@@ -294,7 +308,7 @@ class ScanWorker(
                     // dominated the scan. Rare stale entries (a file deleted
                     // outside MediaStore before its index caught up) are cleaned
                     // up by the periodic deletion check instead.
-                    result.add(WorkItemModified(File(path), relPath, cursor.getLong(modCol)))
+                    result.add(WorkItemModified(File(path), matchedRoot, cursor.getLong(modCol)))
                 }
             } ?: run {
                 // A null cursor means the query itself failed — most often a

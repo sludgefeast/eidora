@@ -3,6 +3,7 @@
 
 package org.eidora.ui.settings
 
+import org.eidora.util.EidoraLog
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -164,6 +165,7 @@ private suspend fun runTest(
                     try {
                         ContainerModelRunner.openDetector(context, container.dir, it)
                     } catch (t: Throwable) {
+                        EidoraLog.w("SelfTestScreen", "ContainerModelRunner.openDetector(cont failed: ${t.message}")
                         null
                     }
                 }

@@ -116,6 +116,9 @@ object EidoraLog {
                 active.appendText(line)
             } catch (t: Throwable) {
                 // Never let logging break the app; logcat already has the line.
+                // MUST use android.util.Log here, NOT EidoraLog — calling
+                // ourselves on a write failure would recurse infinitely.
+                Log.w("EidoraLog", "persisting log line failed: ${t.message}")
             }
         }
     }

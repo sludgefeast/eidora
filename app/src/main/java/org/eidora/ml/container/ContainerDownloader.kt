@@ -134,6 +134,7 @@ object ContainerDownloader {
                 ContainerManifestParser.parse(it).container.embeddingSpace
             }
         } catch (t: Throwable) {
+            EidoraLog.w(TAG, "fallback after error: ${t.message}")
             null
         }
     }
@@ -163,6 +164,7 @@ object ContainerDownloader {
             connection.disconnect()
             size.takeIf { it > 0 }
         } catch (t: Throwable) {
+            EidoraLog.w(TAG, "size.takeIfit>0 failed: ${t.message}")
             null
         }
     }
@@ -231,8 +233,10 @@ object ContainerDownloader {
                 try {
                     readManifestFromZip(tmpZip)
                 } catch (e: ContainerManifestParser.ManifestException) {
+                    EidoraLog.w("ContainerDownloader", "invalid container: ${e.message}", e)
                     return Result.Invalid(e.message ?: "invalid manifest")
                 } catch (e: Throwable) {
+                    EidoraLog.w(TAG, "Result.Invalid(e.message?invalidmanife failed: ${e.message}")
                     return Result.Invalid("could not read manifest: ${e.message}")
                 }
 
@@ -243,6 +247,7 @@ object ContainerDownloader {
             try {
                 unpackInto(tmpZip, dir, manifest)
             } catch (e: Throwable) {
+                EidoraLog.w("ContainerDownloader", "invalid container: ${e.message}", e)
                 dir.deleteRecursively()
                 return Result.Invalid("could not unpack container: ${e.message}")
             }
