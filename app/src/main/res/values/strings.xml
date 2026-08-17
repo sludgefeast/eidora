@@ -108,6 +108,7 @@
     <string name="person_face_count_confirmed">%1$d confirmed</string>
     <string name="action_reject_all_suggestions">Delete all suggestions</string>
     <string name="reject_all_suggestions_confirm">All unnamed suggestions will be deleted. The faces will move back to Unknown. This cannot be undone.</string>
+    <string name="reject_all_suggestions_delete_faces">Also remove the unconfirmed faces entirely (instead of moving them to Unknown)</string>
     <string name="settings_folders_title">Folders</string>
     <string name="settings_folders_loading">Loading folders…</string>
     <string name="action_delete_person">Delete person</string>

@@ -95,11 +95,26 @@ class FaceRepository(
         deletePersonIfOrphaned(personId)
     }
 
-    suspend fun rejectAllSuggestions() {
+    /**
+     * Clears all suggestion persons. [deleteFaces] controls what happens to the
+     * faces that were suggested:
+     *  - false (default): only the suggested assignment is undone, the faces
+     *    return to the unknown pool for re-clustering.
+     *  - true: the unconfirmed faces are removed entirely (region + thumbnail),
+     *    so they no longer appear anywhere.
+     */
+    suspend fun rejectAllSuggestions(deleteFaces: Boolean = false) {
         val suggestions = personDao.getSuggestions()
         suggestions.forEach { person ->
             val faces = faceDao.findByPersonId(person.id)
-            faces.forEach { face -> faceDao.updatePersonId(face.id, null) }
+            faces.forEach { face ->
+                if (deleteFaces) {
+                    faceDao.deleteById(face.id)
+                    ThumbnailHelper.deleteThumbnail(context, face.id)
+                } else {
+                    faceDao.updatePersonId(face.id, null)
+                }
+            }
             personDao.deleteById(person.id)
         }
     }
