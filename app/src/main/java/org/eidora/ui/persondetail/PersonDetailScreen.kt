@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import org.eidora.R
 import org.eidora.data.db.FaceRegionWithPhoto
+import org.eidora.data.db.faceRegion
 import org.eidora.ui.common.CircleThumbnail
 import org.eidora.ui.common.LazyGridScrollbar
 import org.eidora.util.ThumbnailHelper

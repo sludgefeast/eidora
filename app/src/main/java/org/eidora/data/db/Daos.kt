@@ -550,21 +550,29 @@ data class FaceRegionWithPhoto(
     @ColumnInfo(name = "quality_score") val qualityScore: Float?,
     @ColumnInfo(name = "embedding_failed") val embeddingFailed: Boolean,
     val photoTakenAt: Long?,
-) {
-    val faceRegion: FaceRegionEntity
-        get() =
-            FaceRegionEntity(
-                id = id,
-                photoId = photoId,
-                personId = personId,
-                name = name,
-                regionJson = regionJson,
-                embedding = null,
-                ignored = ignored,
-                qualityScore = qualityScore,
-                embeddingFailed = embeddingFailed,
-            )
-}
+)
+
+/**
+ * Rebuilds a FaceRegionEntity (with embedding = null) from the lightweight
+ * projection so existing call sites that read face.faceRegion.id / .name /
+ * .ignored / .photoId / .qualityScore keep working unchanged. Defined as an
+ * extension property, NOT a member, so Room's KSP processor does not mistake it
+ * for a column to map (a member `val faceRegion: FaceRegionEntity` made Room try
+ * to resolve FaceRegionEntity as a result type and fail).
+ */
+val FaceRegionWithPhoto.faceRegion: FaceRegionEntity
+    get() =
+        FaceRegionEntity(
+            id = id,
+            photoId = photoId,
+            personId = personId,
+            name = name,
+            regionJson = regionJson,
+            embedding = null,
+            ignored = ignored,
+            qualityScore = qualityScore,
+            embeddingFailed = embeddingFailed,
+        )
 
 data class PathModified(
     val id: String,

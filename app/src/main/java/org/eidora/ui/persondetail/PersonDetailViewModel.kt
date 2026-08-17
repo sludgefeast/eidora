@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.db.FaceRegionWithPhoto
+import org.eidora.data.db.faceRegion
 import org.eidora.data.db.PersonWithCount
 import org.eidora.data.repository.FaceRepository
 import org.eidora.ui.common.MultiSelectState
