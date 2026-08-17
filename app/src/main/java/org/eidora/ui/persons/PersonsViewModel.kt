@@ -205,9 +205,9 @@ class PersonsViewModel(
         }
     }
 
-    fun rejectAllSuggestions(deleteFaces: Boolean = false) {
+    fun rejectAllSuggestions() {
         viewModelScope.launch {
-            repo.rejectAllSuggestions(deleteFaces)
+            repo.rejectAllSuggestions()
             org.eidora.worker.SyncPipeline
                 .enqueueClustering(getApplication())
         }

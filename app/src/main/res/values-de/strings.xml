@@ -106,9 +106,9 @@
     <string name="action_delete_face">Gesicht löschen (Falsch-Positiv)</string>
     <string name="delete_face_confirm_message">Dieses Gesicht wird dauerhaft gelöscht und beim nächsten Sync nicht erneut erkannt. Verwende diese Aktion um falsch erkannte Gesichter zu entfernen.</string>
     <string name="person_face_count_confirmed">%1$d bestätigt</string>
-    <string name="action_reject_all_suggestions">Alle Vorschläge löschen</string>
-    <string name="reject_all_suggestions_confirm">Alle unbenannten Vorschläge werden gelöscht. Die Gesichter werden in Unbekannt verschoben. Dies kann nicht rückgängig gemacht werden.</string>
-    <string name="reject_all_suggestions_delete_faces">Unbestätigte Gesichter ganz entfernen (statt sie nach Unbekannt zu verschieben)</string>
+    <string name="action_reject_all_suggestions">Alle Vorschläge zurücknehmen</string>
+    <string name="action_take_back">Zurücknehmen</string>
+    <string name="reject_all_suggestions_confirm">Alle vorgeschlagenen Personen werden entfernt und unbestätigte Gesichter benannter Personen werden zurückgenommen. Alle betroffenen Gesichter werden wieder Unbekannt zugeordnet. Dies kann nicht rückgängig gemacht werden.</string>
     <string name="settings_folders_title">Ordner</string>
     <string name="settings_folders_loading">Lade Ordner…</string>
     <string name="action_delete_person">Person löschen</string>

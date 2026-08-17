@@ -103,20 +103,30 @@ class FaceRepository(
      *  - true: the unconfirmed faces are removed entirely (region + thumbnail),
      *    so they no longer appear anywhere.
      */
-    suspend fun rejectAllSuggestions(deleteFaces: Boolean = false) {
+    /**
+     * Takes back ALL suggestions, moving every affected face back to Unknown
+     * (never deletes a face). Two cases:
+     *  1. Suggestion persons (persons.name IS NULL) — whole unnamed persons that
+     *     are only a suggestion: the person is removed and each of its faces is
+     *     unassigned (personId = null).
+     *  2. Unconfirmed faces of NAMED persons (face.name IS NULL but assigned to a
+     *     person the user has named): the suggested assignment is undone
+     *     (personId = null); the named person itself stays.
+     * All affected faces end up unassigned, i.e. back in the Unknown pool.
+     */
+    suspend fun rejectAllSuggestions() {
+        // Case 1: whole suggestion persons.
         val suggestions = personDao.getSuggestions()
         suggestions.forEach { person ->
-            val faces = faceDao.findByPersonId(person.id)
-            faces.forEach { face ->
-                if (deleteFaces) {
-                    faceDao.deleteById(face.id)
-                    ThumbnailHelper.deleteThumbnail(context, face.id)
-                } else {
-                    faceDao.updatePersonId(face.id, null)
-                }
+            faceDao.findByPersonId(person.id).forEach { face ->
+                faceDao.updatePersonId(face.id, null)
             }
             personDao.deleteById(person.id)
         }
+        // Case 2: unconfirmed faces still attached to named persons.
+        faceDao.unassignUnconfirmedFaces()
+        // Any person left without faces is pruned.
+        personDao.deleteOrphaned()
     }
 
     // -----------------------------------------------------------------------

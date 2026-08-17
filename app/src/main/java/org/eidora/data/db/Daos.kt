@@ -420,6 +420,14 @@ interface FaceRegionDao {
         personId: String?,
     )
 
+    /**
+     * Unassigns every unconfirmed face (name IS NULL) that is still attached to a
+     * person, moving it back to the Unknown pool. Confirmed faces (name set) are
+     * left untouched. Used by "take back all suggestions".
+     */
+    @Query("UPDATE face_regions SET personId = NULL WHERE name IS NULL AND personId IS NOT NULL")
+    suspend fun unassignUnconfirmedFaces()
+
     @Query("UPDATE face_regions SET personId = :personId, name = :name WHERE id = :id")
     suspend fun updatePersonAndName(
         id: String,

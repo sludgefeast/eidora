@@ -21,12 +21,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -351,7 +349,6 @@ fun EidoraApp() {
     val personsVm: PersonsViewModel = viewModel()
     var menuExpanded by remember { mutableStateOf(false) }
     var showRejectAllConfirm by remember { mutableStateOf(false) }
-    var rejectAllDeleteFaces by remember { mutableStateOf(false) }
     var showReanalyseAllConfirm by remember { mutableStateOf(false) }
     val reanalyseScope = rememberCoroutineScope()
 
@@ -359,38 +356,15 @@ fun EidoraApp() {
         AlertDialog(
             onDismissRequest = { showRejectAllConfirm = false },
             title = { Text(stringResource(R.string.action_reject_all_suggestions)) },
-            text = {
-                Column {
-                    Text(stringResource(R.string.reject_all_suggestions_confirm))
-                    Spacer(Modifier.height(16.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable { rejectAllDeleteFaces = !rejectAllDeleteFaces },
-                    ) {
-                        Checkbox(
-                            checked = rejectAllDeleteFaces,
-                            onCheckedChange = { rejectAllDeleteFaces = it },
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.reject_all_suggestions_delete_faces))
-                    }
-                }
-            },
+            text = { Text(stringResource(R.string.reject_all_suggestions_confirm)) },
             confirmButton = {
                 TextButton(onClick = {
-                    personsVm.rejectAllSuggestions(rejectAllDeleteFaces)
+                    personsVm.rejectAllSuggestions()
                     showRejectAllConfirm = false
-                    rejectAllDeleteFaces = false
-                }) { Text(stringResource(R.string.action_delete)) }
+                }) { Text(stringResource(R.string.action_take_back)) }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showRejectAllConfirm = false
-                    rejectAllDeleteFaces = false
-                }) {
+                TextButton(onClick = { showRejectAllConfirm = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
