@@ -313,12 +313,12 @@ interface FaceRegionDao {
     @Query(
         "SELECT f.id, f.photoId, f.personId, f.name, f.regionJson, f.embedding, f.ignored, f.quality_score, f.embedding_failed, ph.takenAt AS photoTakenAt FROM face_regions f JOIN photos ph ON f.photoId = ph.id WHERE f.personId = :personId",
     )
-    suspend fun findByPersonIdWithDate(personId: String): List<FaceRegionWithPhoto>
+    suspend fun findByPersonIdWithDate(personId: String): List<FaceRegionForClustering>
 
     @Query(
         "SELECT f.id, f.photoId, f.personId, f.name, f.regionJson, f.embedding, f.ignored, f.quality_score, f.embedding_failed, ph.takenAt AS photoTakenAt FROM face_regions f JOIN photos ph ON f.photoId = ph.id WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding IS NOT NULL",
     )
-    suspend fun findUnclusteredWithDate(): List<FaceRegionWithPhoto>
+    suspend fun findUnclusteredWithDate(): List<FaceRegionForClustering>
 
     @Query(
         """
@@ -440,7 +440,7 @@ interface FaceRegionDao {
 
     @Query(
         """
-        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson, f.embedding,
+        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson,
                f.ignored, f.quality_score, f.embedding_failed,
                ph.takenAt AS photoTakenAt
         FROM face_regions f
@@ -458,7 +458,7 @@ interface FaceRegionDao {
 
     @Query(
         """
-        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson, f.embedding,
+        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson,
                f.ignored, f.quality_score, f.embedding_failed,
                ph.takenAt AS photoTakenAt
         FROM face_regions f
@@ -471,7 +471,7 @@ interface FaceRegionDao {
 
     @Query(
         """
-        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson, f.embedding,
+        SELECT f.id, f.photoId, f.personId, f.name, f.regionJson,
                f.ignored, f.quality_score, f.embedding_failed,
                ph.takenAt AS photoTakenAt
         FROM face_regions f
@@ -517,10 +517,54 @@ interface FaceRegionDao {
     fun observeByPhotoId(photoId: String): Flow<List<FaceRegionEntity>>
 }
 
-data class FaceRegionWithPhoto(
+/**
+ * Face row WITH the embedding blob, for the clustering worker which needs it.
+ * Kept separate from [FaceRegionWithPhoto] (the UI projection) so UI list
+ * queries never pull the blob into a CursorWindow. These run as suspend calls
+ * in the background, not as observed flows bound to the UI.
+ */
+data class FaceRegionForClustering(
     @Embedded val faceRegion: FaceRegionEntity,
     val photoTakenAt: Long?,
 )
+
+/**
+ * Face row for UI lists, WITHOUT the embedding blob. The embedding is 128–512
+ * floats per row; selecting it for a person with hundreds of faces overflowed
+ * the SQLite CursorWindow (~2 MB) and crashed observed queries with "Couldn't
+ * read row N from CursorWindow". Room populates these scalar columns directly
+ * (no @Embedded blob), so the window holds far more rows.
+ *
+ * [faceRegion] rebuilds a FaceRegionEntity with embedding = null so existing
+ * call sites that read face.faceRegion.id / .name / .ignored / .photoId /
+ * .qualityScore keep working unchanged. Consumers needing the embedding (the
+ * clustering worker) use FaceRegionForClustering instead.
+ */
+data class FaceRegionWithPhoto(
+    val id: String,
+    val photoId: String,
+    val personId: String?,
+    val name: String?,
+    val regionJson: String,
+    val ignored: Boolean,
+    @ColumnInfo(name = "quality_score") val qualityScore: Float?,
+    @ColumnInfo(name = "embedding_failed") val embeddingFailed: Boolean,
+    val photoTakenAt: Long?,
+) {
+    val faceRegion: FaceRegionEntity
+        get() =
+            FaceRegionEntity(
+                id = id,
+                photoId = photoId,
+                personId = personId,
+                name = name,
+                regionJson = regionJson,
+                embedding = null,
+                ignored = ignored,
+                qualityScore = qualityScore,
+                embeddingFailed = embeddingFailed,
+            )
+}
 
 data class PathModified(
     val id: String,
