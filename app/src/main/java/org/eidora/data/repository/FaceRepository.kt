@@ -80,7 +80,7 @@ class FaceRepository(
                 personDao.deleteById(personId)
                 photoIds
             }
-        affectedPhotoIds.forEach { markPendingXmpWrite(it) }
+        markPendingXmpWriteBatch(affectedPhotoIds)
     }
 
     /**
@@ -242,7 +242,7 @@ class FaceRepository(
         faceDao.updateConfirmedNamesForPerson(personId, newName)
         val faces = faceDao.findByPersonId(personId).filter { it.name != null }
         val photoIds = faces.map { it.photoId }.distinct()
-        photoIds.forEach { markPendingXmpWrite(it) }
+        markPendingXmpWriteBatch(photoIds)
     }
 
     // -----------------------------------------------------------------------
@@ -264,7 +264,7 @@ class FaceRepository(
         if (confirm) {
             faceDao.updateConfirmedNamesForPerson(personId, name)
             val photoIds = faceDao.findByPersonId(personId).map { it.photoId }.distinct()
-            photoIds.forEach { markPendingXmpWrite(it) }
+            markPendingXmpWriteBatch(photoIds)
         }
         recomputeCentroid(personId)
     }
@@ -293,7 +293,7 @@ class FaceRepository(
         val faces = faceDao.findByPersonId(winnerId)
         // Only photos with a confirmed (named) face need an XMP write.
         val photoIds = faces.filter { it.name != null }.map { it.photoId }.distinct()
-        photoIds.forEach { markPendingXmpWrite(it) }
+        markPendingXmpWriteBatch(photoIds)
     }
 
     // -----------------------------------------------------------------------
@@ -549,6 +549,24 @@ class FaceRepository(
      */
     private suspend fun markPendingXmpWrite(photoId: String) {
         photoDao.markPendingXmpWrite(photoId)
+        org.eidora.worker.XmpWriteWorker
+            .enqueue(context)
+    }
+
+    /**
+     * Marks many photos pending in a single DB update and enqueues the XMP writer
+     * ONCE, instead of per photo. Deleting a person or taking back suggestions
+     * can affect thousands of photos; calling the per-photo variant in a loop
+     * fired thousands of DB writes and worker enqueues in quick succession and
+     * overloaded the worker process (it ran out of memory and the UI's data
+     * flows collapsed). Chunked so the IN clause stays within SQLite's variable
+     * limit.
+     */
+    private suspend fun markPendingXmpWriteBatch(photoIds: List<String>) {
+        if (photoIds.isEmpty()) return
+        photoIds.distinct().chunked(500).forEach { chunk ->
+            photoDao.markPendingXmpWriteBatch(chunk)
+        }
         org.eidora.worker.XmpWriteWorker
             .enqueue(context)
     }

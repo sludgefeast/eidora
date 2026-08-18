@@ -49,8 +49,14 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE pending_xmp_write = 1")
     suspend fun getPendingXmpWrites(): List<PhotoEntity>
 
+    @Query("SELECT * FROM photos WHERE pending_xmp_write = 1 LIMIT :limit")
+    suspend fun getPendingXmpWrites(limit: Int): List<PhotoEntity>
+
     @Query("UPDATE photos SET pending_xmp_write = 1 WHERE id = :id")
     suspend fun markPendingXmpWrite(id: String)
+
+    @Query("UPDATE photos SET pending_xmp_write = 1 WHERE id IN (:ids)")
+    suspend fun markPendingXmpWriteBatch(ids: List<String>)
 
     @Query("UPDATE photos SET pending_xmp_write = 0, modifiedAt = :modifiedAt WHERE id = :id")
     suspend fun clearPendingXmpWrite(

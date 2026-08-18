@@ -38,7 +38,7 @@ class XmpWriteWorker(
 
         val pending =
             try {
-                photoDao.getPendingXmpWrites()
+                photoDao.getPendingXmpWrites(MAX_PER_RUN)
             } catch (t: Throwable) {
                 EidoraLog.e(TAG, "Failed to load pending XMP writes", t)
                 return Result.retry()
@@ -88,11 +88,23 @@ class XmpWriteWorker(
             }
         }
 
+        // If we filled a whole batch there are probably more pending; run again
+        // rather than loading everything (thousands of photos after deleting a
+        // person) into one process and risking an out-of-memory kill.
+        if (pending.size >= MAX_PER_RUN) {
+            EidoraLog.i(TAG, "Hit per-run cap, re-enqueuing for the rest")
+            enqueue(applicationContext)
+        }
         return Result.success()
     }
 
     companion object {
         private const val UNIQUE_WORK_NAME = "eidora-xmp-write"
+
+        // Cap photos processed per run so a bulk change (e.g. deleting a person
+        // with thousands of faces) is drained across several short jobs instead
+        // of one huge one that can exhaust the worker process's heap.
+        private const val MAX_PER_RUN = 500
 
         fun enqueue(context: Context) {
             WorkManager.getInstance(context).enqueueUniqueWork(
