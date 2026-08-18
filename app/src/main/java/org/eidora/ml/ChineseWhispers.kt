@@ -17,6 +17,13 @@ import kotlin.random.Random
 object ChineseWhispers {
     private const val MAX_ITERATIONS = 100
 
+    // Cap on edges kept per node. Bounds graph memory at O(n × MAX_NEIGHBORS);
+    // without it a frequently-photographed face collects thousands of neighbours
+    // and the graph exhausts the heap. 128 is a standard fan-out for face-graph
+    // clustering — enough to connect a person's photos, while dropping weak
+    // noisy edges. Relative to the graph, not tuned to any collection.
+    private const val MAX_NEIGHBORS = 128
+
     // Enable LSH-based candidate generation above this node count.
     private const val LSH_THRESHOLD = 500
 
@@ -265,16 +272,41 @@ object ChineseWhispers {
             curWeights = FloatArray(4)
             idx[from] = curIdx
             weights[from] = curWeights
-        } else if (count == curIdx.size) {
-            val newSize = curIdx.size * 2
+        } else if (count == curIdx.size && curIdx.size < MAX_NEIGHBORS) {
+            // Grow, but never beyond MAX_NEIGHBORS. Capping the per-node
+            // adjacency keeps the graph's memory at O(n × MAX_NEIGHBORS) instead
+            // of unbounded: with well-aligned embeddings a frequently-photographed
+            // face can otherwise collect thousands of neighbours and exhaust the
+            // heap (OutOfMemoryError in addEdge). Keeping only the strongest
+            // edges also drops weak, noisy ones, which helps cluster quality.
+            val newSize = minOf(curIdx.size * 2, MAX_NEIGHBORS)
             curIdx = curIdx.copyOf(newSize)
             curWeights = curWeights!!.copyOf(newSize)
             idx[from] = curIdx
             weights[from] = curWeights
         }
-        curIdx[count] = to
-        curWeights!![count] = weight
-        counts[from] = count + 1
+        curWeights = curWeights!!
+        if (count < curIdx.size) {
+            // Room left: append.
+            curIdx[count] = to
+            curWeights[count] = weight
+            counts[from] = count + 1
+        } else {
+            // Full at MAX_NEIGHBORS: replace the weakest edge if this one is
+            // stronger, so each node keeps its top-MAX_NEIGHBORS strongest edges.
+            var minPos = 0
+            var minW = curWeights[0]
+            for (p in 1 until curIdx.size) {
+                if (curWeights[p] < minW) {
+                    minW = curWeights[p]
+                    minPos = p
+                }
+            }
+            if (weight > minW) {
+                curIdx[minPos] = to
+                curWeights[minPos] = weight
+            }
+        }
     }
 
     private fun shuffleIntArray(array: IntArray) {
