@@ -486,6 +486,25 @@ interface FaceRegionDao {
     )
     fun observeUnknown(folders: List<String>): Flow<List<FaceRegionWithPhoto>>
 
+    /**
+     * PagingSource variant of [observeUnknown] for the Unknown screen, which can
+     * hold tens of thousands of faces. No LIMIT — Paging loads pages on demand,
+     * so the UI shows the first page immediately instead of blocking on the whole
+     * result set.
+     */
+    @Query(
+        """
+        SELECT f.id, f.photoId, f.personId, f.name,
+               f.ignored, f.quality_score, f.embedding_failed,
+               ph.takenAt AS photoTakenAt
+        FROM face_regions f
+        JOIN photos ph ON ph.id = f.photoId
+        WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding_failed = 0 AND ph.folder IN (:folders)
+        ORDER BY ph.takenAt DESC
+    """,
+    )
+    fun pagingUnknown(folders: List<String>): androidx.paging.PagingSource<Int, FaceRegionWithPhoto>
+
     @Query(
         """
         SELECT f.id, f.photoId, f.personId, f.name,

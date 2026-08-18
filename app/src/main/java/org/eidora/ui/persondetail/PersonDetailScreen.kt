@@ -11,6 +11,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -50,6 +51,10 @@ fun PersonDetailScreen(
     onFaceClick: (faceRegionId: String, photoId: String) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
+    // Unknown mode is paged (can be tens of thousands of faces); other modes use
+    // the in-state face lists. Only collected when a paged flow is present.
+    val unknownItems =
+        viewModel.unknownPaged?.collectAsLazyPagingItems()
 
     var isEditingName by remember { mutableStateOf(false) }
     var editedName by remember(state.personName) { mutableStateOf(state.personName) }
@@ -263,7 +268,7 @@ fun PersonDetailScreen(
                     onAssign = { viewModel.showAssignSheet() },
                 )
             } else if (state.viewMode == PersonDetailViewMode.UNKNOWN &&
-                state.unconfirmedFaces.isNotEmpty()
+                (unknownItems?.itemCount ?: 0) > 0
             ) {
                 Surface(shadowElevation = 8.dp) {
                     Row(
@@ -319,7 +324,39 @@ fun PersonDetailScreen(
                         )
                     }
                 }
-                if (state.unconfirmedFaces.isNotEmpty()) {
+                if (state.viewMode == PersonDetailViewMode.UNKNOWN && unknownItems != null) {
+                    // Paged unknown faces (no month headers — the full ordering
+                    // isn't known page-by-page). Placeholder-free, so null items
+                    // don't occur.
+                    items(
+                        count = unknownItems.itemCount,
+                        key = { index -> unknownItems[index]?.id ?: index },
+                    ) { index ->
+                        val face = unknownItems[index]
+                        if (face != null) {
+                            FaceGridItem(
+                                face = face,
+                                isSelected = state.selectedFaceIds.contains(face.id),
+                                borderColor = null,
+                                onTap = {
+                                    if (state.isMultiSelectActive) {
+                                        viewModel.toggleFaceSelection(face.id)
+                                    } else {
+                                        viewModel.showFaceActions(face.id)
+                                    }
+                                },
+                                onLongPress = {
+                                    if (state.isMultiSelectActive) {
+                                        viewModel.rangeSelectFace(face.id)
+                                    } else {
+                                        viewModel.toggleFaceSelection(face.id)
+                                    }
+                                },
+                                onImageTap = { onFaceClick(face.id, face.photoId) },
+                            )
+                        }
+                    }
+                } else if (state.unconfirmedFaces.isNotEmpty()) {
                     faceItemsWithMonthHeaders(
                         faces = state.unconfirmedFaces,
                         isSelected = { state.selectedFaceIds.contains(it) },
@@ -389,6 +426,25 @@ fun PersonDetailScreen(
                 scope = scope,
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
             )
+            // Loading spinner while the (potentially very large) face list is
+            // still being read from the database. Shown only until the first
+            // batch of results arrives, so opening Unknown with tens of
+            // thousands of faces gives immediate feedback instead of a blank
+            // screen.
+            val showLoading =
+                if (state.viewMode == PersonDetailViewMode.UNKNOWN && unknownItems != null) {
+                    // Paging: show the spinner while the first page is refreshing
+                    // and nothing is on screen yet.
+                    unknownItems.loadState.refresh is androidx.paging.LoadState.Loading &&
+                        unknownItems.itemCount == 0
+                } else {
+                    state.isLoading && state.unconfirmedFaces.isEmpty()
+                }
+            if (showLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
         } // Box
     }
 
@@ -396,6 +452,7 @@ fun PersonDetailScreen(
         val face =
             state.unconfirmedFaces.find { it.faceRegion.id == faceId }
                 ?: state.confirmedFaces.find { it.faceRegion.id == faceId }
+                ?: unknownItems?.itemSnapshotList?.items?.find { it.id == faceId }
         FaceActionsSheet(
             viewMode = state.viewMode,
             onOpenPhoto = {

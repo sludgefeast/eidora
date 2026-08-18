@@ -6,6 +6,7 @@ package org.eidora.ui.persondetail
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.cachedIn
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.eidora.data.db.DatabaseProvider
@@ -30,6 +31,7 @@ data class PersonDetailUiState(
     val allPersons: List<PersonWithCount> = emptyList(),
     val personSearchQuery: String = "",
     val isReassigning: Boolean = false,
+    val isLoading: Boolean = true,
     val renameConflict: RenameConflict? = null,
 ) {
     val selectedFaceIds get() = multiSelect.selectedIds
@@ -101,26 +103,37 @@ class PersonDetailViewModel(
                             faces.filter { f ->
                                 f.faceRegion.name != null && !f.faceRegion.ignored
                             },
+                        isLoading = false,
                     )
                 }
             }
         }
     }
 
+    /**
+     * Paged stream of unknown faces, driven by Paging 3. Non-null only while the
+     * Unknown screen is active. The screen collects this with
+     * collectAsLazyPagingItems() so the first page shows immediately and further
+     * pages load on scroll — essential with tens of thousands of unknown faces.
+     */
+    var unknownPaged: kotlinx.coroutines.flow.Flow<androidx.paging.PagingData<FaceRegionWithPhoto>>? = null
+        private set
+
     fun loadUnknown() {
         viewModelScope.launch {
             val folders = settingsRepo.getFolderWhitelist().toList()
-            repo.observeUnknownFaces(folders).collect { faces: List<FaceRegionWithPhoto> ->
-                _uiState.update {
-                    it.copy(
-                        personName =
-                            getApplication<Application>()
-                                .getString(org.eidora.R.string.virtual_person_unknown),
-                        viewMode = PersonDetailViewMode.UNKNOWN,
-                        unconfirmedFaces = faces,
-                        confirmedFaces = emptyList(),
-                    )
-                }
+            unknownPaged =
+                repo.pagingUnknownFaces(folders).cachedIn(viewModelScope)
+            _uiState.update {
+                it.copy(
+                    personName =
+                        getApplication<Application>()
+                            .getString(org.eidora.R.string.virtual_person_unknown),
+                    viewMode = PersonDetailViewMode.UNKNOWN,
+                    unconfirmedFaces = emptyList(),
+                    confirmedFaces = emptyList(),
+                    isLoading = false,
+                )
             }
         }
     }
@@ -137,6 +150,7 @@ class PersonDetailViewModel(
                         viewMode = PersonDetailViewMode.IGNORED,
                         unconfirmedFaces = faces,
                         confirmedFaces = emptyList(),
+                        isLoading = false,
                     )
                 }
             }
