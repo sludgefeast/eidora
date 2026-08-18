@@ -4,6 +4,7 @@
 package org.eidora.data.repository
 
 import android.content.Context
+import androidx.room.withTransaction
 import org.eidora.util.EidoraLog
 import kotlinx.coroutines.flow.Flow
 import org.eidora.data.db.*
@@ -60,22 +61,25 @@ class FaceRepository(
      * removes the person record.
      */
     suspend fun deletePerson(personId: String) {
-        val person = personDao.findById(personId) ?: return
-        val faces = faceDao.findByPersonId(personId)
-
-        // Collect affected photo IDs before touching anything
-        val affectedPhotoIds = faces.map { it.photoId }.distinct()
-
-        // Detach all faces from this person (confirmed + unconfirmed)
-        faces.forEach { face ->
-            faceDao.updatePersonId(face.id, null)
-            if (face.name != null) {
-                faceDao.clearName(face.id)
+        // Wrap in a transaction so the whole delete (detach faces, clear names,
+        // remove the person) either fully completes or not at all. Without this,
+        // if the caller's scope was cancelled mid-way (e.g. the detail screen
+        // navigated back the moment delete was tapped), the person could be left
+        // half-deleted — some faces still attached — and appear not to delete.
+        val affectedPhotoIds =
+            db.withTransaction {
+                personDao.findById(personId) ?: return@withTransaction emptyList<String>()
+                val faces = faceDao.findByPersonId(personId)
+                val photoIds = faces.map { it.photoId }.distinct()
+                faces.forEach { face ->
+                    faceDao.updatePersonId(face.id, null)
+                    if (face.name != null) {
+                        faceDao.clearName(face.id)
+                    }
+                }
+                personDao.deleteById(personId)
+                photoIds
             }
-        }
-
-        personDao.deleteById(personId)
-
         affectedPhotoIds.forEach { markPendingXmpWrite(it) }
     }
 

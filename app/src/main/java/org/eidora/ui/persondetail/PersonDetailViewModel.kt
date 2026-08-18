@@ -216,7 +216,13 @@ class PersonDetailViewModel(
     fun deleteCurrentPerson(onDeleted: () -> Unit) {
         val personId = currentPersonId ?: return
         viewModelScope.launch {
-            repo.deletePerson(personId)
+            // The delete must finish even though onDeleted() navigates back and
+            // tears down this ViewModel (cancelling viewModelScope). Run the DB
+            // work in NonCancellable so navigation can't leave a person
+            // half-deleted; only then invoke the callback.
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                repo.deletePerson(personId)
+            }
             onDeleted()
         }
     }

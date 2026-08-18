@@ -58,7 +58,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import kotlinx.coroutines.launch
-import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.repository.FaceRepository
 import org.eidora.ui.fullscreen.FullscreenPhotoScreen
 import org.eidora.ui.fullscreen.FullscreenViewModel
@@ -350,7 +349,6 @@ fun EidoraApp() {
     var menuExpanded by remember { mutableStateOf(false) }
     var showRejectAllConfirm by remember { mutableStateOf(false) }
     var showReanalyseAllConfirm by remember { mutableStateOf(false) }
-    val reanalyseScope = rememberCoroutineScope()
 
     if (showRejectAllConfirm) {
         AlertDialog(
@@ -379,37 +377,12 @@ fun EidoraApp() {
             confirmButton = {
                 TextButton(onClick = {
                     showReanalyseAllConfirm = false
-                    reanalyseScope.launch {
-                        // The reset walks every photo and rewrites its XMP on
-                        // disk — heavy file I/O that must not run on the main
-                        // thread (with a large library it would freeze the UI /
-                        // trigger an ANR, which looked like "nothing happens").
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            EidoraLog.i("FaceRepository", "Re-analyze all: starting")
-                            val repo =
-                                org.eidora.data.repository.FaceRepository(
-                                    context,
-                                    DatabaseProvider.getInstance(context),
-                                )
-                            // Only the currently visible folders (the same
-                            // whitelist the photo grid shows), not every photo
-                            // the DB has ever seen.
-                            val folders =
-                                org.eidora.data.settings.SettingsProvider
-                                    .get(context)
-                                    .getFolderWhitelist()
-                                    .toList()
-                            // Fully stop the running sync + clustering and WAIT
-                            // until workers have stopped, THEN clear face data,
-                            // THEN start detection. Waiting first prevents a
-                            // still-running triage pass from re-importing XMP
-                            // persons the reset is deleting.
-                            SyncPipeline.cancelAndAwaitSync(context)
-                            repo.resetFoldersForRedetection(folders)
-                            SyncPipeline.enqueueRedetectAll(context)
-                            EidoraLog.i("FaceRepository", "Re-analyze all: enqueued detection")
-                        }
-                    }
+                    // Run the reset as a WorkManager job, NOT in a
+                    // rememberCoroutineScope: closing this dialog leaves the
+                    // composition and would cancel a UI-tied scope mid-reset
+                    // (ForgottenCoroutineScopeException on every photo, so it
+                    // looked like nothing happened). The worker survives that.
+                    org.eidora.worker.ReanalyzeWorker.enqueue(context)
                 }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
