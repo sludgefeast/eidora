@@ -30,6 +30,7 @@ data class PersonsUiState(
     val renamingPersonId: String? = null,
     val showMergeSheet: Boolean = false,
     val namesakeConflict: NamesakeConflict? = null,
+    val isClustering: Boolean = false,
 ) {
     val selectedPersonIds get() = multiSelect.selectedIds
     val isMultiSelectActive get() = multiSelect.isActive
@@ -95,9 +96,19 @@ class PersonsViewModel(
                         multiSelect = _uiState.value.multiSelect,
                         renamingPersonId = _uiState.value.renamingPersonId,
                         showMergeSheet = _uiState.value.showMergeSheet,
+                        isClustering = _uiState.value.isClustering,
                     )
                 }
             }.collect { newState -> _uiState.value = newState }
+        }
+        // Separate collector: reflects whether clustering is running so the UI
+        // can show progress feedback instead of appearing frozen.
+        viewModelScope.launch {
+            org.eidora.worker.SyncPipeline
+                .clusteringRunningFlow(getApplication())
+                .collect { running ->
+                    _uiState.update { it.copy(isClustering = running) }
+                }
         }
     }
 

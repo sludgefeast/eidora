@@ -9,6 +9,7 @@
     <!-- Persons screen -->
     <string name="section_suggestions">Suggestions</string>
     <string name="section_confirmed">Confirmed</string>
+    <string name="clustering_in_progress">Grouping similar faces…</string>
     <string name="virtual_person_unknown">Unknown</string>
     <string name="virtual_person_ignored">Ignored</string>
     <string name="hint_enter_name">Enter name…</string>

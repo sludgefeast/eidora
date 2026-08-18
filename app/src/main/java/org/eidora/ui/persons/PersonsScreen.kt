@@ -164,6 +164,39 @@ fun PersonsScreen(
             scope = scope,
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
         )
+        // Clustering feedback: a slim banner so the user knows grouping is in
+        // progress and the app isn't frozen. Sits at the top, over the grid,
+        // and only shows while clustering runs.
+        if (state.isClustering) {
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth(),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = stringResource(R.string.clustering_in_progress),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
+        }
     } // Box
 
     // Merge sheet

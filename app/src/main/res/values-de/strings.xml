@@ -9,6 +9,7 @@
     <!-- Persons screen -->
     <string name="section_suggestions">Vorschläge</string>
     <string name="section_confirmed">Bestätigt</string>
+    <string name="clustering_in_progress">Ähnliche Gesichter werden gruppiert…</string>
     <string name="virtual_person_unknown">Unbekannt</string>
     <string name="virtual_person_ignored">Ignoriert</string>
     <string name="hint_enter_name">Namen eingeben…</string>
