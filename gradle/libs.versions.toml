@@ -5,7 +5,7 @@ kotlin = "2.4.10"
 # release paired with Kotlin 2.4.10 (see kotlinlang.org KSP quickstart) and
 # carries the AGP-9 built-in-Kotlin fixes.
 ksp = "2.3.11"
-compose-bom = "2026.06.01"
+compose-bom = "2026.08.00"
 activity-compose = "1.13.0"
 lifecycle = "2.11.0"
 navigation = "2.8.5"
@@ -20,15 +20,15 @@ coil = "2.7.0"
 kotlinx-serialization = "1.11.0"
 kotlinx-coroutines = "1.11.0"
 core-ktx = "1.19.0"
-junit-jupiter = "6.1.2"
+junit-jupiter = "6.1.3"
 # Must stay aligned with junit-jupiter: JUnit 6.x numbers Platform and Jupiter
 # identically. Gradle bundles an older 1.x launcher, so we pin the matching one
 # explicitly, otherwise test discovery fails with "OutputDirectoryCreator not
 # available".
-junit-platform-launcher = "6.1.2"
+junit-platform-launcher = "6.1.3"
 aboutlibraries = "15.0.4"
 
-appcompat = "1.7.0"
+appcompat = "1.8.0"
 snakeyaml = "2.6"
 
 [libraries]
