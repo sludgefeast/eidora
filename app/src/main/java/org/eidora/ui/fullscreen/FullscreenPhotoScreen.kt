@@ -218,20 +218,41 @@ fun FullscreenPhotoScreen(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+        }
 
-            if (containerSize != IntSize.Zero && intrinsicSize != IntSize.Zero) {
-                val imageRect = fitRect(intrinsicSize, containerSize)
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    state.faceRegions.forEach { face ->
-                        val coords = face.regionJson.toFaceRegionCoords()
-                        val color =
-                            when {
-                                face.id == currentFaceRegionId -> Color.Magenta
-                                face.ignored -> Color.Gray
-                                else -> Color.Green
-                            }
-                        drawFaceRect(coords, color, imageRect, strokeScale = 1f / scale)
-                    }
+        // Face frames are drawn in a SEPARATE overlay that is NOT inside the
+        // rotated graphics layer above. Drawing them in the rotated layer meant
+        // that during a rotation — while displayRotation is briefly non-zero and
+        // the reloaded image / updated coords haven't both arrived yet — the
+        // frames were rotated with the container and no longer matched the
+        // picture. This overlay carries the same scale/pan as the image but no
+        // rotation, and only draws once the transition has settled
+        // (displayRotation == 0f), so frames always match what's on screen.
+        if (containerSize != IntSize.Zero &&
+            intrinsicSize != IntSize.Zero &&
+            displayRotation == 0f
+        ) {
+            val imageRect = fitRect(intrinsicSize, containerSize)
+            Canvas(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offsetX,
+                            translationY = offsetY,
+                        ),
+            ) {
+                state.faceRegions.forEach { face ->
+                    val coords = face.regionJson.toFaceRegionCoords()
+                    val color =
+                        when {
+                            face.id == currentFaceRegionId -> Color.Magenta
+                            face.ignored -> Color.Gray
+                            else -> Color.Green
+                        }
+                    drawFaceRect(coords, color, imageRect, strokeScale = 1f / scale)
                 }
             }
         }
