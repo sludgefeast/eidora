@@ -19,10 +19,12 @@ object ChineseWhispers {
 
     // Cap on edges kept per node. Bounds graph memory at O(n × MAX_NEIGHBORS);
     // without it a frequently-photographed face collects thousands of neighbours
-    // and the graph exhausts the heap. 128 is a standard fan-out for face-graph
-    // clustering — enough to connect a person's photos, while dropping weak
-    // noisy edges. Relative to the graph, not tuned to any collection.
-    private const val MAX_NEIGHBORS = 128
+    // and the graph exhausts the heap. 256 balances two failure modes: too low
+    // (128) starved Chinese Whispers of connections and fragmented large groups
+    // into many small clusters + singletons; too high risks OOM again. At ~26k
+    // faces this is ~100 MB, safely under the 256 MB heap. Relative to the
+    // graph, not tuned to any collection.
+    private const val MAX_NEIGHBORS = 256
 
     // Enable LSH-based candidate generation above this node count.
     private const val LSH_THRESHOLD = 500
@@ -81,6 +83,12 @@ object ChineseWhispers {
                 neighborCount,
             )
         }
+
+        // Top-K capping is applied per direction, so an edge u→v can survive
+        // while v→u gets dropped (v's list was full of stronger edges). That
+        // asymmetry starves Chinese Whispers' label propagation and fragments
+        // clusters. Restore symmetry: every edge exists in both directions.
+        symmetrizeEdges(neighborsIdx, neighborsWeight, neighborCount, n)
 
         // Iterative label propagation
         val indices = IntArray(n) { it }
@@ -255,6 +263,85 @@ object ChineseWhispers {
     // -------------------------------------------------------------------------
     // Utilities
     // -------------------------------------------------------------------------
+
+    /**
+     * Ensures the adjacency is symmetric: if u lists v as a neighbour, v also
+     * lists u (with the same weight). Per-direction top-K capping can drop one
+     * side of an edge; this adds the missing side back. A node may end up with
+     * slightly more than MAX_NEIGHBORS edges, which is fine — the cap exists to
+     * bound memory against pathological fan-out, and the symmetric completions
+     * are limited to edges that already survived capping on the other side, so
+     * the overhead is small. Reuses addEdge's growable arrays, temporarily
+     * lifting the cap via a direct append so a full node can still receive its
+     * missing back-edges.
+     */
+    private fun symmetrizeEdges(
+        idx: Array<IntArray?>,
+        weights: Array<FloatArray?>,
+        counts: IntArray,
+        n: Int,
+    ) {
+        // Snapshot counts up front: we mutate counts as we add back-edges, but
+        // only want to scan the edges that existed before symmetrisation.
+        val originalCounts = counts.copyOf()
+        for (u in 0 until n) {
+            val uCount = originalCounts[u]
+            if (uCount == 0) continue
+            val uIdx = idx[u]!!
+            val uWeights = weights[u]!!
+            for (k in 0 until uCount) {
+                val v = uIdx[k]
+                val w = uWeights[k]
+                // Does v already list u (within v's original edges)?
+                val vOriginal = originalCounts[v]
+                val vIdx = idx[v]
+                var found = false
+                if (vIdx != null) {
+                    for (p in 0 until vOriginal) {
+                        if (vIdx[p] == u) {
+                            found = true
+                            break
+                        }
+                    }
+                }
+                if (!found) {
+                    appendEdgeUncapped(idx, weights, counts, v, u, w)
+                }
+            }
+        }
+    }
+
+    /**
+     * Appends an edge with no top-K cap, growing the arrays as needed. Used only
+     * by [symmetrizeEdges] to add back-edges a full node would otherwise reject.
+     */
+    private fun appendEdgeUncapped(
+        idx: Array<IntArray?>,
+        weights: Array<FloatArray?>,
+        counts: IntArray,
+        from: Int,
+        to: Int,
+        weight: Float,
+    ) {
+        var curIdx = idx[from]
+        var curWeights = weights[from]
+        val count = counts[from]
+        if (curIdx == null) {
+            curIdx = IntArray(4)
+            curWeights = FloatArray(4)
+            idx[from] = curIdx
+            weights[from] = curWeights
+        } else if (count == curIdx.size) {
+            val newSize = curIdx.size * 2
+            curIdx = curIdx.copyOf(newSize)
+            curWeights = curWeights!!.copyOf(newSize)
+            idx[from] = curIdx
+            weights[from] = curWeights
+        }
+        curIdx[count] = to
+        curWeights!![count] = weight
+        counts[from] = count + 1
+    }
 
     private fun addEdge(
         idx: Array<IntArray?>,
