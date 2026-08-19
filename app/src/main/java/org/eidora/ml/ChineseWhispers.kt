@@ -3,6 +3,7 @@
 
 package org.eidora.ml
 
+import org.eidora.util.EidoraLog
 import kotlin.random.Random
 
 /**
@@ -35,6 +36,7 @@ object ChineseWhispers {
     private const val LSH_L = 8 // 8 tables → good recall
     private const val LSH_SEED = 42L // deterministic between runs
     private const val EMBEDDING_DIM = 512
+    private const val TAG = "ChineseWhispers"
 
     data class ClusterResult(
         val faceRegionId: String,
@@ -218,6 +220,13 @@ object ChineseWhispers {
         // A "seen" set per source node prevents redundant work when a pair
         // collides in multiple tables.
         val seen = IntArray(n) { -1 }
+        // Diagnostics: how many candidate pairs LSH actually tests, how many
+        // become edges, and how the distances distribute around edgeThreshold.
+        // This shows whether fragmentation comes from too-few candidates (LSH
+        // recall) or distances just above the threshold (threshold too strict).
+        var pairsTested = 0L
+        var edgesFormed = 0L
+        val distBins = IntArray(10) // 0.0-0.1 .. 0.9-1.0
         for (table in tables) {
             for ((_, bucket) in table) {
                 val bucketSize = bucket.size
@@ -233,6 +242,7 @@ object ChineseWhispers {
                         val v = if (i < j) j else i
                         if (seen[u] == v) continue
                         seen[u] = v
+                        pairsTested++
                         val cosD = EmbeddingModel.cosineDistance(embeddings[u], embeddings[v])
                         val penalty =
                             TemporalDistance.penalty(
@@ -242,7 +252,10 @@ object ChineseWhispers {
                                 edgeThreshold,
                             )
                         val dist = cosD + penalty
+                        val bin = (cosD * 10f).toInt().coerceIn(0, 9)
+                        distBins[bin]++
                         if (dist < edgeThreshold) {
+                            edgesFormed++
                             val weight = 1f - dist
                             addEdge(neighborsIdx, neighborsWeight, neighborCount, u, v, weight)
                             addEdge(neighborsIdx, neighborsWeight, neighborCount, v, u, weight)
@@ -251,6 +264,14 @@ object ChineseWhispers {
                 }
             }
         }
+        val isolated = (0 until n).count { neighborCount[it] == 0 }
+        val histogram =
+            distBins.mapIndexed { idx, c -> "${idx * 10}-${idx * 10 + 10}:$c" }.joinToString(" ")
+        EidoraLog.i(
+            TAG,
+            "LSH edges: n=$n pairsTested=$pairsTested edgesFormed=$edgesFormed " +
+                "isolated=$isolated edgeThreshold=$edgeThreshold | cosD histogram(counts): $histogram",
+        )
     }
 
     private fun dot(
