@@ -46,6 +46,7 @@ object ChineseWhispers {
         edgeThreshold: Float = 0.30f,
         takenAt: Map<String, Long?> = emptyMap(),
         timeWeight: Float = 0f,
+        onRound: ((round: Int, total: Int) -> Unit)? = null,
     ): List<ClusterResult> {
         if (nodes.isEmpty()) return emptyList()
         if (nodes.size == 1) return listOf(ClusterResult(nodes[0].first, 0))
@@ -93,7 +94,8 @@ object ChineseWhispers {
         // Iterative label propagation
         val indices = IntArray(n) { it }
         val weightByLabel = HashMap<Int, Float>()
-        repeat(MAX_ITERATIONS) {
+        repeat(MAX_ITERATIONS) { iteration ->
+            onRound?.invoke(iteration + 1, MAX_ITERATIONS)
             var changed = false
             shuffleIntArray(indices)
             for (i in indices) {

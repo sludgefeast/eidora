@@ -9,7 +9,6 @@
     <!-- Persons screen -->
     <string name="section_suggestions">Vorschläge</string>
     <string name="section_confirmed">Bestätigt</string>
-    <string name="clustering_in_progress">Ähnliche Gesichter werden gruppiert…</string>
     <string name="virtual_person_unknown">Unbekannt</string>
     <string name="virtual_person_ignored">Ignoriert</string>
     <string name="hint_enter_name">Namen eingeben…</string>
@@ -90,6 +89,7 @@
     <string name="notif_matching_persons">Gleiche bekannte Personen ab… %1$d/%2$d</string>
     <string name="notif_matching_persons_done">Bekannte Personen abgeglichen</string>
     <string name="notif_grouping">Gruppiere ähnliche Gesichter… (%1$d Kandidaten)</string>
+    <string name="notif_grouping_round">Gruppiere ähnliche Gesichter… (Runde %1$d/%2$d)</string>
     <string name="notif_grouping_done">Ähnliche Gesichter gruppiert</string>
     <string name="notif_assigning">Ordne Cluster zu… %1$d/%2$d</string>
     <string name="notif_updating_centroids">Aktualisiere Referenzgesichter…</string>

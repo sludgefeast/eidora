@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
 import org.eidora.MainActivity
 import org.eidora.R
+import org.eidora.util.EidoraLog
 
 object NotificationHelper {
     private const val CHANNEL_SYNC = "sync"
@@ -121,6 +122,40 @@ object NotificationHelper {
                 gateBlocked = gateBlocked,
             )
         return makeForegroundInfo(NOTIFICATION_ID_CLUSTERING, notification)
+    }
+
+    /**
+     * Updates the clustering notification directly (not via setForeground), so a
+     * long synchronous phase like Chinese Whispers label propagation can post a
+     * heartbeat ("round X") without a suspend context. Keeps the same progress
+     * bar value; only the text changes, so the user sees the app is still working
+     * instead of a bar that looks frozen. No-op if notifications aren't permitted.
+     */
+    fun updateClusteringNotification(
+        context: Context,
+        progress: Int,
+        message: String,
+    ) {
+        try {
+            val notification =
+                buildNotification(
+                    context,
+                    titleWithStep(
+                        context,
+                        context.getString(R.string.notif_clustering_title),
+                        STEP_CLUSTERING,
+                    ),
+                    message,
+                    progress,
+                )
+            androidx.core.app.NotificationManagerCompat
+                .from(context)
+                .notify(NOTIFICATION_ID_CLUSTERING, notification)
+        } catch (t: Throwable) {
+            // Best-effort heartbeat; never let a notification update break
+            // clustering. (Missing POST_NOTIFICATIONS permission lands here.)
+            EidoraLog.d("NotificationHelper", "clustering heartbeat failed: ${t.message}")
+        }
     }
 
     fun modelDownloadForegroundInfo(

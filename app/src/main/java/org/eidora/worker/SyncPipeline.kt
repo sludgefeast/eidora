@@ -10,7 +10,6 @@ import android.util.Log
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import kotlinx.coroutines.flow.map
 
 object SyncPipeline {
     const val UNIQUE_SYNC_NAME = "eidora-sync-pipeline"
@@ -254,19 +253,4 @@ object SyncPipeline {
             .get()
             ?.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
             ?: false
-
-    /**
-     * Reactive stream of whether clustering is currently running or queued, for
-     * in-app progress feedback (so the Persons screen can show that grouping is
-     * in progress instead of looking frozen). Emits on every work-state change.
-     */
-    fun clusteringRunningFlow(context: Context): kotlinx.coroutines.flow.Flow<Boolean> =
-        WorkManager
-            .getInstance(context)
-            .getWorkInfosForUniqueWorkFlow(UNIQUE_CLUSTERING_NAME)
-            .map { infos ->
-                infos.any {
-                    it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED
-                }
-            }
 }

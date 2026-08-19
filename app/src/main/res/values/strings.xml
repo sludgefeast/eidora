@@ -9,7 +9,6 @@
     <!-- Persons screen -->
     <string name="section_suggestions">Suggestions</string>
     <string name="section_confirmed">Confirmed</string>
-    <string name="clustering_in_progress">Grouping similar faces…</string>
     <string name="virtual_person_unknown">Unknown</string>
     <string name="virtual_person_ignored">Ignored</string>
     <string name="hint_enter_name">Enter name…</string>
@@ -90,6 +89,7 @@
     <string name="notif_matching_persons">Matching known persons… %1$d/%2$d</string>
     <string name="notif_matching_persons_done">Matching known persons… done</string>
     <string name="notif_grouping">Grouping similar faces… (%1$d candidates)</string>
+    <string name="notif_grouping_round">Grouping similar faces… (round %1$d/%2$d)</string>
     <string name="notif_grouping_done">Grouping similar faces… done</string>
     <string name="notif_assigning">Assigning clusters… %1$d/%2$d</string>
     <string name="notif_updating_centroids">Updating centroids…</string>

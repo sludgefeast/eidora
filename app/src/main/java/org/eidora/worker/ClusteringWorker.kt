@@ -299,7 +299,25 @@ class ClusteringWorker(
             reportProgress(30, applicationContext.getString(org.eidora.R.string.notif_grouping, candidates.size))
             val clusterResults =
                 try {
-                    ChineseWhispers.cluster(candidates, config.edgeThreshold, candidateTakenAt, timeWeight)
+                    ChineseWhispers.cluster(
+                        candidates,
+                        config.edgeThreshold,
+                        candidateTakenAt,
+                        timeWeight,
+                    ) { round, total ->
+                        // Heartbeat during the long label-propagation phase so the
+                        // notification doesn't look frozen. Keeps progress at 30
+                        // (this phase's start); only the text moves.
+                        NotificationHelper.updateClusteringNotification(
+                            applicationContext,
+                            30,
+                            applicationContext.getString(
+                                org.eidora.R.string.notif_grouping_round,
+                                round,
+                                total,
+                            ),
+                        )
+                    }
                 } catch (t: Throwable) {
                     EidoraLog.e(TAG, "Clustering algorithm failed", t)
                     return Result.failure()
