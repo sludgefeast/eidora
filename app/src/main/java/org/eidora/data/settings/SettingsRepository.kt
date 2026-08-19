@@ -5,6 +5,7 @@ package org.eidora.data.settings
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -21,6 +22,8 @@ private val KEY_INDIVIDUAL_MATCH_THRESHOLD = floatPreferencesKey("individual_mat
 private val KEY_MIN_CLUSTER_SIZE = intPreferencesKey("min_cluster_size")
 private val KEY_TIME_WEIGHT = floatPreferencesKey("clustering_time_weight")
 private val KEY_SUGGEST_MARGIN = floatPreferencesKey("clustering_suggest_margin")
+private val KEY_LIMIT_SUGGESTIONS = booleanPreferencesKey("clustering_limit_suggestions")
+private val KEY_MAX_SUGGESTIONS = intPreferencesKey("clustering_max_suggestions")
 private val KEY_MIN_BATTERY_PERCENT = intPreferencesKey("min_battery_percent")
 private val KEY_MAX_BATTERY_TEMP = floatPreferencesKey("max_battery_temp_celsius")
 private val KEY_RESUME_BATTERY_PERCENT = intPreferencesKey("resume_battery_percent")
@@ -50,6 +53,8 @@ data class ClusteringConfig(
     val minClusterSize: Int,
     val timeWeight: Float,
     val suggestMargin: Float,
+    val limitSuggestions: Boolean,
+    val maxSuggestions: Int,
 )
 
 /**
@@ -94,6 +99,8 @@ class SettingsRepository(
                 minClusterSize = prefs[KEY_MIN_CLUSTER_SIZE] ?: DEFAULT_MIN_CLUSTER_SIZE,
                 timeWeight = prefs[KEY_TIME_WEIGHT] ?: DEFAULT_TIME_WEIGHT,
                 suggestMargin = prefs[KEY_SUGGEST_MARGIN] ?: DEFAULT_SUGGEST_MARGIN,
+                limitSuggestions = prefs[KEY_LIMIT_SUGGESTIONS] ?: DEFAULT_LIMIT_SUGGESTIONS,
+                maxSuggestions = prefs[KEY_MAX_SUGGESTIONS] ?: DEFAULT_MAX_SUGGESTIONS,
             )
         }
 
@@ -107,6 +114,8 @@ class SettingsRepository(
             prefs[KEY_MIN_CLUSTER_SIZE] = config.minClusterSize
             prefs[KEY_TIME_WEIGHT] = config.timeWeight
             prefs[KEY_SUGGEST_MARGIN] = config.suggestMargin
+            prefs[KEY_LIMIT_SUGGESTIONS] = config.limitSuggestions
+            prefs[KEY_MAX_SUGGESTIONS] = config.maxSuggestions
         }
     }
 
@@ -305,6 +314,13 @@ class SettingsRepository(
         // the confident band; higher recovers more borderline faces but mixes
         // more. See ClusteringWorker for the rationale behind the 0.10 default.
         const val DEFAULT_SUGGEST_MARGIN = 0.10f
+
+        // Cap the number of suggestions surfaced after clustering. On by default
+        // so the Persons screen isn't flooded with hundreds of tiny/low-quality
+        // suggestions; the strongest (by cluster quality/size) are kept. Users
+        // who want to see everything can turn the cap off.
+        const val DEFAULT_LIMIT_SUGGESTIONS = true
+        const val DEFAULT_MAX_SUGGESTIONS = 20
 
         // Manual assignment confirms faces by default; naming a suggestion
         // does not auto-confirm all its faces (they stay suggestions);

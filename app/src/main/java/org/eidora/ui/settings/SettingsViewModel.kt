@@ -26,6 +26,8 @@ data class SettingsUiState(
             minClusterSize = SettingsRepository.DEFAULT_MIN_CLUSTER_SIZE,
             timeWeight = SettingsRepository.DEFAULT_TIME_WEIGHT,
             suggestMargin = SettingsRepository.DEFAULT_SUGGEST_MARGIN,
+            limitSuggestions = SettingsRepository.DEFAULT_LIMIT_SUGGESTIONS,
+            maxSuggestions = SettingsRepository.DEFAULT_MAX_SUGGESTIONS,
         ),
     val powerConfig: PowerConfig =
         PowerConfig(

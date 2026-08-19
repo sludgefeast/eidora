@@ -571,6 +571,20 @@ class ClusteringWorker(
                 EidoraLog.e(TAG, "Failed to recompute centroids", t)
             }
 
+            // ----- Enforce global suggestion cap -----
+            // Keep at most config.maxSuggestions suggestions overall (not per
+            // run): after generating this run's suggestions, dissolve the
+            // smallest ones (fewest faces) so only the largest remain. A later
+            // run whose clusters are bigger than older suggestions thus displaces
+            // them; its faces go back to Unknown and can regroup.
+            if (config.limitSuggestions) {
+                try {
+                    enforceSuggestionCap(db, config.maxSuggestions)
+                } catch (t: Throwable) {
+                    EidoraLog.w(TAG, "Failed to enforce suggestion cap", t)
+                }
+            }
+
             reportProgress(100, applicationContext.getString(org.eidora.R.string.notif_done))
             return Result.success()
         } catch (t: Throwable) {
@@ -593,6 +607,36 @@ class ClusteringWorker(
      * nearest-neighbour matching. Persons whose faces are all ignored or lack an
      * embedding are skipped. Extracted from doWork to keep the phases readable.
      */
+    /**
+     * Enforces a global cap on the number of suggestions. Suggestions
+     * (unnamed persons) are ranked by face count; everything past the top
+     * [maxSuggestions] is dissolved via rejectSuggestion (faces back to Unknown,
+     * the empty suggestion person removed). Keeps the largest suggestions, so a
+     * new run's bigger clusters displace older, smaller suggestions.
+     */
+    private suspend fun enforceSuggestionCap(
+        db: org.eidora.data.db.EidoraDatabase,
+        maxSuggestions: Int,
+    ) {
+        val personDao = db.personDao()
+        val counts = personDao.getSuggestionFaceCounts() // already largest-first
+        if (counts.size <= maxSuggestions) return
+        val repo = org.eidora.data.repository.FaceRepository(applicationContext, db)
+        val toDissolve = counts.drop(maxSuggestions)
+        toDissolve.forEach { sc ->
+            try {
+                repo.rejectSuggestion(sc.personId)
+            } catch (t: Throwable) {
+                EidoraLog.w(TAG, "Failed to dissolve suggestion ${sc.personId}", t)
+            }
+        }
+        EidoraLog.i(
+            TAG,
+            "Suggestion cap: kept $maxSuggestions, dissolved ${toDissolve.size} " +
+                "(smallest by face count)",
+        )
+    }
+
     private suspend fun loadPersonData(
         faceDao: org.eidora.data.db.FaceRegionDao,
         personDao: org.eidora.data.db.PersonDao,
@@ -693,6 +737,8 @@ class ClusteringWorker(
                 minClusterSize = 2,
                 timeWeight = 1.0f,
                 suggestMargin = 0.10f,
+                limitSuggestions = true,
+                maxSuggestions = 20,
             )
         }
 

@@ -102,6 +102,11 @@
     <string name="permission_files">File access</string>
     <string name="setting_time_weight">Temporal weight</string>
     <string name="setting_suggest_margin">Suggestion margin</string>
+    <string name="setting_limit_suggestions">Limit number of suggestions</string>
+    <string name="setting_limit_suggestions_description">Keep only a fixed number of suggestions in total, always the largest ones. When a new clustering run finds bigger groups, smaller older suggestions are dissolved back to Unknown so the total stays capped. Turn off to keep every suggestion.</string>
+    <string name="setting_max_suggestions">Maximum suggestions</string>
+    <string name="setting_max_suggestions_description">The total number of suggestions kept at once when the limit is on.</string>
+    <string name="setting_max_suggestions_hint">Only the suggestions with the most faces are kept. A lower number keeps the Persons screen tidy; a higher number keeps more groups at once.</string>
     <string name="setting_suggest_margin_description">How far past the auto-assign threshold a face may still be offered as an unconfirmed suggestion, as a fraction of that threshold. 0.10 = suggestions stay close to confident matches; higher recovers more borderline faces but mixes more.</string>
     <string name="setting_time_weight_description">How strongly the time between photos influences clustering. 0 = ignore time, 1 = default (half-life 3 years), 2 = strong influence. Helps separate siblings and track ageing.</string>
     <string name="action_delete_face">Delete face (false positive)</string>

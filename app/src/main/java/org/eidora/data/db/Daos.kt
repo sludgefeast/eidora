@@ -216,6 +216,23 @@ interface PersonDao {
     @Query("SELECT * FROM persons WHERE name IS NULL")
     suspend fun getSuggestions(): List<PersonEntity>
 
+    /**
+     * Suggestion (unnamed person) ids with how many faces each has, largest
+     * first. Used to enforce a global cap on the number of suggestions: after a
+     * clustering run, everything past the top-N by face count is dissolved.
+     */
+    @Query(
+        """
+        SELECT f.personId AS personId, COUNT(*) AS faceCount
+        FROM face_regions f
+        JOIN persons p ON p.id = f.personId
+        WHERE p.name IS NULL AND f.personId IS NOT NULL
+        GROUP BY f.personId
+        ORDER BY faceCount DESC
+        """,
+    )
+    suspend fun getSuggestionFaceCounts(): List<SuggestionFaceCount>
+
     @Query("DELETE FROM persons")
     suspend fun deleteAll()
 
@@ -288,6 +305,12 @@ data class PersonWithCount(
     @Embedded val person: PersonEntity,
     val confirmedCount: Int,
     val unconfirmedCount: Int = 0,
+)
+
+/** A suggestion (unnamed person) id and how many faces it holds. */
+data class SuggestionFaceCount(
+    val personId: String,
+    val faceCount: Int,
 )
 
 // ---------------------------------------------------------------------------

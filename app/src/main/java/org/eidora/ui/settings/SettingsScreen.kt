@@ -291,6 +291,23 @@ fun SettingsScreen(
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(suggestMargin = it)) },
             )
 
+            SwitchSetting(
+                label = stringResource(R.string.setting_limit_suggestions),
+                description = stringResource(R.string.setting_limit_suggestions_description),
+                checked = cfg.limitSuggestions,
+                onCheckedChange = { viewModel.setClusteringConfig(cfg.copy(limitSuggestions = it)) },
+            )
+            if (cfg.limitSuggestions) {
+                IntSetting(
+                    label = stringResource(R.string.setting_max_suggestions),
+                    description = stringResource(R.string.setting_max_suggestions_description),
+                    hint = stringResource(R.string.setting_max_suggestions_hint),
+                    value = cfg.maxSuggestions,
+                    default = SettingsRepository.DEFAULT_MAX_SUGGESTIONS,
+                    onValueChange = { viewModel.setClusteringConfig(cfg.copy(maxSuggestions = it)) },
+                )
+            }
+
             // Section: confirmation behaviour
             SectionHeader(stringResource(R.string.settings_confirm_title))
             Text(
