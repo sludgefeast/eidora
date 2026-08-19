@@ -94,6 +94,12 @@ fun FullscreenPhotoScreen(
 
     // Rotation state (0, 90, 180, 270) – visual only until saved
     var displayRotation by remember { mutableStateOf(0f) }
+    // While a rotation is being persisted, the on-screen image and the face
+    // coords can briefly disagree (the image reloads via Coil at a different
+    // time than the DB flow delivers the rotated coords). Hide the frames until
+    // the rotation write has finished AND fresh coords have been requested, so a
+    // frame is never drawn against a mismatched image.
+    var awaitingRotation by remember { mutableStateOf(false) }
     // Key to force Coil to reload after write
     var imageKey by remember { mutableStateOf(0) }
 
@@ -103,6 +109,7 @@ fun FullscreenPhotoScreen(
     fun rotate(delta: Float) {
         val newRotation = (displayRotation + delta + 360f) % 360f
         displayRotation = newRotation
+        awaitingRotation = true
         scope.launch {
             withContext(Dispatchers.IO) {
                 try {
@@ -152,6 +159,12 @@ fun FullscreenPhotoScreen(
             // the reoriented bitmap is actually on screen, avoiding a flicker
             // back to 0° before the new image is ready.
             imageKey++
+            // The DB writes above are done, so the rotated coords are committed.
+            // Re-query faces explicitly so the overlay draws against the fresh
+            // coords instead of whatever the observe-flow last delivered, then
+            // allow frames again.
+            viewModel.reloadFaces()
+            awaitingRotation = false
         }
     }
 
@@ -230,7 +243,8 @@ fun FullscreenPhotoScreen(
         // (displayRotation == 0f), so frames always match what's on screen.
         if (containerSize != IntSize.Zero &&
             intrinsicSize != IntSize.Zero &&
-            displayRotation == 0f
+            displayRotation == 0f &&
+            !awaitingRotation
         ) {
             val imageRect = fitRect(intrinsicSize, containerSize)
             Canvas(

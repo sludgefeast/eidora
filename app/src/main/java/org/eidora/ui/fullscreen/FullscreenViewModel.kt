@@ -28,8 +28,11 @@ class FullscreenViewModel(
     private val _uiState = MutableStateFlow(FullscreenUiState())
     val uiState: StateFlow<FullscreenUiState> = _uiState.asStateFlow()
 
+    private var currentPhotoId: String? = null
+
     // Fix 5: reactive Flow so UI updates after re-detect
     fun load(photoId: String) {
+        currentPhotoId = photoId
         viewModelScope.launch {
             val photo = photoDao.findById(photoId) ?: return@launch
             _uiState.update { it.copy(photoPath = photo.path) }
@@ -39,6 +42,20 @@ class FullscreenViewModel(
             faceDao.observeByPhotoId(photoId).collect { faces: List<FaceRegionEntity> ->
                 _uiState.update { it.copy(faceRegions = faces) }
             }
+        }
+    }
+
+    /**
+     * Explicitly re-queries this photo's faces once, bypassing the observe-flow's
+     * timing. Called right after a rotation persists its new coords, so the frame
+     * overlay redraws against the committed (rotated) coords instead of stale ones
+     * the flow may not have delivered yet.
+     */
+    fun reloadFaces() {
+        val photoId = currentPhotoId ?: return
+        viewModelScope.launch {
+            val faces = faceDao.findByPhotoId(photoId)
+            _uiState.update { it.copy(faceRegions = faces) }
         }
     }
 
