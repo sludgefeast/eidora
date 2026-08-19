@@ -65,7 +65,7 @@ object LogExporter {
         // pressure. Two sources, one exported file.
         val persisted =
             try {
-                EidoraLog.readPersisted()
+                filterPersistedByRange(EidoraLog.readPersisted(), range)
             } catch (t: Throwable) {
                 EidoraLog.w("LogExporter", "EidoraLog.readPersisted() failed: ${t.message}")
                 ""
@@ -107,6 +107,47 @@ object LogExporter {
             appendLine("Filter:    all Eidora processes (via startup marker)")
             appendLine("-".repeat(60))
         }
+    }
+
+    /**
+     * Keeps only persisted-log lines at or after the range's cutoff, so a
+     * "last N hours" export doesn't still carry days-old lines from the
+     * persistent file (which readPersisted returns in full). Lines are prefixed
+     * with a "MM-dd HH:mm:ss.SSS" timestamp; because that format sorts
+     * lexicographically in time order, a plain string compare against a cutoff
+     * built the same way is enough — no date parsing. Continuation lines without
+     * a timestamp (e.g. stack traces) inherit the decision of the line above, so
+     * a kept error keeps its whole trace. Range.hours == null means "everything",
+     * so the input is returned unchanged.
+     *
+     * Caveat: the timestamp carries no year, so across a year boundary (e.g.
+     * 12-31 → 01-01) the string compare would wrongly drop January lines. That
+     * window is rare and self-corrects once the old December lines roll out of
+     * the 4 MB file; treating it specially isn't worth the complexity.
+     */
+    private fun filterPersistedByRange(
+        persisted: String,
+        range: Range,
+    ): String {
+        val hours = range.hours ?: return persisted
+        val cutoff =
+            SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US)
+                .format(Date(System.currentTimeMillis() - hours * 3600_000L))
+        val stampRegex = Regex("""^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}""")
+        val sb = StringBuilder()
+        var keepingCurrent = false
+        for (line in persisted.lineSequence()) {
+            val match = stampRegex.find(line)
+            if (match != null) {
+                // Timestamped line: decide by comparing its stamp to the cutoff.
+                keepingCurrent = match.value >= cutoff
+            }
+            // Untimestamped lines inherit keepingCurrent from the line above.
+            if (keepingCurrent) {
+                sb.append(line).append('\n')
+            }
+        }
+        return sb.toString()
     }
 
     private fun readLogcat(

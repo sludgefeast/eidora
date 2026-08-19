@@ -6,7 +6,6 @@ package org.eidora.worker
 import org.eidora.util.EidoraLog
 
 import android.content.Context
-import android.util.Log
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
