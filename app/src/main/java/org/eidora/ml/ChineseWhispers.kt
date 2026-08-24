@@ -93,10 +93,15 @@ object ChineseWhispers {
         // clusters. Restore symmetry: every edge exists in both directions.
         symmetrizeEdges(neighborsIdx, neighborsWeight, neighborCount, n)
 
-        // Iterative label propagation
+        // Iterative label propagation. A real for-loop (not repeat) so we can
+        // BREAK the moment a full pass changes no label — Chinese Whispers
+        // usually converges in a handful of rounds, and repeat{…return@repeat}
+        // only skipped to the next round rather than stopping, wasting the rest
+        // of the 100-round cap on no-op passes. MAX_ITERATIONS stays as a safety
+        // ceiling for the rare non-converging graph.
         val indices = IntArray(n) { it }
         val weightByLabel = HashMap<Int, Float>()
-        repeat(MAX_ITERATIONS) { iteration ->
+        for (iteration in 0 until MAX_ITERATIONS) {
             onRound?.invoke(iteration + 1, MAX_ITERATIONS)
             var changed = false
             shuffleIntArray(indices)
@@ -123,7 +128,9 @@ object ChineseWhispers {
                     changed = true
                 }
             }
-            if (!changed) return@repeat
+            // Converged: a whole pass reassigned nothing, so further passes
+            // can't change anything either. Stop instead of looping to the cap.
+            if (!changed) break
         }
 
         return nodes.mapIndexed { index, (id, _) ->
