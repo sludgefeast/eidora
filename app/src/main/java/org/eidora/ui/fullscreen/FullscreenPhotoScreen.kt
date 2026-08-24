@@ -141,6 +141,18 @@ fun FullscreenPhotoScreen(
                     faces.forEach { face ->
                         val oldCoords = face.regionJson.toFaceRegionCoords()
                         val newCoords = oldCoords.rotate(delta.toInt())
+                        // DIAGNOSTIC: log the transform so we can compare the
+                        // rotate() result against what a fresh detect on the
+                        // re-oriented image produces (which the user confirms is
+                        // correct). Remove once rotation is fixed.
+                        EidoraLog.d(
+                            "RotateDiag",
+                            "rotate delta=${delta.toInt()} face=${face.id.take(6)} " +
+                                "old(cx=${"%.3f".format(oldCoords.x)},cy=${"%.3f".format(oldCoords.y)}," +
+                                "w=${"%.3f".format(oldCoords.w)},h=${"%.3f".format(oldCoords.h)}) " +
+                                "new(cx=${"%.3f".format(newCoords.x)},cy=${"%.3f".format(newCoords.y)}," +
+                                "w=${"%.3f".format(newCoords.w)},h=${"%.3f".format(newCoords.h)})",
+                        )
                         faceDao.updateRegionJson(face.id, newCoords.toJson())
                         ThumbnailHelper.createThumbnail(context, file, newCoords, face.id)
                     }
@@ -260,6 +272,19 @@ fun FullscreenPhotoScreen(
             ) {
                 state.faceRegions.forEach { face ->
                     val coords = face.regionJson.toFaceRegionCoords()
+                    // DIAGNOSTIC: log the actual values used to place each frame,
+                    // so a rotation mismatch (coords vs. image orientation vs.
+                    // intrinsic size) becomes visible in the log instead of us
+                    // guessing. Remove once the rotation issue is resolved.
+                    EidoraLog.d(
+                        "RotateDiag",
+                        "draw face=${face.id.take(6)} coords(cx=${"%.3f".format(coords.x)}," +
+                            "cy=${"%.3f".format(coords.y)},w=${"%.3f".format(coords.w)}," +
+                            "h=${"%.3f".format(coords.h)}) intrinsic=${intrinsicSize.width}x" +
+                            "${intrinsicSize.height} imageRect=(${"%.0f".format(imageRect.left)}," +
+                            "${"%.0f".format(imageRect.top)},${"%.0f".format(imageRect.width)}x" +
+                            "${"%.0f".format(imageRect.height)})",
+                    )
                     val color =
                         when {
                             face.id == currentFaceRegionId -> Color.Magenta

@@ -33,15 +33,15 @@ data class FaceRegionCoords(
      */
     fun rotate(degrees: Int): FaceRegionCoords =
         when (((degrees % 360) + 360) % 360) {
-            // (x, y) is the box's TOP-LEFT corner and the box has extent (w, h),
-            // so rotating that one corner isn't enough — after the turn a
-            // different corner becomes the new top-left. The formulas below give
-            // the new top-left directly (derived from rotating all four corners
-            // and taking min-x/min-y). Landmarks are points with no extent, so
-            // rotatePoints keeps the simple point rotation.
+            // (x, y) is the box CENTER (see PhotoAnalyzer: x = (xMin + width/2)/
+            // srcW), so the center rotates like any point — the same rotation
+            // rotatePoints applies to landmarks — and w/h simply swap on 90/270.
+            // Do NOT switch these to a top-left-corner formula: draw code and the
+            // detector both use the center convention, and a corner formula
+            // shifts every box by half its size.
             90 ->
                 FaceRegionCoords(
-                    x = 1f - y - h,
+                    x = 1f - y,
                     y = x,
                     w = h,
                     h = w,
@@ -49,8 +49,8 @@ data class FaceRegionCoords(
                 )
             180 ->
                 FaceRegionCoords(
-                    x = 1f - x - w,
-                    y = 1f - y - h,
+                    x = 1f - x,
+                    y = 1f - y,
                     w = w,
                     h = h,
                     landmarks = landmarks.rotatePoints(180),
@@ -58,7 +58,7 @@ data class FaceRegionCoords(
             270 ->
                 FaceRegionCoords(
                     x = y,
-                    y = 1f - x - w,
+                    y = 1f - x,
                     w = h,
                     h = w,
                     landmarks = landmarks.rotatePoints(270),

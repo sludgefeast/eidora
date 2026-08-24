@@ -42,27 +42,27 @@ class FaceRegionCoordsTest {
     }
 
     @Test
-    @DisplayName("90° clockwise maps top-left corner and swaps dimensions")
+    @DisplayName("90° clockwise rotates center and swaps dimensions")
     fun rotate90() {
         val r = sample.rotate(90)
-        // New top-left after 90° CW: x' = 1 - y - h, y' = x, w' = h, h' = w
-        assertCoordsEqual(FaceRegionCoords(x = 0.50f, y = 0.25f, w = 0.10f, h = 0.20f), r)
+        // Center convention: x' = 1 - y, y' = x, w' = h, h' = w
+        assertCoordsEqual(FaceRegionCoords(x = 0.60f, y = 0.25f, w = 0.10f, h = 0.20f), r)
     }
 
     @Test
     @DisplayName("180° mirrors both axes, keeps dimensions")
     fun rotate180() {
         val r = sample.rotate(180)
-        // x' = 1 - x - w, y' = 1 - y - h
-        assertCoordsEqual(FaceRegionCoords(x = 0.55f, y = 0.50f, w = 0.20f, h = 0.10f), r)
+        // Center convention: x' = 1 - x, y' = 1 - y
+        assertCoordsEqual(FaceRegionCoords(x = 0.75f, y = 0.60f, w = 0.20f, h = 0.10f), r)
     }
 
     @Test
-    @DisplayName("270° maps top-left corner and swaps dimensions")
+    @DisplayName("270° rotates center and swaps dimensions")
     fun rotate270() {
         val r = sample.rotate(270)
-        // x' = y, y' = 1 - x - w, w' = h, h' = w
-        assertCoordsEqual(FaceRegionCoords(x = 0.40f, y = 0.55f, w = 0.10f, h = 0.20f), r)
+        // Center convention: x' = y, y' = 1 - x, w' = h, h' = w
+        assertCoordsEqual(FaceRegionCoords(x = 0.40f, y = 0.75f, w = 0.10f, h = 0.20f), r)
     }
 
     @Test
