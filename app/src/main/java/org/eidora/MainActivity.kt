@@ -640,6 +640,14 @@ fun EidoraApp() {
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                     onOpenModels = { navController.navigate("models") },
+                    onOpenFolders = { navController.navigate("folder_selection") },
+                )
+            }
+            composable("folder_selection") {
+                val vm: org.eidora.ui.settings.SettingsViewModel = viewModel()
+                org.eidora.ui.settings.FolderSelectionScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable("models") {

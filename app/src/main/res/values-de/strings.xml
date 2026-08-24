@@ -185,6 +185,8 @@
     <string name="models_screen_title">Modelle</string>
     <string name="models_settings_entry">Modelle</string>
     <string name="models_settings_entry_desc">Modelle für Gesichts-Erkennung und -Identifizierung verwalten</string>
+    <string name="settings_folders_entry">Ordner</string>
+    <string name="settings_folders_entry_desc">Wählen, welche Ordner nach Gesichtern durchsucht werden</string>
     <string name="models_import_button">Container importieren…</string>
     <string name="models_update_check">Nach Modell-Updates suchen</string>
     <string name="models_update_none">Deine Modelle sind aktuell.</string>
