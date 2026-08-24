@@ -3,7 +3,6 @@
 
 package org.eidora.util
 
-import org.eidora.util.EidoraLog
 import androidx.exifinterface.media.ExifInterface
 import com.ashampoo.xmp.XMPMeta
 import com.ashampoo.xmp.XMPMetaFactory

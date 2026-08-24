@@ -3,7 +3,6 @@
 
 package org.eidora
 
-import org.eidora.util.EidoraLog
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,6 +12,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import org.eidora.data.db.DatabaseProvider
+import org.eidora.util.EidoraLog
 import org.eidora.worker.PeriodicSyncWorker
 import java.util.concurrent.TimeUnit
 

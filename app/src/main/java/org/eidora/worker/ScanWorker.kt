@@ -6,7 +6,6 @@ package org.eidora.worker
 import android.content.Context
 import android.content.SharedPreferences
 import android.provider.MediaStore
-import org.eidora.util.EidoraLog
 import androidx.work.CoroutineWorker
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
@@ -17,6 +16,7 @@ import org.eidora.data.db.PhotoEntity
 import org.eidora.data.db.PhotoStage
 import org.eidora.data.settings.SettingsProvider
 import org.eidora.data.settings.SettingsRepository
+import org.eidora.util.EidoraLog
 import org.eidora.util.FileUtil
 import java.io.File
 import java.util.UUID
@@ -138,6 +138,7 @@ class ScanWorker(
     }
 
     /** Register or refresh one photo row, resetting to NEW when new/modified. */
+
     /** Register or refresh one photo row, resetting to NEW when new/modified.
      *  [existing] is the pre-loaded DB entry for this path (null if unknown),
      *  so no per-photo findByPath query is needed. */
@@ -311,11 +312,11 @@ class ScanWorker(
                     result.add(WorkItemModified(File(path), matchedRoot, cursor.getLong(modCol)))
                 }
             } ?: run {
-                // A null cursor means the query itself failed — most often a
-                // missing media permission. Make that explicit instead of a
-                // silent empty scan.
-                EidoraLog.e(TAG, "MediaStore query returned null cursor (permission problem?)")
-            }
+            // A null cursor means the query itself failed — most often a
+            // missing media permission. Make that explicit instead of a
+            // silent empty scan.
+            EidoraLog.e(TAG, "MediaStore query returned null cursor (permission problem?)")
+        }
         EidoraLog.i(
             TAG,
             "MediaStore: $totalRows JPEG rows, $filteredOut filtered by whitelist " +

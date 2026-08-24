@@ -4,12 +4,12 @@
 package org.eidora.worker
 
 import android.content.Context
-import org.eidora.util.EidoraLog
 import androidx.work.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import org.eidora.data.db.DatabaseProvider
+import org.eidora.util.EidoraLog
 import org.eidora.util.XmpFaceRegion
 import org.eidora.util.XmpHelper
 import org.eidora.util.toFaceRegionCoords

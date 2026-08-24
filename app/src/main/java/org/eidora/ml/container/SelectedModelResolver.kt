@@ -4,10 +4,10 @@
 package org.eidora.ml.container
 
 import android.content.Context
-import org.eidora.util.EidoraLog
 import org.eidora.data.settings.SettingsProvider
 import org.eidora.ml.EmbeddingModel
 import org.eidora.ml.FaceDetector
+import org.eidora.util.EidoraLog
 
 /**
  * Resolves the model the user has selected in settings into a running detector

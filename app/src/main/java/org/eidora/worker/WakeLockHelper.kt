@@ -5,13 +5,13 @@ package org.eidora.worker
 
 import android.content.Context
 import android.os.PowerManager
-import org.eidora.util.EidoraLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.eidora.util.EidoraLog
 
 /**
  * Runs [block] while holding a PARTIAL_WAKE_LOCK, so CPU-bound background work

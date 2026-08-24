@@ -3,7 +3,6 @@
 
 package org.eidora.ui.settings
 
-import org.eidora.util.EidoraLog
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,6 +14,7 @@ import org.eidora.data.settings.ClusteringConfig
 import org.eidora.data.settings.PowerConfig
 import org.eidora.data.settings.SettingsProvider
 import org.eidora.data.settings.SettingsRepository
+import org.eidora.util.EidoraLog
 
 data class SettingsUiState(
     val clusteringConfig: ClusteringConfig =

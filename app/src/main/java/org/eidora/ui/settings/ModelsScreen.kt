@@ -3,7 +3,6 @@
 
 package org.eidora.ui.settings
 
-import org.eidora.util.EidoraLog
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -56,6 +55,7 @@ import org.eidora.R
 import org.eidora.ml.container.ContainerDownloader
 import org.eidora.ml.container.ContainerManifest
 import org.eidora.ml.container.ContainerStore
+import org.eidora.util.EidoraLog
 import java.io.File
 
 /**

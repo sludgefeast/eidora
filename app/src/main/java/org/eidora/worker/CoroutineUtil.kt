@@ -3,8 +3,6 @@
 
 package org.eidora.worker
 
-import org.eidora.util.EidoraLog
-
 import kotlinx.coroutines.CancellationException
 
 /**

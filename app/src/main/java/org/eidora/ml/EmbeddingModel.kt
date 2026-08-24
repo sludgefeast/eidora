@@ -5,9 +5,9 @@ package org.eidora.ml
 
 import android.content.Context
 import android.graphics.Bitmap
-import org.eidora.util.EidoraLog
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.eidora.util.EidoraLog
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.GpuDelegate
 import java.io.Closeable

@@ -4,7 +4,6 @@
 package org.eidora.worker
 
 import android.content.Context
-import org.eidora.util.EidoraLog
 import androidx.work.CoroutineWorker
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
@@ -12,6 +11,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.db.PhotoStage
+import org.eidora.util.EidoraLog
 import java.io.File
 
 /**

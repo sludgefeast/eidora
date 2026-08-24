@@ -3,8 +3,6 @@
 
 package org.eidora.ui.fullscreen
 
-import org.eidora.util.EidoraLog
-
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -45,6 +43,7 @@ import kotlinx.coroutines.withContext
 import org.eidora.R
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.domain.model.FaceRegionCoords
+import org.eidora.util.EidoraLog
 import org.eidora.util.ThumbnailHelper
 import org.eidora.util.toFaceRegionCoords
 import org.eidora.util.toJson

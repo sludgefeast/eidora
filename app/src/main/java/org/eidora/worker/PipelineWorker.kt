@@ -4,9 +4,7 @@
 package org.eidora.worker
 
 import android.content.Context
-import org.eidora.util.EidoraLog
 import androidx.work.CoroutineWorker
-import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +20,7 @@ import kotlinx.coroutines.launch
 import org.eidora.data.settings.PowerConfig
 import org.eidora.data.settings.SettingsProvider
 import org.eidora.data.settings.SettingsRepository
+import org.eidora.util.EidoraLog
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -159,14 +158,14 @@ abstract class PipelineWorker(
                             }
                             emit(item)
                         }
-                        // Heavy work (bitmap decode, ML inference, file I/O) runs on
-                        // the elastic IO pool. Without this it ran on Dispatchers.
-                        // Default (the worker's default) — the same small CPU pool the
-                        // notifier uses, so under background CPU throttling the blocked
-                        // detection threads starved the notifier: the notification
-                        // froze (same file, same ETA) and progress stalled until the
-                        // app came to the foreground. flowOn keeps them separate.
-                        .flowOn(Dispatchers.IO)
+                            // Heavy work (bitmap decode, ML inference, file I/O) runs on
+                            // the elastic IO pool. Without this it ran on Dispatchers.
+                            // Default (the worker's default) — the same small CPU pool the
+                            // notifier uses, so under background CPU throttling the blocked
+                            // detection threads starved the notifier: the notification
+                            // froze (same file, same ETA) and progress stalled until the
+                            // app came to the foreground. flowOn keeps them separate.
+                            .flowOn(Dispatchers.IO)
                     }.collect { doneCount.incrementAndGet() }
             }
         } finally {

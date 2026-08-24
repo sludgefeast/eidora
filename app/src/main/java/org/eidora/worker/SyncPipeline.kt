@@ -3,12 +3,11 @@
 
 package org.eidora.worker
 
-import org.eidora.util.EidoraLog
-
 import android.content.Context
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import org.eidora.util.EidoraLog
 
 object SyncPipeline {
     const val UNIQUE_SYNC_NAME = "eidora-sync-pipeline"

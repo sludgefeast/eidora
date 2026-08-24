@@ -4,7 +4,6 @@
 package org.eidora.worker
 
 import android.content.Context
-import org.eidora.util.EidoraLog
 import org.eidora.data.db.DatabaseProvider
 import org.eidora.data.db.FaceRegionEntity
 import org.eidora.data.db.PersonEntity
@@ -14,6 +13,7 @@ import org.eidora.domain.model.FaceRegionCoords
 import org.eidora.ml.DetectedFace
 import org.eidora.ml.FaceDetector
 import org.eidora.util.BitmapLoader
+import org.eidora.util.EidoraLog
 import org.eidora.util.FaceQuality
 import org.eidora.util.FileUtil
 import org.eidora.util.ThumbnailHelper

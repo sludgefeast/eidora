@@ -3,8 +3,6 @@
 
 package org.eidora
 
-import org.eidora.util.EidoraLog
-
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -57,7 +55,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import kotlinx.coroutines.launch
-import org.eidora.data.repository.FaceRepository
 import org.eidora.ui.fullscreen.FullscreenPhotoScreen
 import org.eidora.ui.fullscreen.FullscreenViewModel
 import org.eidora.ui.persondetail.PersonDetailScreen
@@ -69,6 +66,7 @@ import org.eidora.ui.persons.VIRTUAL_UNKNOWN
 import org.eidora.ui.photos.PhotosScreen
 import org.eidora.ui.photos.PhotosViewModel
 import org.eidora.ui.theme.EidoraTheme
+import org.eidora.util.EidoraLog
 import org.eidora.worker.SyncPipeline
 
 class MainActivity : AppCompatActivity() {

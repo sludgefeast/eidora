@@ -3,7 +3,6 @@
 
 package org.eidora.ui.settings
 
-import org.eidora.util.EidoraLog
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +44,7 @@ import org.eidora.ml.container.ContainerManifest
 import org.eidora.ml.container.ContainerModelRunner
 import org.eidora.ml.container.ContainerStore
 import org.eidora.ml.container.SelfTest
+import org.eidora.util.EidoraLog
 
 private sealed interface TestState {
     data object Running : TestState

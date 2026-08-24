@@ -5,11 +5,11 @@ package org.eidora.data.repository
 
 import android.content.Context
 import androidx.room.withTransaction
-import org.eidora.util.EidoraLog
 import kotlinx.coroutines.flow.Flow
 import org.eidora.data.db.*
 import org.eidora.ml.EmbeddingModel
 import org.eidora.util.*
+import org.eidora.util.EidoraLog
 import java.io.File
 import java.util.UUID
 
@@ -107,6 +107,7 @@ class FaceRepository(
      *  - true: the unconfirmed faces are removed entirely (region + thumbnail),
      *    so they no longer appear anywhere.
      */
+
     /**
      * Takes back ALL suggestions, moving every affected face back to Unknown
      * (never deletes a face). Two cases:

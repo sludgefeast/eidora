@@ -94,10 +94,15 @@ object FaceAligner {
         var dstMeanX = 0f
         var dstMeanY = 0f
         for (i in 0 until n) {
-            srcMeanX += src[i * 2]; srcMeanY += src[i * 2 + 1]
-            dstMeanX += dst[i * 2]; dstMeanY += dst[i * 2 + 1]
+            srcMeanX += src[i * 2]
+            srcMeanY += src[i * 2 + 1]
+            dstMeanX += dst[i * 2]
+            dstMeanY += dst[i * 2 + 1]
         }
-        srcMeanX /= n; srcMeanY /= n; dstMeanX /= n; dstMeanY /= n
+        srcMeanX /= n
+        srcMeanY /= n
+        dstMeanX /= n
+        dstMeanY /= n
 
         // a = Σ(sd·dd)/Σ|sd|², b = Σ(sd×dd)/Σ|sd|²  where sd, dd are centered.
         var dot = 0f // Σ (sd · dd)

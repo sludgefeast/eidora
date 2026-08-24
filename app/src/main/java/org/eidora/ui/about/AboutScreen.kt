@@ -3,7 +3,6 @@
 
 package org.eidora.ui.about
 
-import org.eidora.util.EidoraLog
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -56,6 +55,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.eidora.BuildConfig
 import org.eidora.R
+import org.eidora.util.EidoraLog
 import org.eidora.util.LogExporter
 
 private const val REPO_URL = "https://github.com/sludgefeast/eidora"

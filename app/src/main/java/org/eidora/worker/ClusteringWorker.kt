@@ -4,7 +4,6 @@
 package org.eidora.worker
 
 import android.content.Context
-import org.eidora.util.EidoraLog
 import androidx.work.*
 import androidx.work.WorkInfo
 import org.eidora.data.db.DatabaseProvider
@@ -12,6 +11,7 @@ import org.eidora.data.db.EidoraDatabase
 import org.eidora.data.db.PersonEntity
 import org.eidora.ml.ChineseWhispers
 import org.eidora.ml.EmbeddingModel
+import org.eidora.util.EidoraLog
 import java.util.UUID
 
 private const val TAG = "ClusteringWorker"
@@ -624,6 +624,7 @@ class ClusteringWorker(
      * nearest-neighbour matching. Persons whose faces are all ignored or lack an
      * embedding are skipped. Extracted from doWork to keep the phases readable.
      */
+
     /**
      * Enforces a global cap on the number of suggestions. Suggestions
      * (unnamed persons) are ranked by face count; everything past the top

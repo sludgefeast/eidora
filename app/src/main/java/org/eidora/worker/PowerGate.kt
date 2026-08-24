@@ -8,8 +8,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.PowerManager
-import org.eidora.util.EidoraLog
 import kotlinx.coroutines.delay
+import org.eidora.util.EidoraLog
 
 private const val TAG = "PowerGate"
 private const val CHECK_INTERVAL_MS = 5000L

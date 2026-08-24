@@ -5,11 +5,11 @@ package org.eidora.ml.container
 
 import android.content.Context
 import android.graphics.Bitmap
-import org.eidora.util.EidoraLog
+import org.eidora.domain.model.FaceRegionCoords
 import org.eidora.ml.DetectedFace
 import org.eidora.ml.EmbeddingModel
-import org.eidora.domain.model.FaceRegionCoords
 import org.eidora.util.BitmapLoader
+import org.eidora.util.EidoraLog
 import org.eidora.util.ThumbnailHelper
 import org.eidora.util.XmpHelper
 import java.io.File

@@ -197,6 +197,7 @@ object ThumbnailHelper {
      * Crops the face region WITHOUT padding, scaled square crop for the embedding model input.
      * Coords are in the rotated (visually correct) image space.
      */
+
     /**
      * Produces an aligned 112×112 face bitmap for embedding when landmarks are
      * present, using [FaceAligner] to warp the five landmarks onto the embedder's

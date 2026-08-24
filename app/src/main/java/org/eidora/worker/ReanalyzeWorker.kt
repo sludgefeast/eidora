@@ -32,31 +32,29 @@ class ReanalyzeWorker(
     context: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result {
-        return try {
-            EidoraLog.i(TAG, "Re-analyze all: starting")
-            val repo =
-                FaceRepository(
-                    applicationContext,
-                    DatabaseProvider.getInstance(applicationContext),
-                )
-            // Only the currently visible folders (the same whitelist the photo
-            // grid shows), not every photo the DB has ever seen.
-            val folders =
-                SettingsProvider
-                    .get(applicationContext)
-                    .getFolderWhitelist()
-                    .toList()
-            SyncPipeline.cancelAndAwaitSync(applicationContext)
-            repo.resetFoldersForRedetection(folders)
-            SyncPipeline.enqueueRedetectAll(applicationContext)
-            EidoraLog.i(TAG, "Re-analyze all: enqueued detection")
-            Result.success()
-        } catch (t: Throwable) {
-            t.rethrowIfCancellation()
-            EidoraLog.e(TAG, "Re-analyze all failed", t)
-            Result.failure()
-        }
+    override suspend fun doWork(): Result = try {
+        EidoraLog.i(TAG, "Re-analyze all: starting")
+        val repo =
+            FaceRepository(
+                applicationContext,
+                DatabaseProvider.getInstance(applicationContext),
+            )
+        // Only the currently visible folders (the same whitelist the photo
+        // grid shows), not every photo the DB has ever seen.
+        val folders =
+            SettingsProvider
+                .get(applicationContext)
+                .getFolderWhitelist()
+                .toList()
+        SyncPipeline.cancelAndAwaitSync(applicationContext)
+        repo.resetFoldersForRedetection(folders)
+        SyncPipeline.enqueueRedetectAll(applicationContext)
+        EidoraLog.i(TAG, "Re-analyze all: enqueued detection")
+        Result.success()
+    } catch (t: Throwable) {
+        t.rethrowIfCancellation()
+        EidoraLog.e(TAG, "Re-analyze all failed", t)
+        Result.failure()
     }
 
     companion object {
