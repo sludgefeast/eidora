@@ -269,7 +269,18 @@ class PersonDetailViewModel(
                 }
                 return@launch
             }
-            repo.renamePerson(personId, trimmed)
+            val wasSuggestion = _uiState.value.viewMode == PersonDetailViewMode.SUGGESTION
+            if (wasSuggestion) {
+                // Naming a suggestion: honour the confirm-on-name-suggestion
+                // setting, exactly like naming from the Persons overview. Using
+                // renamePerson here instead would have ignored the setting and
+                // only touched already-confirmed faces.
+                val confirm = settingsRepo.getConfirmOnNameSuggestion()
+                repo.nameSuggestion(personId, trimmed, confirm = confirm)
+            } else {
+                // Renaming an already-named person: just change the name.
+                repo.renamePerson(personId, trimmed)
+            }
             _uiState.update {
                 it.copy(
                     personName = trimmed,

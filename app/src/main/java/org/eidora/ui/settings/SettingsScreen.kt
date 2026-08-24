@@ -334,6 +334,12 @@ fun SettingsScreen(
                 checked = state.confirmOnMergeSuggestion,
                 onCheckedChange = { viewModel.setConfirmOnMergeSuggestion(it) },
             )
+            SwitchSetting(
+                label = stringResource(R.string.setting_auto_confirm_cluster),
+                description = stringResource(R.string.setting_auto_confirm_cluster_description),
+                checked = state.autoConfirmClusterMatches,
+                onCheckedChange = { viewModel.setAutoConfirmClusterMatches(it) },
+            )
 
             // Section: metadata
             SectionHeader(stringResource(R.string.settings_metadata_title))

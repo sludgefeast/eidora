@@ -103,6 +103,15 @@ class ClusteringWorker(
             runPreCleaning(db, personDao)
 
             val config = loadClusteringConfig()
+            val autoConfirmClusterMatches =
+                try {
+                    org.eidora.data.settings.SettingsProvider
+                        .get(applicationContext)
+                        .getAutoConfirmClusterMatches()
+                } catch (t: Throwable) {
+                    t.rethrowIfCancellation()
+                    org.eidora.data.settings.SettingsRepository.DEFAULT_AUTO_CONFIRM_CLUSTER
+                }
             val powerConfig = loadPowerConfig()
             val powerGate = PowerGate(applicationContext)
 
@@ -213,9 +222,17 @@ class ClusteringWorker(
                         val suggestedId = suggestId
                         val assigned =
                             when {
-                                // Below the strict threshold: assign AND confirm.
+                                // Below the strict threshold. With auto-confirm on,
+                                // assign AND confirm (write the name). With it off
+                                // (default), assign but leave unconfirmed so the user
+                                // reviews it — automatic confirmation had named many
+                                // wrong faces.
                                 matchedId != null -> {
-                                    faceDao.updatePersonAndName(face.faceRegion.id, matchedId, matchedName)
+                                    if (autoConfirmClusterMatches) {
+                                        faceDao.updatePersonAndName(face.faceRegion.id, matchedId, matchedName)
+                                    } else {
+                                        faceDao.updatePersonId(face.faceRegion.id, matchedId)
+                                    }
                                     true
                                 }
                                 // In the suggestion band: assign but leave unconfirmed,

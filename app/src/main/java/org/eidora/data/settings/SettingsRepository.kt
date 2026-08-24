@@ -43,6 +43,8 @@ private val KEY_CONFIRM_ON_NAME_SUGGESTION =
     androidx.datastore.preferences.core.booleanPreferencesKey("confirm_on_name_suggestion")
 private val KEY_CONFIRM_ON_MERGE_SUGGESTION =
     androidx.datastore.preferences.core.booleanPreferencesKey("confirm_on_merge_suggestion")
+private val KEY_AUTO_CONFIRM_CLUSTER =
+    androidx.datastore.preferences.core.booleanPreferencesKey("auto_confirm_cluster_matches")
 private val KEY_FILL_MISSING_DATE =
     androidx.datastore.preferences.core.booleanPreferencesKey("fill_missing_date")
 
@@ -276,6 +278,13 @@ class SettingsRepository(
     val confirmOnMergeSuggestion: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_CONFIRM_ON_MERGE_SUGGESTION] ?: DEFAULT_CONFIRM_ON_MERGE_SUGGESTION }
 
+    // Whether the clustering worker, when a face falls below the strict match
+    // threshold, auto-CONFIRMS it (writes the name) or only attaches it as an
+    // unconfirmed suggestion for the user to review. Default off: automatic
+    // confirmation caused wrong faces to be silently named.
+    val autoConfirmClusterMatches: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_AUTO_CONFIRM_CLUSTER] ?: DEFAULT_AUTO_CONFIRM_CLUSTER }
+
     val fillMissingDate: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_FILL_MISSING_DATE] ?: DEFAULT_FILL_MISSING_DATE }
 
@@ -284,6 +293,8 @@ class SettingsRepository(
     suspend fun getConfirmOnNameSuggestion(): Boolean = confirmOnNameSuggestion.first()
 
     suspend fun getConfirmOnMergeSuggestion(): Boolean = confirmOnMergeSuggestion.first()
+
+    suspend fun getAutoConfirmClusterMatches(): Boolean = autoConfirmClusterMatches.first()
 
     suspend fun getFillMissingDate(): Boolean = fillMissingDate.first()
 
@@ -297,6 +308,10 @@ class SettingsRepository(
 
     suspend fun setConfirmOnMergeSuggestion(value: Boolean) {
         context.dataStore.edit { it[KEY_CONFIRM_ON_MERGE_SUGGESTION] = value }
+    }
+
+    suspend fun setAutoConfirmClusterMatches(value: Boolean) {
+        context.dataStore.edit { it[KEY_AUTO_CONFIRM_CLUSTER] = value }
     }
 
     suspend fun setFillMissingDate(value: Boolean) {
@@ -342,6 +357,12 @@ class SettingsRepository(
         const val DEFAULT_CONFIRM_ON_ASSIGN = true
         const val DEFAULT_CONFIRM_ON_NAME_SUGGESTION = false
         const val DEFAULT_CONFIRM_ON_MERGE_SUGGESTION = true
+
+        // Default OFF: when clustering matches a face below the strict threshold
+        // it attaches it as an unconfirmed suggestion rather than silently
+        // confirming (writing the name). Automatic confirmation previously named
+        // many wrong faces, so review-first is the safer default.
+        const val DEFAULT_AUTO_CONFIRM_CLUSTER = false
 
         // Like Aves: when a photo has no capture date in its metadata, write one
         // (derived from the file's modification time) before editing, so its

@@ -170,6 +170,8 @@
     <string name="setting_confirm_on_name_suggestion_description">Wenn du einem Vorschlag einen Namen gibst, werden auch alle seine Gesichter bestätigt.</string>
     <string name="setting_confirm_on_merge_suggestion">Bestätigen beim Verschmelzen eines Vorschlags</string>
     <string name="setting_confirm_on_merge_suggestion_description">Wenn du einen Vorschlag mit einer bestehenden Person verschmilzt, werden die verschmolzenen Gesichter bestätigt.</string>
+    <string name="setting_auto_confirm_cluster">Sichere Cluster-Treffer automatisch bestätigen</string>
+    <string name="setting_auto_confirm_cluster_description">Wenn das Clustering ein Gesicht findet, das einer benannten Person sehr ähnlich ist, den Namen automatisch schreiben. Aus (Standard): als unbestätigten Vorschlag anhängen, den du zuerst prüfst. Ausgeschaltet lassen vermeidet falsch benannte Gesichter.</string>
     <string name="permission_continue">Weiter</string>
     <string name="container_download_title">Gesichtsmodelle einrichten</string>
     <string name="container_download_intro">Eidora benötigt ein Modell zur Gesichts-Erkennung und -Identifizierung. Das freie Modell-Set (YuNet + SFace, Apache-2.0) wird einmalig heruntergeladen und läuft danach vollständig auf deinem Gerät.</string>

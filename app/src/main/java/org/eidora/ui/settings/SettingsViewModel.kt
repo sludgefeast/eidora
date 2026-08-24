@@ -42,6 +42,7 @@ data class SettingsUiState(
     val fillMissingDate: Boolean = SettingsRepository.DEFAULT_FILL_MISSING_DATE,
     val confirmOnNameSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_NAME_SUGGESTION,
     val confirmOnMergeSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_MERGE_SUGGESTION,
+    val autoConfirmClusterMatches: Boolean = SettingsRepository.DEFAULT_AUTO_CONFIRM_CLUSTER,
     val embeddingModelId: String = org.eidora.ml.EmbeddingModelSpec.DEFAULT.id,
     val detectionModelId: String = org.eidora.ml.DetectionModelSpec.DEFAULT.id,
 )
@@ -115,6 +116,9 @@ class SettingsViewModel(
             repo.confirmOnMergeSuggestion.collect { v -> _uiState.update { it.copy(confirmOnMergeSuggestion = v) } }
         }
         viewModelScope.launch {
+            repo.autoConfirmClusterMatches.collect { v -> _uiState.update { it.copy(autoConfirmClusterMatches = v) } }
+        }
+        viewModelScope.launch {
             repo.fillMissingDate.collect { v -> _uiState.update { it.copy(fillMissingDate = v) } }
         }
     }
@@ -133,6 +137,10 @@ class SettingsViewModel(
 
     fun setConfirmOnMergeSuggestion(value: Boolean) {
         viewModelScope.launch { repo.setConfirmOnMergeSuggestion(value) }
+    }
+
+    fun setAutoConfirmClusterMatches(value: Boolean) {
+        viewModelScope.launch { repo.setAutoConfirmClusterMatches(value) }
     }
 
     fun setClusteringConfig(config: ClusteringConfig) {

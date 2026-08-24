@@ -170,6 +170,8 @@
     <string name="setting_confirm_on_name_suggestion_description">When you give a suggestion a name, also confirm all of its faces.</string>
     <string name="setting_confirm_on_merge_suggestion">Confirm when merging a suggestion</string>
     <string name="setting_confirm_on_merge_suggestion_description">When you merge a suggestion into an existing person, confirm the merged faces.</string>
+    <string name="setting_auto_confirm_cluster">Auto-confirm strong cluster matches</string>
+    <string name="setting_auto_confirm_cluster_description">When clustering finds a face very close to a named person, write the name automatically. Off (default): attach it as an unconfirmed suggestion to review first. Leaving this off avoids wrongly named faces.</string>
     <string name="permission_continue">Continue</string>
     <string name="container_download_title">Set up face models</string>
     <string name="container_download_intro">Eidora needs a face detection and recognition model to work. The free model set (YuNet + SFace, Apache-2.0) will be downloaded once and then runs fully on your device.</string>
