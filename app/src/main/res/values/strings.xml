@@ -108,7 +108,7 @@
     <string name="setting_max_suggestions_description">The total number of suggestions kept at once when the limit is on.</string>
     <string name="setting_max_suggestions_hint">Only the suggestions with the most faces are kept. A lower number keeps the Persons screen tidy; a higher number keeps more groups at once.</string>
     <string name="setting_suggest_margin_description">How far past the auto-assign threshold a face may still be offered as an unconfirmed suggestion, as a fraction of that threshold. 0.10 = suggestions stay close to confident matches; higher recovers more borderline faces but mixes more.</string>
-    <string name="setting_time_weight_description">How strongly the time between photos influences clustering. 0 = ignore time, 1 = default (half-life 3 years), 2 = strong influence. Helps separate siblings and track ageing.</string>
+    <string name="setting_time_weight_description">How strongly the time between photos influences clustering. 0 = off (default; ignore time, match on face similarity only), 1 = moderate (half-life 3 years), 2 = strong influence. Raise it to help separate siblings and track ageing.</string>
     <string name="action_delete_face">Delete face (false positive)</string>
     <string name="delete_face_confirm_message">This face will be permanently deleted and will not be detected again during the next sync. Use this to remove false positive detections.</string>
     <string name="person_face_count_confirmed">%1$d confirmed</string>

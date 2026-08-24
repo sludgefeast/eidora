@@ -276,6 +276,12 @@ class PersonDetailViewModel(
                     viewMode = PersonDetailViewMode.NORMAL,
                 )
             }
+            // Naming a person is the supervised signal the matcher needs: kick off
+            // clustering so its k-NN phase pulls this person's other unknown faces
+            // in. enqueueClustering uses KEEP, so naming several people quickly
+            // coalesces into one run instead of one per name.
+            org.eidora.worker.SyncPipeline
+                .enqueueClustering(getApplication())
         }
     }
 

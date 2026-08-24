@@ -306,8 +306,22 @@ class SettingsRepository(
     companion object {
         // Clustering threshold defaults are model-dependent and live in
         // EmbeddingModelSpec.defaultThresholds (see clusteringConfig above).
-        const val DEFAULT_MIN_CLUSTER_SIZE = 2
-        const val DEFAULT_TIME_WEIGHT = 1.0f
+        // Minimum faces for a cluster to become a suggestion. 4 (not 2) keeps
+        // the initial, unsupervised clustering to larger, more reliable groups —
+        // small clusters from SFace are often mixed. The user names these few
+        // solid groups, after which the supervised k-NN phase absorbs the rest.
+        const val DEFAULT_MIN_CLUSTER_SIZE = 4
+
+        // Temporal weight default is 0 = the time-distance feature is OFF by
+        // default. SFace can't cleanly separate "same person, different session"
+        // from "different people" on face distance alone, and any positive
+        // timeWeight then adds a penalty for time-apart photos that makes only
+        // same-second photo bursts cluster together. Off means clustering uses
+        // face similarity only. Users who specifically want to separate siblings
+        // or track ageing can raise it (half-life 3 years at 1.0).
+        // NOTE: because 0 disables the feature, keep this in mind if the temporal
+        // logic is ever revisited — the default path does not exercise it.
+        const val DEFAULT_TIME_WEIGHT = 0.0f
 
         // Suggest-threshold margin over the model's auto (individual-match)
         // threshold: suggest = auto × (1 + margin). Keeps suggestions just past
