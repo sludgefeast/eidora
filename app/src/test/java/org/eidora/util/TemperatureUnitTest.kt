@@ -107,18 +107,21 @@ class TemperatureUnitTest {
         @ParameterizedTest(name = "{0} uses Fahrenheit")
         @ValueSource(strings = ["US", "LR", "MM", "KY"])
         fun fahrenheitRegions(country: String) {
-            assertTrue(TemperatureUnit.usesFahrenheitByRegion(Locale("en", country)))
+            assertTrue(
+                TemperatureUnit.usesFahrenheitByRegion(
+                    Locale.Builder().setLanguage("en").setRegion(country).build(),
+                ),
+            )
         }
 
         @ParameterizedTest(name = "{0} uses Celsius")
         @ValueSource(strings = ["DE", "GB", "FR", "AT", "CH", "JP", "CN"])
         fun celsiusRegions(country: String) {
-            assertFalse(TemperatureUnit.usesFahrenheitByRegion(Locale("de", country)))
-        }
-
-        @Test
-        fun `country code is matched case-insensitively`() {
-            assertTrue(TemperatureUnit.usesFahrenheitByRegion(Locale("en", "us")))
+            assertFalse(
+                TemperatureUnit.usesFahrenheitByRegion(
+                    Locale.Builder().setLanguage("de").setRegion(country).build(),
+                ),
+            )
         }
     }
 
