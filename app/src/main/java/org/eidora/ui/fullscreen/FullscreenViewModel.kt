@@ -51,12 +51,10 @@ class FullscreenViewModel(
      * overlay redraws against the committed (rotated) coords instead of stale ones
      * the flow may not have delivered yet.
      */
-    fun reloadFaces() {
+    suspend fun reloadFaces() {
         val photoId = currentPhotoId ?: return
-        viewModelScope.launch {
-            val faces = faceDao.findByPhotoId(photoId)
-            _uiState.update { it.copy(faceRegions = faces) }
-        }
+        val faces = faceDao.findByPhotoId(photoId)
+        _uiState.update { it.copy(faceRegions = faces) }
     }
 
     fun redetectFaces(photoId: String) {

@@ -443,6 +443,16 @@ interface FaceRegionDao {
     @Query("UPDATE face_regions SET embedding = NULL, embedding_failed = 0")
     suspend fun clearAllEmbeddings()
 
+    /**
+     * Clears one face's embedding (and its failure flag) so the embedding worker
+     * recomputes it. Used after a photo is rotated: the crop-fallback embedding
+     * path is not rotation-invariant, so a stale embedding could mis-identify a
+     * rotated face. The aligned path usually survives rotation, but resetting is
+     * cheap (one face) and covers both paths safely.
+     */
+    @Query("UPDATE face_regions SET embedding = NULL, embedding_failed = 0 WHERE id = :id")
+    suspend fun clearEmbedding(id: String)
+
     @Query("UPDATE face_regions SET personId = :personId WHERE id = :id")
     suspend fun updatePersonId(
         id: String,

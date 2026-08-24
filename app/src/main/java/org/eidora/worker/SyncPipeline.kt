@@ -183,6 +183,18 @@ object SyncPipeline {
             .enqueue()
     }
 
+    /**
+     * Enqueues only the embedding worker (no re-detection). Used after a photo
+     * rotation, which resets the affected faces' embeddings to NULL: the worker
+     * picks up every face whose embedding is NULL and recomputes it from the
+     * re-oriented image, without disturbing the freshly rotated coordinates.
+     */
+    fun enqueueEmbedding(context: Context) {
+        WorkManager
+            .getInstance(context)
+            .enqueue(EmbeddingWorker.buildRequest())
+    }
+
     fun enqueueReSyncPhoto(
         context: Context,
         photoId: String,

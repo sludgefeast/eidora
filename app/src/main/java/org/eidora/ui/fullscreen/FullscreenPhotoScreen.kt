@@ -141,19 +141,11 @@ fun FullscreenPhotoScreen(
                     faces.forEach { face ->
                         val oldCoords = face.regionJson.toFaceRegionCoords()
                         val newCoords = oldCoords.rotate(delta.toInt())
-                        // DIAGNOSTIC: log the transform so we can compare the
-                        // rotate() result against what a fresh detect on the
-                        // re-oriented image produces (which the user confirms is
-                        // correct). Remove once rotation is fixed.
-                        EidoraLog.d(
-                            "RotateDiag",
-                            "rotate delta=${delta.toInt()} face=${face.id.take(6)} " +
-                                "old(cx=${"%.3f".format(oldCoords.x)},cy=${"%.3f".format(oldCoords.y)}," +
-                                "w=${"%.3f".format(oldCoords.w)},h=${"%.3f".format(oldCoords.h)}) " +
-                                "new(cx=${"%.3f".format(newCoords.x)},cy=${"%.3f".format(newCoords.y)}," +
-                                "w=${"%.3f".format(newCoords.w)},h=${"%.3f".format(newCoords.h)})",
-                        )
                         faceDao.updateRegionJson(face.id, newCoords.toJson())
+                        // The crop-fallback embedding path isn't rotation-
+                        // invariant, so drop this face's embedding; the embedding
+                        // worker recomputes it from the re-oriented image.
+                        faceDao.clearEmbedding(face.id)
                         ThumbnailHelper.createThumbnail(context, file, newCoords, face.id)
                     }
 
@@ -162,20 +154,27 @@ fun FullscreenPhotoScreen(
                     context.imageLoader.memoryCache?.remove(
                         coil.memory.MemoryCache.Key(file.absolutePath),
                     )
+
+                    // 4. Recompute embeddings for the faces whose embeddings we
+                    // just cleared. Embedding-only enqueue — no re-detection, so
+                    // the rotated coords stay intact.
+                    org.eidora.worker.SyncPipeline.enqueueEmbedding(context)
                 } catch (t: Throwable) {
                     EidoraLog.e("FullscreenPhoto", "Failed to save rotation", t)
                 }
             }
+            // Load the committed rotated coords into UI state FIRST and wait for
+            // it, so the overlay can't draw stale coords. Only then bump imageKey
+            // (reload the reoriented image) and release the gate. reloadFaces is
+            // now suspend, so this actually completes before awaitingRotation
+            // clears — closing the race the log showed (new coords in DB, but the
+            // draw still used the old ones against the newly-portrait image).
+            viewModel.reloadFaces()
             // Bump imageKey to force Coil to reload the file. The visual
             // rotation (displayRotation) is reset in AsyncImage.onSuccess once
             // the reoriented bitmap is actually on screen, avoiding a flicker
             // back to 0° before the new image is ready.
             imageKey++
-            // The DB writes above are done, so the rotated coords are committed.
-            // Re-query faces explicitly so the overlay draws against the fresh
-            // coords instead of whatever the observe-flow last delivered, then
-            // allow frames again.
-            viewModel.reloadFaces()
             awaitingRotation = false
         }
     }
@@ -240,6 +239,12 @@ fun FullscreenPhotoScreen(
                     // The freshly loaded bitmap already has the new orientation
                     // baked in (Coil applies EXIF), so reset the visual rotation.
                     displayRotation = 0f
+                    // Second guard against the stale-coords race: when the
+                    // reoriented image actually appears, re-sync the overlay
+                    // coords to the committed (rotated) values. Combined with the
+                    // awaited reloadFaces in rotate(), the frames can't be drawn
+                    // against old coords no matter how the async timing lands.
+                    scope.launch { viewModel.reloadFaces() }
                 },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -272,19 +277,6 @@ fun FullscreenPhotoScreen(
             ) {
                 state.faceRegions.forEach { face ->
                     val coords = face.regionJson.toFaceRegionCoords()
-                    // DIAGNOSTIC: log the actual values used to place each frame,
-                    // so a rotation mismatch (coords vs. image orientation vs.
-                    // intrinsic size) becomes visible in the log instead of us
-                    // guessing. Remove once the rotation issue is resolved.
-                    EidoraLog.d(
-                        "RotateDiag",
-                        "draw face=${face.id.take(6)} coords(cx=${"%.3f".format(coords.x)}," +
-                            "cy=${"%.3f".format(coords.y)},w=${"%.3f".format(coords.w)}," +
-                            "h=${"%.3f".format(coords.h)}) intrinsic=${intrinsicSize.width}x" +
-                            "${intrinsicSize.height} imageRect=(${"%.0f".format(imageRect.left)}," +
-                            "${"%.0f".format(imageRect.top)},${"%.0f".format(imageRect.width)}x" +
-                            "${"%.0f".format(imageRect.height)})",
-                    )
                     val color =
                         when {
                             face.id == currentFaceRegionId -> Color.Magenta
