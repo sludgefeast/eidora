@@ -55,6 +55,12 @@ fun PersonDetailScreen(
     // the in-state face lists. Only collected when a paged flow is present.
     val unknownItems =
         viewModel.unknownPaged?.collectAsLazyPagingItems()
+    // Confirmed / unconfirmed faces for a named person, fully paged. Collected
+    // only when present (NORMAL / SUGGESTION mode).
+    val confirmedItems =
+        viewModel.confirmedPaged?.collectAsLazyPagingItems()
+    val unconfirmedItems =
+        viewModel.unconfirmedPaged?.collectAsLazyPagingItems()
 
     var isEditingName by remember { mutableStateOf(false) }
     var editedName by remember(state.personName) { mutableStateOf(state.personName) }
@@ -356,38 +362,45 @@ fun PersonDetailScreen(
                             )
                         }
                     }
-                } else if (state.unconfirmedFaces.isNotEmpty()) {
-                    faceItemsWithMonthHeaders(
-                        faces = state.unconfirmedFaces,
-                        isSelected = { state.selectedFaceIds.contains(it) },
-                        borderColorFor = {
-                            if (state.viewMode ==
-                                PersonDetailViewMode.NORMAL
-                            ) {
-                                Color(0xFF4CAF50)
-                            } else {
-                                null
-                            }
-                        },
-                        onTap = { id ->
-                            if (state.isMultiSelectActive) {
-                                viewModel.toggleFaceSelection(id)
-                            } else {
-                                viewModel.showFaceActions(id)
-                            }
-                        },
-                        onLongPress = { id ->
-                            if (state.isMultiSelectActive) {
-                                viewModel.rangeSelectFace(id)
-                            } else {
-                                viewModel.toggleFaceSelection(id)
-                            }
-                        },
-                        onImageTap = { faceId, photoId -> onFaceClick(faceId, photoId) },
-                    )
+                } else if (unconfirmedItems != null && unconfirmedItems.itemCount > 0) {
+                    // Paged unconfirmed faces (no month headers — page-by-page
+                    // ordering isn't known up front, same as the Unknown view).
+                    items(
+                        count = unconfirmedItems.itemCount,
+                        key = { index -> unconfirmedItems[index]?.id ?: "unconf_$index" },
+                    ) { index ->
+                        val face = unconfirmedItems[index]
+                        if (face != null) {
+                            FaceGridItem(
+                                face = face,
+                                isSelected = state.selectedFaceIds.contains(face.id),
+                                borderColor =
+                                    if (state.viewMode == PersonDetailViewMode.NORMAL) {
+                                        Color(0xFF4CAF50)
+                                    } else {
+                                        null
+                                    },
+                                onTap = {
+                                    if (state.isMultiSelectActive) {
+                                        viewModel.toggleFaceSelection(face.id)
+                                    } else {
+                                        viewModel.showFaceActions(face.id)
+                                    }
+                                },
+                                onLongPress = {
+                                    if (state.isMultiSelectActive) {
+                                        viewModel.rangeSelectFace(face.id)
+                                    } else {
+                                        viewModel.toggleFaceSelection(face.id)
+                                    }
+                                },
+                                onImageTap = { onFaceClick(face.id, face.photoId) },
+                            )
+                        }
+                    }
                 }
 
-                if (state.confirmedFaces.isNotEmpty()) {
+                if (confirmedItems != null && confirmedItems.itemCount > 0) {
                     item(span = { GridItemSpan(3) }) {
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -398,26 +411,34 @@ fun PersonDetailScreen(
                             )
                         }
                     }
-                    faceItemsWithMonthHeaders(
-                        faces = state.confirmedFaces,
-                        isSelected = { state.selectedFaceIds.contains(it) },
-                        borderColorFor = { null },
-                        onTap = { id ->
-                            if (state.isMultiSelectActive) {
-                                viewModel.toggleFaceSelection(id)
-                            } else {
-                                viewModel.showFaceActions(id)
-                            }
-                        },
-                        onLongPress = { id ->
-                            if (state.isMultiSelectActive) {
-                                viewModel.rangeSelectFace(id)
-                            } else {
-                                viewModel.toggleFaceSelection(id)
-                            }
-                        },
-                        onImageTap = { faceId, photoId -> onFaceClick(faceId, photoId) },
-                    )
+                    items(
+                        count = confirmedItems.itemCount,
+                        key = { index -> confirmedItems[index]?.id ?: "conf_$index" },
+                    ) { index ->
+                        val face = confirmedItems[index]
+                        if (face != null) {
+                            FaceGridItem(
+                                face = face,
+                                isSelected = state.selectedFaceIds.contains(face.id),
+                                borderColor = null,
+                                onTap = {
+                                    if (state.isMultiSelectActive) {
+                                        viewModel.toggleFaceSelection(face.id)
+                                    } else {
+                                        viewModel.showFaceActions(face.id)
+                                    }
+                                },
+                                onLongPress = {
+                                    if (state.isMultiSelectActive) {
+                                        viewModel.rangeSelectFace(face.id)
+                                    } else {
+                                        viewModel.toggleFaceSelection(face.id)
+                                    }
+                                },
+                                onImageTap = { onFaceClick(face.id, face.photoId) },
+                            )
+                        }
+                    }
                 }
             }
             // Drag scrollbar
@@ -437,6 +458,18 @@ fun PersonDetailScreen(
                     // and nothing is on screen yet.
                     unknownItems.loadState.refresh is androidx.paging.LoadState.Loading &&
                         unknownItems.itemCount == 0
+                } else if (confirmedItems != null || unconfirmedItems != null) {
+                    // NORMAL / SUGGESTION: paged. Show the spinner only while both
+                    // streams are still doing their initial load and nothing is on
+                    // screen yet.
+                    val confLoading =
+                        confirmedItems?.loadState?.refresh is androidx.paging.LoadState.Loading
+                    val unconfLoading =
+                        unconfirmedItems?.loadState?.refresh is androidx.paging.LoadState.Loading
+                    val nothingYet =
+                        (confirmedItems?.itemCount ?: 0) == 0 &&
+                            (unconfirmedItems?.itemCount ?: 0) == 0
+                    (confLoading || unconfLoading) && nothingYet
                 } else {
                     state.isLoading && state.unconfirmedFaces.isEmpty()
                 }
@@ -452,6 +485,8 @@ fun PersonDetailScreen(
         val face =
             state.unconfirmedFaces.find { it.faceRegion.id == faceId }
                 ?: state.confirmedFaces.find { it.faceRegion.id == faceId }
+                ?: unconfirmedItems?.itemSnapshotList?.items?.find { it.id == faceId }
+                ?: confirmedItems?.itemSnapshotList?.items?.find { it.id == faceId }
                 ?: unknownItems?.itemSnapshotList?.items?.find { it.id == faceId }
         FaceActionsSheet(
             viewMode = state.viewMode,
@@ -695,76 +730,6 @@ private fun MultiSelectActionBar(
             // Redetect and Assign are available in every mode.
             TextButton(onClick = onRedetect) { Text(stringResource(R.string.action_redetect)) }
             TextButton(onClick = onAssign) { Text(stringResource(R.string.action_assign_to_person)) }
-        }
-    }
-}
-
-private fun LazyGridScope.faceItemsWithMonthHeaders(
-    faces: List<org.eidora.data.db.FaceRegionWithPhoto>,
-    isSelected: (String) -> Boolean,
-    borderColorFor: (String) -> androidx.compose.ui.graphics.Color?,
-    onTap: (String) -> Unit,
-    onLongPress: (String) -> Unit,
-    onImageTap: (faceId: String, photoId: String) -> Unit,
-) {
-    val formatter =
-        java.time.format.DateTimeFormatter.ofPattern(
-            "MMMM yyyy",
-            java.util.Locale.getDefault(),
-        )
-    var lastMonthKey = ""
-
-    faces.forEach { faceWithPhoto ->
-        val takenAt = faceWithPhoto.photoTakenAt
-        val monthKey =
-            if (takenAt != null) {
-                val date =
-                    java.time.Instant
-                        .ofEpochMilli(takenAt)
-                        .atZone(java.time.ZoneId.systemDefault())
-                        .toLocalDate()
-                "${date.year}-${date.monthValue}"
-            } else {
-                "unknown"
-            }
-
-        if (monthKey != lastMonthKey) {
-            lastMonthKey = monthKey
-            val label =
-                if (takenAt != null) {
-                    val date =
-                        java.time.Instant
-                            .ofEpochMilli(takenAt)
-                            .atZone(java.time.ZoneId.systemDefault())
-                    formatter.format(date)
-                } else {
-                    "–"
-                }
-            item(key = "month_${monthKey}_${faceWithPhoto.faceRegion.id}", span = { GridItemSpan(3) }) {
-                androidx.compose.material3.Text(
-                    text = label,
-                    style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier =
-                        androidx.compose.ui.Modifier.padding(
-                            start = 4.dp,
-                            end = 4.dp,
-                            top = 12.dp,
-                            bottom = 4.dp,
-                        ),
-                )
-            }
-        }
-
-        item(key = faceWithPhoto.faceRegion.id) {
-            FaceGridItem(
-                face = faceWithPhoto,
-                isSelected = isSelected(faceWithPhoto.faceRegion.id),
-                borderColor = borderColorFor(faceWithPhoto.faceRegion.id),
-                onTap = { onTap(faceWithPhoto.faceRegion.id) },
-                onLongPress = { onLongPress(faceWithPhoto.faceRegion.id) },
-                onImageTap = { onImageTap(faceWithPhoto.faceRegion.id, faceWithPhoto.faceRegion.photoId) },
-            )
         }
     }
 }

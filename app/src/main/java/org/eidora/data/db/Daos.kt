@@ -494,8 +494,13 @@ interface FaceRegionDao {
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
         WHERE f.personId = :personId AND ph.folder IN (:folders)
+        -- Confirmed faces (name NOT NULL) sort FIRST so they can never be
+        -- pushed past the LIMIT by a flood of unconfirmed suggestions the
+        -- clustering assigned to this person. Confirmed faces are the user's
+        -- manual work and must always reach the UI; unconfirmed ones are
+        -- regenerable. Confirmed counts stay small (manual), so they fit easily.
         ORDER BY 
-            CASE WHEN f.name IS NULL THEN 0 ELSE 1 END ASC,
+            CASE WHEN f.name IS NULL THEN 1 ELSE 0 END ASC,
             ph.takenAt DESC
         LIMIT 10000
     """,
@@ -537,6 +542,72 @@ interface FaceRegionDao {
     """,
     )
     fun pagingUnknown(folders: List<String>): androidx.paging.PagingSource<Int, FaceRegionWithPhoto>
+
+    /**
+     * Paged confirmed faces (name NOT NULL) for one person. No LIMIT — Paging
+     * loads pages on demand, so a person can hold any number of faces without
+     * confirmed ones being pushed out of a capped result set (the bug the old
+     * LIMIT 10000 observeByPersonId caused).
+     */
+    @Query(
+        """
+        SELECT f.id, f.photoId, f.personId, f.name,
+               f.ignored, f.quality_score, f.embedding_failed,
+               ph.takenAt AS photoTakenAt
+        FROM face_regions f
+        JOIN photos ph ON ph.id = f.photoId
+        WHERE f.personId = :personId AND f.name IS NOT NULL AND f.ignored = 0
+              AND ph.folder IN (:folders)
+        ORDER BY ph.takenAt DESC
+    """,
+    )
+    fun pagingConfirmedByPerson(
+        personId: String,
+        folders: List<String>,
+    ): androidx.paging.PagingSource<Int, FaceRegionWithPhoto>
+
+    /**
+     * Paged unconfirmed faces (name IS NULL) for one person. No LIMIT, same
+     * reasoning as [pagingConfirmedByPerson].
+     */
+    @Query(
+        """
+        SELECT f.id, f.photoId, f.personId, f.name,
+               f.ignored, f.quality_score, f.embedding_failed,
+               ph.takenAt AS photoTakenAt
+        FROM face_regions f
+        JOIN photos ph ON ph.id = f.photoId
+        WHERE f.personId = :personId AND f.name IS NULL AND f.ignored = 0
+              AND ph.folder IN (:folders)
+        ORDER BY ph.takenAt DESC
+    """,
+    )
+    fun pagingUnconfirmedByPerson(
+        personId: String,
+        folders: List<String>,
+    ): androidx.paging.PagingSource<Int, FaceRegionWithPhoto>
+
+    /**
+     * All face IDs for a person in the SAME order the paged confirmed+unconfirmed
+     * views display them (confirmed first, then unconfirmed, each newest-first).
+     * Lightweight (ids only) — used for range selection, which needs the full
+     * ordered id list even though the grid itself is paged.
+     */
+    @Query(
+        """
+        SELECT f.id
+        FROM face_regions f
+        JOIN photos ph ON ph.id = f.photoId
+        WHERE f.personId = :personId AND f.ignored = 0 AND ph.folder IN (:folders)
+        ORDER BY
+            CASE WHEN f.name IS NULL THEN 1 ELSE 0 END ASC,
+            ph.takenAt DESC
+    """,
+    )
+    suspend fun orderedFaceIdsForPerson(
+        personId: String,
+        folders: List<String>,
+    ): List<String>
 
     @Query(
         """

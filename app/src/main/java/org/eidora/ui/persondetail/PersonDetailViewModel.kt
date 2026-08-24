@@ -92,21 +92,15 @@ class PersonDetailViewModel(
             }
 
             val folders = settingsRepo.getFolderWhitelist().toList()
-            faceDao.observeByPersonId(personId, folders).collect { faces: List<FaceRegionWithPhoto> ->
-                _uiState.update {
-                    it.copy(
-                        unconfirmedFaces =
-                            faces.filter { f ->
-                                f.faceRegion.name == null && !f.faceRegion.ignored
-                            },
-                        confirmedFaces =
-                            faces.filter { f ->
-                                f.faceRegion.name != null && !f.faceRegion.ignored
-                            },
-                        isLoading = false,
-                    )
-                }
-            }
+            // Fully paged, split into confirmed and unconfirmed streams. No cap:
+            // confirmed faces (the user's manual work) can never be pushed out by
+            // a flood of unconfirmed suggestions, which the old LIMIT 10000 query
+            // allowed. cachedIn keeps pages across recompositions.
+            confirmedPaged =
+                repo.pagingConfirmedFaces(personId, folders).cachedIn(viewModelScope)
+            unconfirmedPaged =
+                repo.pagingUnconfirmedFaces(personId, folders).cachedIn(viewModelScope)
+            _uiState.update { it.copy(isLoading = false) }
         }
     }
 
@@ -117,6 +111,17 @@ class PersonDetailViewModel(
      * pages load on scroll — essential with tens of thousands of unknown faces.
      */
     var unknownPaged: kotlinx.coroutines.flow.Flow<androidx.paging.PagingData<FaceRegionWithPhoto>>? = null
+        private set
+
+    /**
+     * Paged confirmed / unconfirmed faces for a named person. Fully paged (no
+     * cap), so a person with any number of faces loads page-by-page and confirmed
+     * faces can never be pushed out of a capped query. Non-null only in NORMAL /
+     * SUGGESTION mode. The screen collects each with collectAsLazyPagingItems().
+     */
+    var confirmedPaged: kotlinx.coroutines.flow.Flow<androidx.paging.PagingData<FaceRegionWithPhoto>>? = null
+        private set
+    var unconfirmedPaged: kotlinx.coroutines.flow.Flow<androidx.paging.PagingData<FaceRegionWithPhoto>>? = null
         private set
 
     fun loadUnknown() {
@@ -162,11 +167,26 @@ class PersonDetailViewModel(
     }
 
     fun rangeSelectFace(faceId: String) {
-        _uiState.update { state ->
+        val personId = currentPersonId ?: return
+        viewModelScope.launch {
+            // Range selection needs the full ordered id list. Under paging the
+            // in-memory lists no longer hold every face, so fetch the ids (only)
+            // in the same order the grid shows them. For virtual views (UNKNOWN/
+            // IGNORED) fall back to whatever faces are currently in state.
             val orderedIds =
-                (state.unconfirmedFaces + state.confirmedFaces)
-                    .map { it.faceRegion.id }
-            state.copy(multiSelect = state.multiSelect.rangeSelect(faceId, orderedIds))
+                if (currentPersonId != null &&
+                    _uiState.value.viewMode != PersonDetailViewMode.UNKNOWN &&
+                    _uiState.value.viewMode != PersonDetailViewMode.IGNORED
+                ) {
+                    val folders = settingsRepo.getFolderWhitelist().toList()
+                    faceDao.orderedFaceIdsForPerson(personId, folders)
+                } else {
+                    (_uiState.value.unconfirmedFaces + _uiState.value.confirmedFaces)
+                        .map { it.faceRegion.id }
+                }
+            _uiState.update { state ->
+                state.copy(multiSelect = state.multiSelect.rangeSelect(faceId, orderedIds))
+            }
         }
     }
 

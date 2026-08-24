@@ -552,6 +552,36 @@ class FaceRepository(
             pagingSourceFactory = { faceDao.pagingUnknown(folders) },
         ).flow
 
+    /** Paged confirmed faces for one person. See [pagingUnknownFaces] for config rationale. */
+    fun pagingConfirmedFaces(
+        personId: String,
+        folders: List<String>,
+    ): kotlinx.coroutines.flow.Flow<androidx.paging.PagingData<FaceRegionWithPhoto>> =
+        androidx.paging.Pager(
+            config =
+                androidx.paging.PagingConfig(
+                    pageSize = 90,
+                    prefetchDistance = 90,
+                    enablePlaceholders = false,
+                ),
+            pagingSourceFactory = { faceDao.pagingConfirmedByPerson(personId, folders) },
+        ).flow
+
+    /** Paged unconfirmed faces for one person. See [pagingUnknownFaces] for config rationale. */
+    fun pagingUnconfirmedFaces(
+        personId: String,
+        folders: List<String>,
+    ): kotlinx.coroutines.flow.Flow<androidx.paging.PagingData<FaceRegionWithPhoto>> =
+        androidx.paging.Pager(
+            config =
+                androidx.paging.PagingConfig(
+                    pageSize = 90,
+                    prefetchDistance = 90,
+                    enablePlaceholders = false,
+                ),
+            pagingSourceFactory = { faceDao.pagingUnconfirmedByPerson(personId, folders) },
+        ).flow
+
     fun observeIgnoredFaces(folders: List<String>): Flow<List<FaceRegionWithPhoto>> = faceDao.observeIgnored(folders)
 
     // -----------------------------------------------------------------------
