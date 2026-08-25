@@ -162,19 +162,16 @@ fun FullscreenPhotoScreen(
                     EidoraLog.e("FullscreenPhoto", "Failed to save rotation", t)
                 }
             }
-            // Load the committed rotated coords into UI state FIRST and wait for
-            // it, so the overlay can't draw stale coords. Only then bump imageKey
-            // (reload the reoriented image) and release the gate. reloadFaces is
-            // now suspend, so this actually completes before awaitingRotation
-            // clears — closing the race the log showed (new coords in DB, but the
-            // draw still used the old ones against the newly-portrait image).
+            // Load the committed rotated coords into UI state and wait for it, so
+            // the overlay has fresh coords ready. Then bump imageKey to reload the
+            // reoriented file. The draw gate (awaitingRotation) is NOT released
+            // here — it is released in AsyncImage.onSuccess, once the new bitmap's
+            // intrinsicSize is in, so frames are never drawn against the old
+            // (pre-rotation) aspect ratio. Releasing here caused the overlay to
+            // draw new coords against the stale portrait/landscape size for one
+            // frame, putting frames in the wrong place until the view reopened.
             viewModel.reloadFaces()
-            // Bump imageKey to force Coil to reload the file. The visual
-            // rotation (displayRotation) is reset in AsyncImage.onSuccess once
-            // the reoriented bitmap is actually on screen, avoiding a flicker
-            // back to 0° before the new image is ready.
             imageKey++
-            awaitingRotation = false
         }
     }
 
@@ -238,12 +235,22 @@ fun FullscreenPhotoScreen(
                     // The freshly loaded bitmap already has the new orientation
                     // baked in (Coil applies EXIF), so reset the visual rotation.
                     displayRotation = 0f
-                    // Second guard against the stale-coords race: when the
-                    // reoriented image actually appears, re-sync the overlay
-                    // coords to the committed (rotated) values. Combined with the
-                    // awaited reloadFaces in rotate(), the frames can't be drawn
-                    // against old coords no matter how the async timing lands.
-                    scope.launch { viewModel.reloadFaces() }
+                    // Now the new bitmap (and its correct intrinsicSize) is on
+                    // screen. Re-sync the overlay coords to the committed rotated
+                    // values, THEN release the draw gate — so frames are only ever
+                    // drawn once image size and coords both match. This is what
+                    // fixes frames landing in the wrong place right after a
+                    // rotation (they were drawn against the old aspect ratio).
+                    scope.launch {
+                        viewModel.reloadFaces()
+                        awaitingRotation = false
+                    }
+                },
+                onError = {
+                    // Never leave the draw gate stuck closed: if the reload fails,
+                    // release it so the overlay can still draw against whatever is
+                    // shown, instead of the frames disappearing permanently.
+                    awaitingRotation = false
                 },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -302,7 +309,14 @@ fun FullscreenPhotoScreen(
                     contentDescription = stringResource(R.string.action_rotate_left),
                 )
             }
-            Button(onClick = onRedetect) {
+            Button(onClick = {
+                // Make sure the overlay isn't left gated shut from a prior
+                // rotation, and force the image to reload so intrinsicSize is
+                // fresh; the reactive face flow then delivers the new detections.
+                awaitingRotation = false
+                imageKey++
+                onRedetect()
+            }) {
                 Text(stringResource(R.string.action_redetect_faces))
             }
             FilledTonalIconButton(onClick = { rotate(90f) }) {
