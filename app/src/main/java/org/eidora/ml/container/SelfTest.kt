@@ -36,8 +36,6 @@ import java.io.File
 object SelfTest {
     private const val ASSET_DIR = "selftest"
 
-    /** One face crop from metadata, tagged with the person's name. */
-
     // ---- Detection ---------------------------------------------------------
 
     data class PhotoDetection(

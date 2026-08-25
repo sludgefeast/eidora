@@ -137,8 +137,6 @@ class ScanWorker(
         return Result.success()
     }
 
-    /** Register or refresh one photo row, resetting to NEW when new/modified. */
-
     /** Register or refresh one photo row, resetting to NEW when new/modified.
      *  [existing] is the pre-loaded DB entry for this path (null if unknown),
      *  so no per-photo findByPath query is needed. */

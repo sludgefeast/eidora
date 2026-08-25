@@ -32,7 +32,7 @@ private const val MAX_EMBEDDING_WAIT_ATTEMPTS = 10
  */
 private const val CONSISTENCY_PENALTY_FRACTION = 0.5f
 
-/**
+/*
  * How far above the (strict) auto-assign threshold a face may still be offered
  * as an unconfirmed *suggestion* for a named person, as a fraction of that
  * threshold, is now a user-adjustable setting: ClusteringConfig.suggestMargin
@@ -620,12 +620,6 @@ class ClusteringWorker(
     }
 
     /**
-     * Loads every named person's stored embeddings (with metadata) for
-     * nearest-neighbour matching. Persons whose faces are all ignored or lack an
-     * embedding are skipped. Extracted from doWork to keep the phases readable.
-     */
-
-    /**
      * Enforces a global cap on the number of suggestions. Suggestions
      * (unnamed persons) are ranked by face count; everything past the top
      * [maxSuggestions] is dissolved via rejectSuggestion (faces back to Unknown,
@@ -655,6 +649,11 @@ class ClusteringWorker(
         )
     }
 
+    /**
+     * Loads every named person's stored embeddings (with metadata) for
+     * nearest-neighbour matching. Persons whose faces are all ignored or lack an
+     * embedding are skipped. Extracted from doWork to keep the phases readable.
+     */
     private suspend fun loadPersonData(
         faceDao: org.eidora.data.db.FaceRegionDao,
         personDao: org.eidora.data.db.PersonDao,

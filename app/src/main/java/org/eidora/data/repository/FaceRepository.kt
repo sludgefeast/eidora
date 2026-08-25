@@ -100,15 +100,6 @@ class FaceRepository(
     }
 
     /**
-     * Clears all suggestion persons. [deleteFaces] controls what happens to the
-     * faces that were suggested:
-     *  - false (default): only the suggested assignment is undone, the faces
-     *    return to the unknown pool for re-clustering.
-     *  - true: the unconfirmed faces are removed entirely (region + thumbnail),
-     *    so they no longer appear anywhere.
-     */
-
-    /**
      * Takes back ALL suggestions, moving every affected face back to Unknown
      * (never deletes a face). Two cases:
      *  1. Suggestion persons (persons.name IS NULL) — whole unnamed persons that
@@ -542,7 +533,9 @@ class FaceRepository(
      * loaded at a time as the user scrolls, so opening the screen with tens of
      * thousands of faces is instant instead of loading everything up front.
      */
-    fun pagingUnknownFaces(folders: List<String>): kotlinx.coroutines.flow.Flow<androidx.paging.PagingData<FaceRegionWithPhoto>> =
+    fun pagingUnknownFaces(
+        folders: List<String>,
+    ): kotlinx.coroutines.flow.Flow<androidx.paging.PagingData<FaceRegionWithPhoto>> =
         androidx.paging.Pager(
             config =
                 androidx.paging.PagingConfig(

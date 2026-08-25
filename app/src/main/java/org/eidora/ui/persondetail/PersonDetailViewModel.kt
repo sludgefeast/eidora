@@ -218,9 +218,11 @@ class PersonDetailViewModel(
     }
 
     /**
-     * Drops a face from the visible lists right away so the UI reacts instantly;
-     * the observed DB flow re-emits the authoritative state once the background
-     * work finishes (and restores the face if the operation failed).
+     * Drops a face from the in-state lists right away so the UI reacts instantly.
+     * Only the virtual views (IGNORED) still render from these lists; the paged
+     * NORMAL/SUGGESTION views invalidate and reload on their own after the DB
+     * write, so this is a no-op there. If the background op fails, the next load
+     * restores the face.
      */
     private fun removeFaceFromViewOptimistically(faceId: String) {
         _uiState.update {
