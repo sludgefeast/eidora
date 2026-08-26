@@ -127,8 +127,9 @@ class PersonDetailViewModel(
     fun loadUnknown() {
         viewModelScope.launch {
             val folders = settingsRepo.getFolderWhitelist().toList()
+            val minQuality = settingsRepo.getMinFaceQuality()
             unknownPaged =
-                repo.pagingUnknownFaces(folders).cachedIn(viewModelScope)
+                repo.pagingUnknownFaces(folders, minQuality).cachedIn(viewModelScope)
             _uiState.update {
                 it.copy(
                     personName =

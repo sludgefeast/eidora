@@ -154,6 +154,10 @@
     <string name="action_pause">Pausieren</string>
     <string name="action_resume">Fortfahren</string>
     <string name="powergate_paused">Pausiert</string>
+    <string name="settings_quality_title">Qualitätsfilter</string>
+    <string name="setting_min_quality">Mindest-Gesichtsqualität</string>
+    <string name="setting_min_quality_description">Blendet nicht zugeordnete Gesichter unter dieser Qualität in der Unbekannt-Ansicht aus. Bereits einer Person oder einem Vorschlag zugeordnete Gesichter werden nie ausgeblendet.</string>
+    <string name="setting_min_quality_hint">Die Qualität kombiniert Gesichtsgröße, Frontalität und Schärfe (0..1). Höher = mehr Hintergrund-/unscharfe/kleine Gesichter ausblenden. 0 = alles anzeigen (Standard). Es wird nichts gelöscht; die Gesichter erscheinen wieder, wenn du den Wert senkst.</string>
     <string name="settings_confirm_title">Bestätigungsverhalten</string>
     <string name="settings_metadata_title">Metadaten</string>
     <string name="settings_metadata_description">Wie Eidora mit Datums- und Metadaten in deinen Fotodateien umgeht.</string>

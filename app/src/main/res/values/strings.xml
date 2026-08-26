@@ -154,6 +154,10 @@
     <string name="action_pause">Pause</string>
     <string name="action_resume">Resume</string>
     <string name="powergate_paused">Paused</string>
+    <string name="settings_quality_title">Quality filter</string>
+    <string name="setting_min_quality">Minimum face quality</string>
+    <string name="setting_min_quality_description">Hides unassigned faces below this quality in the Unknown view. Faces already assigned to a person or a suggestion are never hidden.</string>
+    <string name="setting_min_quality_hint">Quality combines face size, how frontal the face is, and sharpness (0..1). Higher = hide more background/blurry/tiny faces. 0 = show everything (default). Nothing is deleted; the faces reappear if you lower the value.</string>
     <string name="settings_confirm_title">Confirmation behaviour</string>
     <string name="settings_metadata_title">Metadata</string>
     <string name="settings_metadata_description">How Eidora handles dates and metadata in your photo files.</string>

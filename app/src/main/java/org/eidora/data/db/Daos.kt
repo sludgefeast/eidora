@@ -517,12 +517,17 @@ interface FaceRegionDao {
                ph.takenAt AS photoTakenAt
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
-        WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding_failed = 0 AND ph.folder IN (:folders)
+        WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding_failed = 0
+              AND (f.quality_score IS NULL OR f.quality_score >= :minQuality)
+              AND ph.folder IN (:folders)
         ORDER BY ph.takenAt DESC
         LIMIT 10000
     """,
     )
-    fun observeUnknown(folders: List<String>): Flow<List<FaceRegionWithPhoto>>
+    fun observeUnknown(
+        folders: List<String>,
+        minQuality: Float,
+    ): Flow<List<FaceRegionWithPhoto>>
 
     /**
      * PagingSource variant of [observeUnknown] for the Unknown screen, which can
@@ -537,11 +542,16 @@ interface FaceRegionDao {
                ph.takenAt AS photoTakenAt
         FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
-        WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding_failed = 0 AND ph.folder IN (:folders)
+        WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding_failed = 0
+              AND (f.quality_score IS NULL OR f.quality_score >= :minQuality)
+              AND ph.folder IN (:folders)
         ORDER BY ph.takenAt DESC
     """,
     )
-    fun pagingUnknown(folders: List<String>): androidx.paging.PagingSource<Int, FaceRegionWithPhoto>
+    fun pagingUnknown(
+        folders: List<String>,
+        minQuality: Float,
+    ): androidx.paging.PagingSource<Int, FaceRegionWithPhoto>
 
     /**
      * Paged confirmed faces (name NOT NULL) for one person. No LIMIT — Paging
@@ -639,10 +649,15 @@ interface FaceRegionDao {
         """
         SELECT COUNT(*) FROM face_regions f
         JOIN photos ph ON ph.id = f.photoId
-        WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding_failed = 0 AND ph.folder IN (:folders)
+        WHERE f.personId IS NULL AND f.ignored = 0 AND f.embedding_failed = 0
+              AND (f.quality_score IS NULL OR f.quality_score >= :minQuality)
+              AND ph.folder IN (:folders)
     """,
     )
-    fun observeUnknownCount(folders: List<String>): Flow<Int>
+    fun observeUnknownCount(
+        folders: List<String>,
+        minQuality: Float,
+    ): Flow<Int>
 
     @Query(
         """

@@ -37,6 +37,7 @@ private val KEY_FOLDER_WIZARD_DONE =
     androidx.datastore.preferences.core.booleanPreferencesKey("folder_wizard_done")
 private val KEY_METADATA_WIZARD_DONE =
     androidx.datastore.preferences.core.booleanPreferencesKey("metadata_wizard_done")
+private val KEY_MIN_QUALITY = floatPreferencesKey("min_face_quality")
 private val KEY_CONFIRM_ON_ASSIGN =
     androidx.datastore.preferences.core.booleanPreferencesKey("confirm_on_assign")
 private val KEY_CONFIRM_ON_NAME_SUGGESTION =
@@ -269,6 +270,17 @@ class SettingsRepository(
     // Whether each manual operation marks the affected faces as confirmed
     // (name written) or leaves them unconfirmed (suggestion only).
 
+    /**
+     * Minimum face-quality score (0..1) an UNASSIGNED face must reach to stay
+     * visible in the Unknown view. Faces below it are hidden there (background /
+     * blurry / tiny detections), but faces already assigned to a person or a
+     * suggestion are never affected — this is a display filter only, nothing is
+     * deleted. 0 shows everything (default). Faces without a stored score
+     * (older detections) always stay visible.
+     */
+    val minFaceQuality: Flow<Float> =
+        context.dataStore.data.map { it[KEY_MIN_QUALITY] ?: DEFAULT_MIN_QUALITY }
+
     val confirmOnAssign: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_CONFIRM_ON_ASSIGN] ?: DEFAULT_CONFIRM_ON_ASSIGN }
 
@@ -288,6 +300,9 @@ class SettingsRepository(
     val fillMissingDate: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_FILL_MISSING_DATE] ?: DEFAULT_FILL_MISSING_DATE }
 
+    /** Current min face-quality threshold for the Unknown view. */
+    suspend fun getMinFaceQuality(): Float = minFaceQuality.first()
+
     suspend fun getConfirmOnAssign(): Boolean = confirmOnAssign.first()
 
     suspend fun getConfirmOnNameSuggestion(): Boolean = confirmOnNameSuggestion.first()
@@ -297,6 +312,11 @@ class SettingsRepository(
     suspend fun getAutoConfirmClusterMatches(): Boolean = autoConfirmClusterMatches.first()
 
     suspend fun getFillMissingDate(): Boolean = fillMissingDate.first()
+
+    /** Sets the min face-quality threshold (0..1) for the Unknown view. */
+    suspend fun setMinFaceQuality(value: Float) {
+        context.dataStore.edit { it[KEY_MIN_QUALITY] = value.coerceIn(0f, 1f) }
+    }
 
     suspend fun setConfirmOnAssign(value: Boolean) {
         context.dataStore.edit { it[KEY_CONFIRM_ON_ASSIGN] = value }
@@ -354,6 +374,7 @@ class SettingsRepository(
         // Manual assignment confirms faces by default; naming a suggestion
         // does not auto-confirm all its faces (they stay suggestions);
         // merging a suggestion into a person confirms by default.
+        const val DEFAULT_MIN_QUALITY = 0.0f
         const val DEFAULT_CONFIRM_ON_ASSIGN = true
         const val DEFAULT_CONFIRM_ON_NAME_SUGGESTION = false
         const val DEFAULT_CONFIRM_ON_MERGE_SUGGESTION = true

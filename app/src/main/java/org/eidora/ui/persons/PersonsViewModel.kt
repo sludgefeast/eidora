@@ -62,14 +62,17 @@ class PersonsViewModel(
     init {
         viewModelScope.launch {
             @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-            settingsRepo.folderWhitelist.flatMapLatest { wl ->
-                val folders = wl.toList()
-                combine(
-                    repo.observePersonsWithCount(folders),
-                    personDao.observeSuggestions(folders),
-                    faceDao.observeUnknownCount(folders),
-                    faceDao.observeIgnoredCount(folders),
-                ) {
+            combine(
+                settingsRepo.folderWhitelist,
+                settingsRepo.minFaceQuality,
+            ) { wl, minQ -> wl.toList() to minQ }
+                .flatMapLatest { (folders, minQuality) ->
+                    combine(
+                        repo.observePersonsWithCount(folders),
+                        personDao.observeSuggestions(folders),
+                        faceDao.observeUnknownCount(folders, minQuality),
+                        faceDao.observeIgnoredCount(folders),
+                    ) {
                         confirmed: List<PersonWithCount>,
                         suggestions: List<PersonEntity>,
                         unknownCount: Int,

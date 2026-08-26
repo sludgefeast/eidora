@@ -43,6 +43,7 @@ data class SettingsUiState(
     val confirmOnNameSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_NAME_SUGGESTION,
     val confirmOnMergeSuggestion: Boolean = SettingsRepository.DEFAULT_CONFIRM_ON_MERGE_SUGGESTION,
     val autoConfirmClusterMatches: Boolean = SettingsRepository.DEFAULT_AUTO_CONFIRM_CLUSTER,
+    val minFaceQuality: Float = SettingsRepository.DEFAULT_MIN_QUALITY,
     val embeddingModelId: String = org.eidora.ml.EmbeddingModelSpec.DEFAULT.id,
     val detectionModelId: String = org.eidora.ml.DetectionModelSpec.DEFAULT.id,
 )
@@ -121,10 +122,18 @@ class SettingsViewModel(
         viewModelScope.launch {
             repo.fillMissingDate.collect { v -> _uiState.update { it.copy(fillMissingDate = v) } }
         }
+        viewModelScope.launch {
+            repo.minFaceQuality.collect { v -> _uiState.update { it.copy(minFaceQuality = v) } }
+        }
     }
 
     fun setFillMissingDate(value: Boolean) {
         viewModelScope.launch { repo.setFillMissingDate(value) }
+    }
+
+    /** Sets the min face-quality threshold that hides low-quality unknown faces. */
+    fun setMinFaceQuality(value: Float) {
+        viewModelScope.launch { repo.setMinFaceQuality(value) }
     }
 
     fun setConfirmOnAssign(value: Boolean) {

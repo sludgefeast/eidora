@@ -171,6 +171,17 @@ fun SettingsScreen(
                 )
             }
 
+            // Section: quality filter for the Unknown view
+            SectionHeader(stringResource(R.string.settings_quality_title))
+            FloatSetting(
+                label = stringResource(R.string.setting_min_quality),
+                description = stringResource(R.string.setting_min_quality_description),
+                hint = stringResource(R.string.setting_min_quality_hint),
+                value = state.minFaceQuality,
+                default = SettingsRepository.DEFAULT_MIN_QUALITY,
+                onValueChange = { viewModel.setMinFaceQuality(it) },
+            )
+
             // Section: confirmation behaviour
             SectionHeader(stringResource(R.string.settings_confirm_title))
             Text(

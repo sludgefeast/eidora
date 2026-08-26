@@ -526,15 +526,20 @@ class FaceRepository(
     fun observePersonsWithCount(folders: List<String>): Flow<List<PersonWithCount>> =
         personDao.observeAllWithConfirmedCount(folders)
 
-    fun observeUnknownFaces(folders: List<String>): Flow<List<FaceRegionWithPhoto>> = faceDao.observeUnknown(folders)
+    fun observeUnknownFaces(
+        folders: List<String>,
+        minQuality: Float,
+    ): Flow<List<FaceRegionWithPhoto>> = faceDao.observeUnknown(folders, minQuality)
 
     /**
      * Paged stream of unknown faces for the Unknown screen. PAGE_SIZE rows are
      * loaded at a time as the user scrolls, so opening the screen with tens of
      * thousands of faces is instant instead of loading everything up front.
+     * [minQuality] hides unassigned faces below the quality threshold.
      */
     fun pagingUnknownFaces(
         folders: List<String>,
+        minQuality: Float,
     ): kotlinx.coroutines.flow.Flow<androidx.paging.PagingData<FaceRegionWithPhoto>> =
         androidx.paging.Pager(
             config =
@@ -543,7 +548,7 @@ class FaceRepository(
                     prefetchDistance = 90,
                     enablePlaceholders = false,
                 ),
-            pagingSourceFactory = { faceDao.pagingUnknown(folders) },
+            pagingSourceFactory = { faceDao.pagingUnknown(folders, minQuality) },
         ).flow
 
     /** Paged confirmed faces for one person. See [pagingUnknownFaces] for config rationale. */
