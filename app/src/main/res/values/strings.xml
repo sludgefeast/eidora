@@ -186,7 +186,6 @@
     <string name="models_settings_entry">Models</string>
     <string name="models_settings_entry_desc">Manage face detection and recognition models</string>
     <string name="settings_folders_entry">Folders</string>
-    <string name="settings_folders_entry_desc">Choose which folders are scanned for faces</string>
     <string name="models_import_button">Import container…</string>
     <string name="models_update_check">Check for model updates</string>
     <string name="models_update_none">Your models are up to date.</string>

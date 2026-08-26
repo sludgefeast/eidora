@@ -67,18 +67,15 @@ fun SettingsScreen(
 
             // Section: folder filter (top)
             SectionHeader(stringResource(R.string.settings_folders_title), first = true)
-            Text(
-                text = stringResource(R.string.settings_folders_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
 
-            // Folder selection lives on its own page so its async folder
-            // scan doesn't make this list jump on open.
+            // Single clickable entry that opens the folder selection page (on its
+            // own page so its async folder scan doesn't make this list jump on
+            // open). Keeps the detailed description; the previous standalone
+            // description text plus a second, terser entry were merged into this
+            // one to avoid two confusing "Folders" rows.
             NavigationEntry(
                 title = stringResource(R.string.settings_folders_entry),
-                description = stringResource(R.string.settings_folders_entry_desc),
+                description = stringResource(R.string.settings_folders_description),
                 onClick = onOpenFolders,
             )
             if (state.folderWhitelist.isEmpty()) {
