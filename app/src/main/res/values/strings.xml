@@ -102,6 +102,9 @@
     <string name="permission_files">File access</string>
     <string name="setting_time_weight">Temporal weight</string>
     <string name="setting_suggest_margin">Suggestion margin</string>
+    <string name="setting_min_confirmed_for_assign">Minimum faces before auto-assign</string>
+    <string name="setting_min_confirmed_for_assign_description">A person needs at least this many confirmed faces before clustering assigns new unknown faces to them.</string>
+    <string name="setting_min_confirmed_for_assign_hint">With too few confirmed faces, matching a large photo library pulls in many wrong faces on single lucky near-matches. Higher = safer but you must name more faces first. 3 is a good balance; 1 disables this protection.</string>
     <string name="setting_limit_suggestions">Limit number of suggestions</string>
     <string name="setting_limit_suggestions_description">Keep only a fixed number of suggestions in total, always the largest ones. When a new clustering run finds bigger groups, smaller older suggestions are dissolved back to Unknown so the total stays capped. Turn off to keep every suggestion.</string>
     <string name="setting_max_suggestions">Maximum suggestions</string>

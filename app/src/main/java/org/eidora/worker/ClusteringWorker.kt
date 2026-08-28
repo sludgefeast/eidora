@@ -186,6 +186,15 @@ class ClusteringWorker(
                         var suggestDist = suggestThreshold
                         var bestDistAny = Float.MAX_VALUE // best distance ignoring threshold, for diagnostics
                         personData.forEach { (personId, pd) ->
+                            // Guard against tiny persons: with fewer than
+                            // minConfirmedForAssign confirmed faces there is not
+                            // enough history for a reliable k-NN match, so a large
+                            // unknown set pulls in many foreign faces on single
+                            // lucky near hits. Skip such persons entirely for
+                            // auto/suggested assignment (the user can still name
+                            // more faces to grow them past the threshold).
+                            val confirmedCount = pd.faces.count { it.isConfirmed }
+                            if (confirmedCount < config.minConfirmedForAssign) return@forEach
                             // Weighted k-NN: nearest distance to this person's faces,
                             // boosted by temporal proximity, with a consistency penalty.
                             val bestFaceDist =
@@ -260,7 +269,16 @@ class ClusteringWorker(
                         )
                     }
                 }
-                EidoraLog.i(TAG, "Individually assigned ${individuallyAssigned.size} faces to existing persons")
+                val eligiblePersons =
+                    personData.count { (_, pd) ->
+                        pd.faces.count { it.isConfirmed } >= config.minConfirmedForAssign
+                    }
+                EidoraLog.i(
+                    TAG,
+                    "Individually assigned ${individuallyAssigned.size} faces to existing persons " +
+                        "($eligiblePersons/${personData.size} persons eligible, " +
+                        "min ${config.minConfirmedForAssign} confirmed faces required)",
+                )
                 // Diagnostics for threshold tuning: distribution of the best
                 // k-NN distance to any named person, over all unknown faces.
                 // autoMatched = assigned+confirmed below the auto threshold;
@@ -778,6 +796,7 @@ class ClusteringWorker(
                 minClusterSize = 2,
                 timeWeight = 1.0f,
                 suggestMargin = 0.10f,
+                minConfirmedForAssign = 3,
                 limitSuggestions = true,
                 maxSuggestions = 20,
             )

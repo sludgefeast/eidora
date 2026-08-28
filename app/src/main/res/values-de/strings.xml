@@ -102,6 +102,9 @@
     <string name="permission_files">Dateizugriff</string>
     <string name="setting_time_weight">Zeitlicher Einfluss</string>
     <string name="setting_suggest_margin">Vorschlags-Spielraum</string>
+    <string name="setting_min_confirmed_for_assign">Mindestgesichter vor Auto-Zuordnung</string>
+    <string name="setting_min_confirmed_for_assign_description">Eine Person benötigt mindestens so viele bestätigte Gesichter, bevor das Clustering ihr neue unbekannte Gesichter zuordnet.</string>
+    <string name="setting_min_confirmed_for_assign_hint">Bei zu wenigen bestätigten Gesichtern zieht der Abgleich einer großen Fotobibliothek viele falsche Gesichter über einzelne Zufallstreffer herein. Höher = sicherer, aber du musst erst mehr Gesichter benennen. 3 ist ein guter Kompromiss; 1 deaktiviert diesen Schutz.</string>
     <string name="setting_limit_suggestions">Anzahl der Vorschläge begrenzen</string>
     <string name="setting_limit_suggestions_description">Behält insgesamt nur eine feste Anzahl an Vorschlägen, immer die größten. Findet ein neuer Clustering-Lauf größere Gruppen, werden kleinere ältere Vorschläge wieder nach Unbekannt aufgelöst, damit die Gesamtzahl begrenzt bleibt. Ausschalten, um alle Vorschläge zu behalten.</string>
     <string name="setting_max_suggestions">Maximale Vorschläge</string>

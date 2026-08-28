@@ -153,6 +153,14 @@ fun SettingsScreen(
                 default = SettingsRepository.DEFAULT_SUGGEST_MARGIN,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(suggestMargin = it)) },
             )
+            IntSetting(
+                label = stringResource(R.string.setting_min_confirmed_for_assign),
+                description = stringResource(R.string.setting_min_confirmed_for_assign_description),
+                hint = stringResource(R.string.setting_min_confirmed_for_assign_hint),
+                value = cfg.minConfirmedForAssign,
+                default = SettingsRepository.DEFAULT_MIN_CONFIRMED_FOR_ASSIGN,
+                onValueChange = { viewModel.setClusteringConfig(cfg.copy(minConfirmedForAssign = it)) },
+            )
 
             SwitchSetting(
                 label = stringResource(R.string.setting_limit_suggestions),

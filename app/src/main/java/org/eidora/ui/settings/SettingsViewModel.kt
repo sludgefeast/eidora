@@ -26,6 +26,7 @@ data class SettingsUiState(
             minClusterSize = SettingsRepository.DEFAULT_MIN_CLUSTER_SIZE,
             timeWeight = SettingsRepository.DEFAULT_TIME_WEIGHT,
             suggestMargin = SettingsRepository.DEFAULT_SUGGEST_MARGIN,
+            minConfirmedForAssign = SettingsRepository.DEFAULT_MIN_CONFIRMED_FOR_ASSIGN,
             limitSuggestions = SettingsRepository.DEFAULT_LIMIT_SUGGESTIONS,
             maxSuggestions = SettingsRepository.DEFAULT_MAX_SUGGESTIONS,
         ),
