@@ -30,7 +30,11 @@ private const val MAX_EMBEDDING_WAIT_ATTEMPTS = 10
  * consistent ones. Kept conservative so it never overrides the model's tuned
  * threshold on its own.
  */
-private const val CONSISTENCY_PENALTY_FRACTION = 0.5f
+// Cosine-distance radius for grouping a person's confirmed faces into
+// look/era sub-clusters (see buildPersonCentroids). Faces within this of an
+// existing group join it; otherwise a new centroid is started. Tighter than
+// the match thresholds so each centroid stays a coherent single look.
+private const val CENTROID_SUBCLUSTER_DIST = 0.5f
 
 /*
  * How far above the (strict) auto-assign threshold a face may still be offered
@@ -80,6 +84,14 @@ private class PersonEmbedding(
 private class PersonData(
     val name: String?,
     val faces: List<PersonEmbedding>,
+    // Sub-cluster centroids: the person's CONFIRMED faces grouped by visual
+    // similarity (different looks / eras), each group reduced to one
+    // quality-weighted centroid. Matching a candidate against these centroids
+    // — instead of against every individual face and taking the minimum — stops
+    // a single outlier face from pulling in foreign faces on a lucky near hit,
+    // while several centroids still preserve age/lighting/appearance variation.
+    // Empty when the person has too few confirmed faces to form a centroid.
+    val centroids: List<FloatArray>,
 )
 
 class ClusteringWorker(
@@ -711,21 +723,67 @@ class ClusteringWorker(
                 if (allFaces.isEmpty()) {
                     null
                 } else {
+                    val faces =
+                        allFaces.map {
+                            PersonEmbedding(
+                                embedding = EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!),
+                                takenAt = it.photoTakenAt,
+                                quality = it.faceRegion.qualityScore ?: 0.5f,
+                                isConfirmed = it.faceRegion.name != null,
+                            )
+                        }
                     person.id to
                         PersonData(
                             name = person.name,
-                            faces =
-                                allFaces.map {
-                                    PersonEmbedding(
-                                        embedding = EmbeddingModel.bytesToFloatArray(it.faceRegion.embedding!!),
-                                        takenAt = it.photoTakenAt,
-                                        quality = it.faceRegion.qualityScore ?: 0.5f,
-                                        isConfirmed = it.faceRegion.name != null,
-                                    )
-                                },
+                            faces = faces,
+                            centroids = buildPersonCentroids(faces),
                         )
                 }
             }.toMap()
+
+    /**
+     * Groups a person's CONFIRMED faces into visual sub-clusters and reduces each
+     * to one quality-weighted centroid. Uses simple single-link agglomerative
+     * grouping: starting from each confirmed face, faces within
+     * [CENTROID_SUBCLUSTER_DIST] cosine distance of an existing group join it,
+     * otherwise start a new group. This yields a handful of centroids (one per
+     * look/era) rather than one blurred average or every individual face.
+     *
+     * Only confirmed faces are used — unconfirmed suggestions could be wrong and
+     * would poison the centroid. Returns an empty list when there are no
+     * confirmed faces (caller then skips centroid matching for that person).
+     */
+    private fun buildPersonCentroids(faces: List<PersonEmbedding>): List<FloatArray> {
+        val confirmed = faces.filter { it.isConfirmed }
+        if (confirmed.isEmpty()) return emptyList()
+
+        // Each group holds the indices of its member faces.
+        val groups = mutableListOf<MutableList<Int>>()
+        for ((i, face) in confirmed.withIndex()) {
+            var placed = false
+            for (group in groups) {
+                // Single-link: join the group if close to ANY of its members.
+                val close =
+                    group.any { j ->
+                        EmbeddingModel.cosineDistance(face.embedding, confirmed[j].embedding) <=
+                            CENTROID_SUBCLUSTER_DIST
+                    }
+                if (close) {
+                    group.add(i)
+                    placed = true
+                    break
+                }
+            }
+            if (!placed) groups.add(mutableListOf(i))
+        }
+
+        // One quality-weighted centroid per group.
+        return groups.map { group ->
+            EmbeddingModel.weightedCentroid(
+                group.map { confirmed[it].embedding to confirmed[it].quality.coerceAtLeast(0.1f) },
+            )
+        }
+    }
 
     /**
      * Waits until any active sync finishes, so sync and clustering don't run
@@ -910,57 +968,29 @@ class ClusteringWorker(
         person: PersonData,
         timeWeight: Float,
     ): Float? {
-        if (person.faces.isEmpty()) return null
-        // Adjusted cosine distance to each of the person's stored faces (lower =
-        // more similar). The temporal bonus and quality/confirm boost lower the
-        // distance for close-in-time, high-quality, confirmed faces.
-        val adjusted =
-            person.faces
-                .map { pf ->
-                    val cosD = EmbeddingModel.cosineDistance(queryEmbedding, pf.embedding)
-                    val bonus = temporalBonus(queryTakenAt, pf.takenAt, timeWeight)
-                    val boost =
-                        (pf.quality * if (pf.isConfirmed) 1.5f else 1.0f).coerceAtMost(1.0f)
-                    cosD - bonus * boost
-                }.sorted()
+        // Match against the person's look/era CENTROIDS, not individual faces.
+        // Taking the minimum over every stored face let a single outlier match
+        // pull in foreign faces on one lucky near hit (observed: hundreds of
+        // wrong assignments over a large unknown set). A centroid averages a
+        // whole look, so a candidate must resemble the person's actual
+        // appearance, not just happen to sit near one stray face. Several
+        // centroids still cover different looks/ages.
+        if (person.centroids.isEmpty()) return null
 
-        // Primary criterion: the single nearest distance, compared against the
-        // model's established (LFW-calibrated, pairwise) threshold. Keeping the
-        // minimum here means the tuned per-model thresholds stay valid for
-        // everyone — we do NOT introduce a new absolute value that would depend
-        // on a particular collection's spread.
-        val nearest = adjusted.first()
+        // Nearest centroid by cosine distance. The temporal bonus still applies,
+        // using the person's closest-in-time confirmed face as the reference so
+        // near-in-time candidates keep their (smaller) advantage.
+        val nearestCentroid =
+            person.centroids.minOf { c -> EmbeddingModel.cosineDistance(queryEmbedding, c) }
 
-        // k-NN consistency penalty: a *relative* check that needs no calibrated
-        // constant, so it stays valid across collections and models. If the
-        // nearest face is a lone outlier — its k nearest neighbours disagree by
-        // being much farther away — the match is less trustworthy, so we nudge
-        // the effective distance up. When the k nearest are all similarly close
-        // (a consistent match), the penalty is ~0 and behaviour equals the old
-        // minimum. k adapts to history size.
-        val k = adaptiveK(person.faces.size)
-        if (k <= 1 || adjusted.size < 2) return nearest
-        val knn = adjusted.take(k)
-        val spread = (knn.last() - knn.first()).coerceAtLeast(0f)
-        // Penalty is a fraction of the intra-neighbour spread, not an absolute
-        // number: consistent neighbourhoods (small spread) barely move, scattered
-        // ones (large spread) get pushed away from a match.
-        val penalty = CONSISTENCY_PENALTY_FRACTION * spread
-        return nearest + penalty
+        // Temporal bonus: strongest when the candidate is close in time to any of
+        // the person's faces. Kept from the old logic so time still helps, but it
+        // can only *lower* the distance, never invent a match on its own.
+        val bonus =
+            person.faces.maxOf { pf -> temporalBonus(queryTakenAt, pf.takenAt, timeWeight) }
+
+        return (nearestCentroid - bonus).coerceAtLeast(0f)
     }
-
-    /**
-     * Neighbour count for the k-NN consistency check, scaled to the person's
-     * history size: 1-2 faces → 1 (no check possible), 3-5 → 2, 6-10 → 3,
-     * more → 5.
-     */
-    private fun adaptiveK(historySize: Int): Int =
-        when {
-            historySize <= 2 -> 1
-            historySize <= 5 -> 2
-            historySize <= 10 -> 3
-            else -> 5
-        }
 
     /**
      * Returns a temporal bonus in [0..maxBonus] that is highest when the two
