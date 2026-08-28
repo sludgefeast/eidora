@@ -312,8 +312,19 @@ class ClusteringWorker(
                 return Result.success()
             }
 
-            // ----- Phase 2: Chinese Whispers (30-40%) -----
-            reportProgress(30, applicationContext.getString(org.eidora.R.string.notif_grouping, candidates.size))
+            // ----- Phase 2: Chinese Whispers (20-40%) -----
+            reportProgress(20, applicationContext.getString(org.eidora.R.string.notif_building_edges, candidates.size))
+            // Throttle notification updates to at most one per ~400ms: the
+            // progress callbacks can fire in quick bursts, and Android rate-limits
+            // rapid notify() calls (updates would silently drop).
+            var lastNotifMs = 0L
+            fun throttledNotify(pct: Int, message: String) {
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - lastNotifMs >= 400L) {
+                    lastNotifMs = now
+                    NotificationHelper.updateClusteringNotification(applicationContext, pct, message)
+                }
+            }
             val clusterResults =
                 try {
                     ChineseWhispers.cluster(
@@ -321,20 +332,33 @@ class ClusteringWorker(
                         config.edgeThreshold,
                         candidateTakenAt,
                         timeWeight,
-                    ) { round, total ->
-                        // Heartbeat during the long label-propagation phase so the
-                        // notification doesn't look frozen. Keeps progress at 30
-                        // (this phase's start); only the text moves.
-                        NotificationHelper.updateClusteringNotification(
-                            applicationContext,
-                            30,
-                            applicationContext.getString(
-                                org.eidora.R.string.notif_grouping_round,
-                                round,
-                                total,
-                            ),
-                        )
-                    }
+                        onRound = { round, total ->
+                            // Label-propagation phase: move the bar across 35→40%
+                            // as rounds progress so it never looks frozen.
+                            val pct = 35 + (5 * round / total).coerceIn(0, 5)
+                            throttledNotify(
+                                pct,
+                                applicationContext.getString(
+                                    org.eidora.R.string.notif_grouping_round,
+                                    round,
+                                    total,
+                                ),
+                            )
+                        },
+                        onEdgeProgress = { fraction ->
+                            // Edge-building is the long, previously silent phase on
+                            // large libraries. Move the bar across 20→35% as faces
+                            // are compared, so the user sees continuous progress.
+                            val pct = 20 + (15 * fraction).toInt().coerceIn(0, 15)
+                            throttledNotify(
+                                pct,
+                                applicationContext.getString(
+                                    org.eidora.R.string.notif_building_edges,
+                                    candidates.size,
+                                ),
+                            )
+                        },
+                    )
                 } catch (t: Throwable) {
                     EidoraLog.e(TAG, "Clustering algorithm failed", t)
                     return Result.failure()

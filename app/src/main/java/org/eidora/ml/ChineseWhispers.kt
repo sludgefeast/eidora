@@ -49,6 +49,7 @@ object ChineseWhispers {
         takenAt: Map<String, Long?> = emptyMap(),
         timeWeight: Float = 0f,
         onRound: ((round: Int, total: Int) -> Unit)? = null,
+        onEdgeProgress: ((fraction: Float) -> Unit)? = null,
     ): List<ClusterResult> {
         if (nodes.isEmpty()) return emptyList()
         if (nodes.size == 1) return listOf(ClusterResult(nodes[0].first, 0))
@@ -84,6 +85,7 @@ object ChineseWhispers {
                 neighborsIdx,
                 neighborsWeight,
                 neighborCount,
+                onEdgeProgress,
             )
         }
 
@@ -193,6 +195,7 @@ object ChineseWhispers {
         neighborsIdx: Array<IntArray?>,
         neighborsWeight: Array<FloatArray?>,
         neighborCount: IntArray,
+        onProgress: ((fraction: Float) -> Unit)? = null,
     ) {
         val n = embeddings.size
         val random = Random(LSH_SEED)
@@ -221,6 +224,12 @@ object ChineseWhispers {
                 }
                 tables[l].getOrPut(sig) { IntArrayList() }.add(i)
             }
+            // Hashing is the first half of edge-building; report every ~2% so the
+            // notification keeps moving on large libraries instead of looking
+            // frozen. Guard against n == 0 already handled by caller.
+            if (onProgress != null && (i and 0x1FF) == 0) {
+                onProgress(0.5f * (i + 1) / n)
+            }
         }
 
         // Walk each bucket and compute pairwise distances.
@@ -234,7 +243,10 @@ object ChineseWhispers {
         var pairsTested = 0L
         var edgesFormed = 0L
         val distBins = IntArray(10) // 0.0-0.1 .. 0.9-1.0
-        for (table in tables) {
+        for ((tableIndex, table) in tables.withIndex()) {
+            // Bucket-walking is the second half of edge-building; move the bar
+            // from 0.5 to 1.0 across the LSH tables.
+            onProgress?.invoke(0.5f + 0.5f * tableIndex / LSH_L)
             for ((_, bucket) in table) {
                 val bucketSize = bucket.size
                 if (bucketSize < 2) continue
