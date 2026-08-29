@@ -68,6 +68,22 @@ internal fun SectionHeader(
     )
 }
 
+/**
+ * A lighter sub-heading used to group settings within a section (e.g. the
+ * Phase A / Phase B split under Clustering). No divider; sits closer to the
+ * items it introduces than a full SectionHeader.
+ */
+@Composable
+internal fun SubSectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Medium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+    )
+}
+
 /** A labelled on/off row with a description line under the label. */
 @Composable
 internal fun SwitchSetting(

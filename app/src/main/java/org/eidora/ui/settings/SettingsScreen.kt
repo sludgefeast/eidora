@@ -22,6 +22,7 @@ import org.eidora.data.settings.SettingsRepository
 import org.eidora.ui.settings.components.FloatSetting
 import org.eidora.ui.settings.components.IntSetting
 import org.eidora.ui.settings.components.SectionHeader
+import org.eidora.ui.settings.components.SubSectionHeader
 import org.eidora.ui.settings.components.SwitchSetting
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -105,6 +106,44 @@ fun SettingsScreen(
                     .byId(state.embeddingModelId)
                     .defaultThresholds
 
+            // --- Phase A: Recognition ---
+            // The vote's strictness (tau, relative gate, k, purity, quality
+            // floor) is intentionally not exposed yet — those live as constants
+            // in ClusteringWorker while the recognition-first approach is tuned
+            // from real runs. Only the two Phase A knobs that are stable and
+            // still read by the worker are shown.
+            SubSectionHeader(stringResource(R.string.settings_clustering_phase_a))
+            Text(
+                text = stringResource(R.string.settings_clustering_phase_a_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            IntSetting(
+                label = stringResource(R.string.setting_min_confirmed_for_assign),
+                description = stringResource(R.string.setting_min_confirmed_for_assign_description),
+                hint = stringResource(R.string.setting_min_confirmed_for_assign_hint),
+                value = cfg.minConfirmedForAssign,
+                default = SettingsRepository.DEFAULT_MIN_CONFIRMED_FOR_ASSIGN,
+                onValueChange = { viewModel.setClusteringConfig(cfg.copy(minConfirmedForAssign = it)) },
+            )
+            FloatSetting(
+                label = stringResource(R.string.setting_time_weight),
+                description = stringResource(R.string.setting_time_weight_description),
+                hint = stringResource(R.string.setting_time_weight_hint),
+                value = cfg.timeWeight,
+                default = SettingsRepository.DEFAULT_TIME_WEIGHT,
+                onValueChange = { viewModel.setClusteringConfig(cfg.copy(timeWeight = it)) },
+            )
+
+            // --- Phase B: Discovery ---
+            SubSectionHeader(stringResource(R.string.settings_clustering_phase_b))
+            Text(
+                text = stringResource(R.string.settings_clustering_phase_b_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
             FloatSetting(
                 label = stringResource(R.string.setting_edge_threshold),
                 description = stringResource(R.string.setting_edge_threshold_description),
@@ -112,22 +151,6 @@ fun SettingsScreen(
                 value = cfg.edgeThreshold,
                 default = modelThresholds.edge,
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(edgeThreshold = it)) },
-            )
-            FloatSetting(
-                label = stringResource(R.string.setting_cluster_match_threshold),
-                description = stringResource(R.string.setting_cluster_match_threshold_description),
-                hint = stringResource(R.string.setting_cluster_match_threshold_hint),
-                value = cfg.clusterMatchThreshold,
-                default = modelThresholds.clusterMatch,
-                onValueChange = { viewModel.setClusteringConfig(cfg.copy(clusterMatchThreshold = it)) },
-            )
-            FloatSetting(
-                label = stringResource(R.string.setting_individual_match_threshold),
-                description = stringResource(R.string.setting_individual_match_threshold_description),
-                hint = stringResource(R.string.setting_individual_match_threshold_hint),
-                value = cfg.individualMatchThreshold,
-                default = modelThresholds.individualMatch,
-                onValueChange = { viewModel.setClusteringConfig(cfg.copy(individualMatchThreshold = it)) },
             )
             IntSetting(
                 label = stringResource(R.string.setting_min_cluster_size),
@@ -138,28 +161,12 @@ fun SettingsScreen(
                 onValueChange = { viewModel.setClusteringConfig(cfg.copy(minClusterSize = it)) },
             )
             FloatSetting(
-                label = stringResource(R.string.setting_time_weight),
-                description = stringResource(R.string.setting_time_weight_description),
-                hint = stringResource(R.string.setting_time_weight_hint),
-                value = cfg.timeWeight,
-                default = SettingsRepository.DEFAULT_TIME_WEIGHT,
-                onValueChange = { viewModel.setClusteringConfig(cfg.copy(timeWeight = it)) },
-            )
-            FloatSetting(
-                label = stringResource(R.string.setting_suggest_margin),
-                description = stringResource(R.string.setting_suggest_margin_description),
-                hint = stringResource(R.string.setting_suggest_margin_hint),
-                value = cfg.suggestMargin,
-                default = SettingsRepository.DEFAULT_SUGGEST_MARGIN,
-                onValueChange = { viewModel.setClusteringConfig(cfg.copy(suggestMargin = it)) },
-            )
-            IntSetting(
-                label = stringResource(R.string.setting_min_confirmed_for_assign),
-                description = stringResource(R.string.setting_min_confirmed_for_assign_description),
-                hint = stringResource(R.string.setting_min_confirmed_for_assign_hint),
-                value = cfg.minConfirmedForAssign,
-                default = SettingsRepository.DEFAULT_MIN_CONFIRMED_FOR_ASSIGN,
-                onValueChange = { viewModel.setClusteringConfig(cfg.copy(minConfirmedForAssign = it)) },
+                label = stringResource(R.string.setting_cluster_match_threshold),
+                description = stringResource(R.string.setting_cluster_match_threshold_description),
+                hint = stringResource(R.string.setting_cluster_match_threshold_hint),
+                value = cfg.clusterMatchThreshold,
+                default = modelThresholds.clusterMatch,
+                onValueChange = { viewModel.setClusteringConfig(cfg.copy(clusterMatchThreshold = it)) },
             )
 
             SwitchSetting(

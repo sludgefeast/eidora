@@ -52,7 +52,11 @@
     <string name="settings_title">Settings</string>
     <string name="action_delete">Delete</string>
     <string name="settings_clustering_title">Clustering</string>
-    <string name="settings_clustering_description">Controls how faces are grouped into persons. Lower thresholds mean stricter matching.</string>
+    <string name="settings_clustering_description">Faces are handled in two phases. Recognition matches unknown faces against people you have already named. Discovery groups the leftover faces that match no one, so you can name new people. Both only ever propose — you confirm.</string>
+    <string name="settings_clustering_phase_a">Phase A · Recognition</string>
+    <string name="settings_clustering_phase_a_description">Matches unknown faces to named people by a vote over their looks. The match strictness (τ and the relative gate) is fixed in this build while the new approach is tuned from real runs; these controls will return once good values are settled.</string>
+    <string name="settings_clustering_phase_b">Phase B · Discovery</string>
+    <string name="settings_clustering_phase_b_description">Groups only the faces Recognition left unknown, offering each group as a new person to name.</string>
     <string name="setting_edge_threshold">Edge threshold</string>
     <string name="setting_edge_threshold_description">Cosine distance below which two faces are linked in clustering.</string>
     <string name="setting_cluster_match_threshold">Cluster match threshold</string>
@@ -178,7 +182,7 @@
     <string name="setting_confirm_on_merge_suggestion">Confirm when merging a suggestion</string>
     <string name="setting_confirm_on_merge_suggestion_description">When you merge a suggestion into an existing person, confirm the merged faces.</string>
     <string name="setting_auto_confirm_cluster">Auto-confirm strong cluster matches</string>
-    <string name="setting_auto_confirm_cluster_description">When clustering finds a face very close to a named person, write the name automatically. Off (default): attach it as an unconfirmed suggestion to review first. Leaving this off avoids wrongly named faces.</string>
+    <string name="setting_auto_confirm_cluster_description">No longer in effect: with the recognition-first clustering, matches are always attached as unconfirmed suggestions for you to review. Automatic naming has been retired to avoid wrongly named faces.</string>
     <string name="permission_continue">Continue</string>
     <string name="container_download_title">Set up face models</string>
     <string name="container_download_intro">Eidora needs a face detection and recognition model to work. The free model set (YuNet + SFace, Apache-2.0) will be downloaded once and then runs fully on your device.</string>

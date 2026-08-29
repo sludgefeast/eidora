@@ -36,6 +36,60 @@ private const val MAX_EMBEDDING_WAIT_ATTEMPTS = 10
 // the match thresholds so each centroid stays a coherent single look.
 private const val CENTROID_SUBCLUSTER_DIST = 0.5f
 
+// ---------------------------------------------------------------------------
+// Phase A (Recognition) — kNN-vote parameters
+// ---------------------------------------------------------------------------
+// Recognition-first design: an unknown face is CLASSIFIED against named
+// persons via a k-nearest-neighbour vote over their look/era sub-cluster
+// centroids, never via a raw single-nearest-face distance. This replaces the
+// old "distance to nearest centroid < threshold" rule and the coupled
+// individualMatchThreshold / suggestMargin knobs. Everything a face is
+// assigned here is an UNCONFIRMED suggestion (personId set, name stays null);
+// the user confirms. See eidora-recognition-first.md for the full rationale.
+
+/**
+ * Absolute cosine-distance ceiling for a reference centroid to count as a
+ * neighbour at all. Neighbours beyond this never vote. Read from the field
+ * data: in the 2026-08-29 log the genuine matches sit at cosine 0.1–0.5 while
+ * 0.7–0.9 is effectively noise, so 0.6 (old auto threshold) reached deep into
+ * the noise. Start strict at 0.5 and loosen only if recall is too low.
+ */
+private const val VOTE_TAU_ABS = 0.5f
+
+/**
+ * Relative gate (digiKam's second bound): after finding the closest neighbour
+ * at distance dMin, any neighbour farther than dMin / VOTE_REL_FACTOR is
+ * dropped even if it is within VOTE_TAU_ABS. This is what stops a far-away
+ * "bridge" neighbour from polluting the vote — the structural weakness that
+ * pure absolute thresholds (and Chinese Whispers transitivity) can't fix.
+ * 0.8 matches digiKam's long-standing value.
+ */
+private const val VOTE_REL_FACTOR = 0.8f
+
+/**
+ * How many nearest reference centroids take part in the vote. Small on
+ * purpose: with per-person look centroids (not raw faces) the pool is already
+ * balanced, so a handful of neighbours suffices. digiKam found K≈3–5 best.
+ */
+private const val VOTE_K = 5
+
+/**
+ * Minimum share of total vote weight the winning person must hold for the
+ * assignment to stand. Below this the face is contested and stays Unknown
+ * rather than being force-assigned. Relative, so model- and collection-
+ * independent.
+ */
+private const val VOTE_PURITY_MIN = 0.60f
+
+/**
+ * Reference-set quality floor (digiKam FIQA idea). Confirmed faces below this
+ * quality never become kNN reference points — poor crops are the most common
+ * source of outlier/bridge matches. They can still be matched *as* candidates;
+ * they just don't get to vote. Read from the qualityScore distribution; 0.35
+ * is a conservative start.
+ */
+private const val REFERENCE_QUALITY_FLOOR = 0.35f
+
 /*
  * How far above the (strict) auto-assign threshold a face may still be offered
  * as an unconfirmed *suggestion* for a named person, as a fraction of that
@@ -80,18 +134,53 @@ private class PersonEmbedding(
     val isConfirmed: Boolean,
 )
 
+/**
+ * One look/era sub-cluster centroid of a named person, with the metadata the
+ * kNN vote needs. The centroid is the quality-weighted mean of a group of the
+ * person's confirmed faces that share a look; [weight] is the group size times
+ * its mean quality (so a well-supported look counts for more in the vote); and
+ * [medianTakenAt] is the group's median capture time for the temporal bonus.
+ */
+private class SubClusterCentroid(
+    val centroid: FloatArray,
+    val weight: Float,
+    val medianTakenAt: Long?,
+)
+
+/**
+ * A single reference point in the flat kNN pool used by Phase A: one person's
+ * one look-centroid, tagged with that person's id. All persons' centroids go
+ * into one pool so an unknown face votes across looks and persons uniformly.
+ */
+private class ReferencePoint(
+    val personId: String,
+    val centroid: FloatArray,
+    val weight: Float,
+    val medianTakenAt: Long?,
+)
+
+/** Outcome of classifying one unknown face against the reference pool. */
+private sealed class VoteResult {
+    /** Winner found with enough vote share: assign as unconfirmed suggestion. */
+    data class Assign(val personId: String, val bestDistance: Float) : VoteResult()
+
+    /** No neighbour within bounds, or winner too contested: leave Unknown. */
+    object Unknown : VoteResult()
+}
+
 /** All stored embeddings of one named person. */
 private class PersonData(
     val name: String?,
     val faces: List<PersonEmbedding>,
     // Sub-cluster centroids: the person's CONFIRMED faces grouped by visual
-    // similarity (different looks / eras), each group reduced to one
-    // quality-weighted centroid. Matching a candidate against these centroids
-    // — instead of against every individual face and taking the minimum — stops
-    // a single outlier face from pulling in foreign faces on a lucky near hit,
-    // while several centroids still preserve age/lighting/appearance variation.
+    // similarity (different looks / eras), each reduced to one quality-weighted
+    // centroid with metadata. In the recognition-first design these are the
+    // person's contribution to the kNN reference pool — an unknown face votes
+    // against these look-centroids, not against every raw face. This keeps the
+    // outlier resistance of centroids while the vote + relative gate add
+    // robustness the old "distance to nearest centroid" rule lacked.
     // Empty when the person has too few confirmed faces to form a centroid.
-    val centroids: List<FloatArray>,
+    val centroids: List<SubClusterCentroid>,
 )
 
 class ClusteringWorker(
@@ -115,15 +204,10 @@ class ClusteringWorker(
             runPreCleaning(db, personDao)
 
             val config = loadClusteringConfig()
-            val autoConfirmClusterMatches =
-                try {
-                    org.eidora.data.settings.SettingsProvider
-                        .get(applicationContext)
-                        .getAutoConfirmClusterMatches()
-                } catch (t: Throwable) {
-                    t.rethrowIfCancellation()
-                    org.eidora.data.settings.SettingsRepository.DEFAULT_AUTO_CONFIRM_CLUSTER
-                }
+            // Note: auto-confirm (writing names automatically) is intentionally
+            // not used in the recognition-first design — Phase A only ever
+            // produces unconfirmed suggestions. The setting is left in place for
+            // the UI/migration but no longer gates the worker's behaviour.
             val powerConfig = loadPowerConfig()
             val powerGate = PowerGate(applicationContext)
 
@@ -154,15 +238,23 @@ class ClusteringWorker(
 
             val personData: Map<String, PersonData> = loadPersonData(faceDao, personDao)
 
-            // ----- Phase 1: Individual matching (0-30%) -----
+            // ===== Phase A: Recognition (0-30%) =====
+            // Classify each unknown face against NAMED persons via a kNN vote
+            // over their look-centroids (buildReferencePool + classifyByVote).
+            // Everything assigned here is an UNCONFIRMED suggestion (personId
+            // set, name stays null) — the user confirms. No Chinese Whispers,
+            // no person creation. autoConfirmClusterMatches is intentionally not
+            // consulted: the recognition-first design never writes a name
+            // automatically. See eidora-recognition-first.md.
             val individuallyAssigned = mutableSetOf<String>()
-            // Diagnostics: collect the best k-NN distance per unknown face so we
-            // can pick the threshold from real data. Bucketed to keep the log
-            // compact; also track matched vs. just-missed near the threshold.
-            val distBuckets = IntArray(10) // 0.0-0.1, 0.1-0.2, … 0.9-1.0
-            var matchedCount = 0
-            var nearMissCount = 0 // within 0.05 above the threshold
-            if (personData.isNotEmpty() && unknownFacesAll.isNotEmpty()) {
+            val referencePool = buildReferencePool(personData, config.minConfirmedForAssign)
+            // Diagnostics: distribution of the winning-neighbour distance for
+            // faces that got assigned, plus how many were left Unknown, so tau/
+            // rel/purity can be tuned from real data.
+            val distBuckets = IntArray(10) // 0.0-0.1 … 0.9-1.0 of best voter distance
+            var assignedCount = 0
+            var unknownCount = 0
+            if (referencePool.isNotEmpty() && unknownFacesAll.isNotEmpty()) {
                 for ((index, face) in unknownFacesAll.withIndex()) {
                     if (isStopped) {
                         EidoraLog.i(TAG, "Clustering was cancelled at index $index, exiting")
@@ -189,85 +281,27 @@ class ClusteringWorker(
                     }
                     try {
                         val embedding = EmbeddingModel.bytesToFloatArray(face.faceRegion.embedding!!)
-                        val autoThreshold = config.individualMatchThreshold
-                        val suggestThreshold = autoThreshold * (1f + config.suggestMargin)
-                        var bestId: String? = null // best within auto threshold
-                        var bestName: String? = null
-                        var bestDist = autoThreshold
-                        var suggestId: String? = null // best within suggest threshold
-                        var suggestDist = suggestThreshold
-                        var bestDistAny = Float.MAX_VALUE // best distance ignoring threshold, for diagnostics
-                        personData.forEach { (personId, pd) ->
-                            // Guard against tiny persons: with fewer than
-                            // minConfirmedForAssign confirmed faces there is not
-                            // enough history for a reliable k-NN match, so a large
-                            // unknown set pulls in many foreign faces on single
-                            // lucky near hits. Skip such persons entirely for
-                            // auto/suggested assignment (the user can still name
-                            // more faces to grow them past the threshold).
-                            val confirmedCount = pd.faces.count { it.isConfirmed }
-                            if (confirmedCount < config.minConfirmedForAssign) return@forEach
-                            // Weighted k-NN: nearest distance to this person's faces,
-                            // boosted by temporal proximity, with a consistency penalty.
-                            val bestFaceDist =
-                                bestDistanceToPerson(
+                        when (
+                            val vote =
+                                classifyByVote(
                                     embedding,
                                     face.photoTakenAt,
-                                    pd,
+                                    referencePool,
                                     timeWeight,
-                                ) ?: return@forEach
-                            if (bestFaceDist < bestDistAny) bestDistAny = bestFaceDist
-                            if (bestFaceDist < bestDist) {
-                                bestDist = bestFaceDist
-                                bestId = personId
-                                bestName = pd.name
+                                )
+                        ) {
+                            is VoteResult.Assign -> {
+                                // Unconfirmed suggestion: personId only, name stays null.
+                                faceDao.updatePersonId(face.faceRegion.id, vote.personId)
+                                individuallyAssigned.add(face.faceRegion.id)
+                                assignedCount++
+                                val b = (vote.bestDistance * 10f).toInt().coerceIn(0, 9)
+                                distBuckets[b]++
                             }
-                            // Track the best candidate in the wider suggestion band.
-                            if (bestFaceDist < suggestDist) {
-                                suggestDist = bestFaceDist
-                                suggestId = personId
-                            }
+                            VoteResult.Unknown -> unknownCount++
                         }
-                        // Diagnostics: bucket the best distance to any person.
-                        if (bestDistAny != Float.MAX_VALUE) {
-                            val b = (bestDistAny * 10f).toInt().coerceIn(0, 9)
-                            distBuckets[b]++
-                            if (bestId != null) {
-                                matchedCount++
-                            } else if (suggestId != null) {
-                                nearMissCount++
-                            }
-                        }
-                        val matchedId = bestId
-                        val matchedName = bestName
-                        val suggestedId = suggestId
-                        val assigned =
-                            when {
-                                // Below the strict threshold. With auto-confirm on,
-                                // assign AND confirm (write the name). With it off
-                                // (default), assign but leave unconfirmed so the user
-                                // reviews it — automatic confirmation had named many
-                                // wrong faces.
-                                matchedId != null -> {
-                                    if (autoConfirmClusterMatches) {
-                                        faceDao.updatePersonAndName(face.faceRegion.id, matchedId, matchedName)
-                                    } else {
-                                        faceDao.updatePersonId(face.faceRegion.id, matchedId)
-                                    }
-                                    true
-                                }
-                                // In the suggestion band: assign but leave unconfirmed,
-                                // so it shows up in that person's PersonDetail for the
-                                // user to accept or reject (name stays null).
-                                suggestedId != null -> {
-                                    faceDao.updatePersonId(face.faceRegion.id, suggestedId)
-                                    true
-                                }
-                                else -> false
-                            }
-                        if (assigned) individuallyAssigned.add(face.faceRegion.id)
                     } catch (t: Throwable) {
-                        EidoraLog.w(TAG, "Individual match failed for face ${face.faceRegion.id}", t)
+                        EidoraLog.w(TAG, "Recognition vote failed for face ${face.faceRegion.id}", t)
                     }
                     if (index % 10 == 0) {
                         val phaseProgress = (index * 30) / unknownFacesAll.size
@@ -285,31 +319,29 @@ class ClusteringWorker(
                     personData.count { (_, pd) ->
                         pd.faces.count { it.isConfirmed } >= config.minConfirmedForAssign
                     }
-                EidoraLog.i(
-                    TAG,
-                    "Individually assigned ${individuallyAssigned.size} faces to existing persons " +
-                        "($eligiblePersons/${personData.size} persons eligible, " +
-                        "min ${config.minConfirmedForAssign} confirmed faces required)",
-                )
-                // Diagnostics for threshold tuning: distribution of the best
-                // k-NN distance to any named person, over all unknown faces.
-                // autoMatched = assigned+confirmed below the auto threshold;
-                // suggested = assigned as unconfirmed suggestions in the band
-                // between the auto and suggest thresholds.
                 val histogram =
                     (0 until 10).joinToString(" ") { b ->
                         "${b / 10f}-${(b + 1) / 10f}:${distBuckets[b]}"
                     }
-                val suggestThr = config.individualMatchThreshold * (1f + config.suggestMargin)
                 EidoraLog.i(
                     TAG,
-                    "kNN distance histogram (auto=${config.individualMatchThreshold}, " +
-                        "suggest=$suggestThr): $histogram | " +
-                        "autoMatched=$matchedCount suggested=$nearMissCount",
+                    "Phase A (recognition): assigned $assignedCount as suggestions, " +
+                        "$unknownCount left unknown " +
+                        "($eligiblePersons/${personData.size} persons eligible, " +
+                        "${referencePool.size} reference centroids, " +
+                        "tau=$VOTE_TAU_ABS rel=$VOTE_REL_FACTOR k=$VOTE_K purity=$VOTE_PURITY_MIN) | " +
+                        "winner-distance histogram: $histogram",
                 )
             }
             reportProgress(30, applicationContext.getString(org.eidora.R.string.notif_matching_persons_done))
 
+            // ===== Phase B: Discovery — only the residue Phase A left Unknown =====
+            // Chinese Whispers runs ONLY on faces that did not match any named
+            // person, never on the whole library. This is the key structural
+            // change: transitivity can no longer chain confirmed persons together
+            // through bridge faces, because confirmed persons' faces aren't in
+            // this set. Each group Phase B forms is only an offer to name a new
+            // person (an unconfirmed suggestion), created below as before.
             val candidates: List<Pair<String, FloatArray>> =
                 unknownFacesAll
                     .filter { it.faceRegion.id !in individuallyAssigned }
@@ -342,7 +374,7 @@ class ClusteringWorker(
                 return Result.success()
             }
 
-            // ----- Phase 2: Chinese Whispers (20-40%) -----
+            // ----- Phase B.1: Chinese Whispers on the residue (20-40%) -----
             reportProgress(20, applicationContext.getString(org.eidora.R.string.notif_building_edges, candidates.size))
             // Throttle notification updates to at most one per ~400ms: the
             // progress callbacks can fire in quick bursts, and Android rate-limits
@@ -395,7 +427,7 @@ class ClusteringWorker(
                 }
             reportProgress(40, applicationContext.getString(org.eidora.R.string.notif_grouping_done))
 
-            // ----- Phase 3: Cluster assignment (40-80%) -----
+            // ----- Phase B.2: Turn residue clusters into name suggestions (40-80%) -----
             // Pre-load existing suggestions (unnamed persons) with their centroids
             // so new clusters can be merged into them instead of creating duplicates.
             data class SuggestionData(
@@ -750,11 +782,18 @@ class ClusteringWorker(
      * look/era) rather than one blurred average or every individual face.
      *
      * Only confirmed faces are used — unconfirmed suggestions could be wrong and
-     * would poison the centroid. Returns an empty list when there are no
-     * confirmed faces (caller then skips centroid matching for that person).
+     * would poison the centroid. Faces below [REFERENCE_QUALITY_FLOOR] are also
+     * dropped (digiKam FIQA idea): poor crops are the main source of bridge
+     * matches, so they don't get to define a look. Returns an empty list when no
+     * confirmed face survives (caller then skips this person as a reference).
+     *
+     * Each returned centroid carries the metadata the kNN vote needs: a weight
+     * (group size × mean quality, so well-supported looks count more) and the
+     * group's median capture time (for the temporal bonus).
      */
-    private fun buildPersonCentroids(faces: List<PersonEmbedding>): List<FloatArray> {
-        val confirmed = faces.filter { it.isConfirmed }
+    private fun buildPersonCentroids(faces: List<PersonEmbedding>): List<SubClusterCentroid> {
+        val confirmed =
+            faces.filter { it.isConfirmed && it.quality >= REFERENCE_QUALITY_FLOOR }
         if (confirmed.isEmpty()) return emptyList()
 
         // Each group holds the indices of its member faces.
@@ -777,11 +816,17 @@ class ClusteringWorker(
             if (!placed) groups.add(mutableListOf(i))
         }
 
-        // One quality-weighted centroid per group.
+        // One quality-weighted centroid per group, with vote metadata.
         return groups.map { group ->
-            EmbeddingModel.weightedCentroid(
-                group.map { confirmed[it].embedding to confirmed[it].quality.coerceAtLeast(0.1f) },
-            )
+            val centroid =
+                EmbeddingModel.weightedCentroid(
+                    group.map { confirmed[it].embedding to confirmed[it].quality.coerceAtLeast(0.1f) },
+                )
+            val meanQuality = group.map { confirmed[it].quality }.average().toFloat()
+            val weight = group.size * meanQuality.coerceAtLeast(0.1f)
+            val dates = group.mapNotNull { confirmed[it].takenAt }.sorted()
+            val median = if (dates.isEmpty()) null else dates[dates.size / 2]
+            SubClusterCentroid(centroid = centroid, weight = weight, medianTakenAt = median)
         }
     }
 
@@ -981,7 +1026,7 @@ class ClusteringWorker(
         // using the person's closest-in-time confirmed face as the reference so
         // near-in-time candidates keep their (smaller) advantage.
         val nearestCentroid =
-            person.centroids.minOf { c -> EmbeddingModel.cosineDistance(queryEmbedding, c) }
+            person.centroids.minOf { c -> EmbeddingModel.cosineDistance(queryEmbedding, c.centroid) }
 
         // Temporal bonus: strongest when the candidate is close in time to any of
         // the person's faces. Kept from the old logic so time still helps, but it
@@ -990,6 +1035,101 @@ class ClusteringWorker(
             person.faces.maxOf { pf -> temporalBonus(queryTakenAt, pf.takenAt, timeWeight) }
 
         return (nearestCentroid - bonus).coerceAtLeast(0f)
+    }
+
+    /**
+     * Builds the flat kNN reference pool for Phase A: every named person's
+     * look-centroids, each tagged with its person id. Persons with too few
+     * confirmed faces to form any centroid (or all below the quality floor) do
+     * not contribute — they can't be reliably matched yet. Persons below
+     * [minConfirmedForAssign] confirmed faces are also excluded, keeping the old
+     * guard against tiny persons pulling in foreign faces.
+     */
+    private fun buildReferencePool(
+        personData: Map<String, PersonData>,
+        minConfirmedForAssign: Int,
+    ): List<ReferencePoint> {
+        val pool = ArrayList<ReferencePoint>()
+        personData.forEach { (personId, pd) ->
+            val confirmedCount = pd.faces.count { it.isConfirmed }
+            if (confirmedCount < minConfirmedForAssign) return@forEach
+            pd.centroids.forEach { sc ->
+                pool.add(
+                    ReferencePoint(
+                        personId = personId,
+                        centroid = sc.centroid,
+                        weight = sc.weight,
+                        medianTakenAt = sc.medianTakenAt,
+                    ),
+                )
+            }
+        }
+        return pool
+    }
+
+    /**
+     * Classifies one unknown face against the reference pool via a k-nearest-
+     * neighbour vote (the recognition-first core). See eidora-recognition-first.md.
+     *
+     * 1. Distance to each reference = cosine distance minus a temporal bonus
+     *    (the bonus can only lower it, never invent a match).
+     * 2. Absolute gate: references beyond [VOTE_TAU_ABS] never vote.
+     * 3. Keep the [VOTE_K] nearest survivors.
+     * 4. Relative gate (digiKam's second bound): drop any survivor farther than
+     *    dMin / [VOTE_REL_FACTOR] — this kills far-away "bridge" neighbours.
+     * 5. Vote by person, weighted by (1 - distance) × reference weight.
+     * 6. Winner stands only if its share ≥ [VOTE_PURITY_MIN]; otherwise Unknown.
+     *
+     * Returns [VoteResult.Assign] with the winning person id (to be stored as an
+     * UNCONFIRMED suggestion), or [VoteResult.Unknown] to leave the face alone.
+     */
+    private fun classifyByVote(
+        queryEmbedding: FloatArray,
+        queryTakenAt: Long?,
+        pool: List<ReferencePoint>,
+        timeWeight: Float,
+    ): VoteResult {
+        if (pool.isEmpty()) return VoteResult.Unknown
+
+        // Step 1-2: distance with temporal bonus, absolute gate.
+        // Keep (personId, distance, weight) for survivors only.
+        data class Neighbour(val personId: String, val distance: Float, val weight: Float)
+        val survivors = ArrayList<Neighbour>(pool.size)
+        for (r in pool) {
+            val cosD = EmbeddingModel.cosineDistance(queryEmbedding, r.centroid)
+            val bonus = temporalBonus(queryTakenAt, r.medianTakenAt, timeWeight)
+            val d = (cosD - bonus).coerceAtLeast(0f)
+            if (d <= VOTE_TAU_ABS) survivors.add(Neighbour(r.personId, d, r.weight))
+        }
+        if (survivors.isEmpty()) return VoteResult.Unknown
+
+        // Step 3: k nearest.
+        survivors.sortBy { it.distance }
+        val kNearest = if (survivors.size > VOTE_K) survivors.subList(0, VOTE_K) else survivors
+
+        // Step 4: relative gate against the closest survivor.
+        val dMin = kNearest.first().distance
+        val relCeiling = if (VOTE_REL_FACTOR > 0f) dMin / VOTE_REL_FACTOR else Float.MAX_VALUE
+        val voters = kNearest.filter { it.distance <= relCeiling }
+        if (voters.isEmpty()) return VoteResult.Unknown
+
+        // Step 5: weighted vote by person.
+        val voteByPerson = HashMap<String, Float>()
+        var totalVote = 0f
+        for (v in voters) {
+            val vote = (1f - v.distance) * v.weight
+            voteByPerson[v.personId] = (voteByPerson[v.personId] ?: 0f) + vote
+            totalVote += vote
+        }
+        if (totalVote <= 0f) return VoteResult.Unknown
+
+        val winner = voteByPerson.maxByOrNull { it.value } ?: return VoteResult.Unknown
+        val share = winner.value / totalVote
+
+        // Step 6: purity gate.
+        if (share < VOTE_PURITY_MIN) return VoteResult.Unknown
+        val bestDist = voters.filter { it.personId == winner.key }.minOf { it.distance }
+        return VoteResult.Assign(personId = winner.key, bestDistance = bestDist)
     }
 
     /**
