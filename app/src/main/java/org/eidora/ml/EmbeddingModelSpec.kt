@@ -138,7 +138,16 @@ data class EmbeddingModelSpec(
                     Thresholds(
                         edge = 0.64f,
                         clusterMatch = 0.68f,
-                        individualMatch = 0.64f,
+                        // Lowered from the OpenCV-calibrated 0.64 to 0.55 for
+                        // person assignment. 0.64 is the pairwise (one-vs-one)
+                        // calibration; matching tens of thousands of unknown
+                        // faces against a few persons is a many-comparison
+                        // problem where hundreds fall under 0.64 by chance. Real
+                        // matches sit below 0.6 with a clear gap before the noise
+                        // that piles up at 0.6-0.7 (seen in clustering logs), so
+                        // 0.55 keeps the true matches and cuts the noise. Suggest
+                        // threshold derives from this (× 1 + suggestMargin).
+                        individualMatch = 0.55f,
                     ),
             )
 
