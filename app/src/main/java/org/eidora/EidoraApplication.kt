@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Sebastian (Eidora contributors)
 
+// NOTE: setDiagnosticStackTraceMode is marked experimental in the Compose
+// runtime (opt-in required). ExperimentalComposeRuntimeApi is the marker as of
+// the compose-bom used here; if GitHub Actions reports a different marker
+// name or "unresolved reference", swap it for whatever the compiler error
+// names.
+@file:OptIn(androidx.compose.runtime.ExperimentalComposeRuntimeApi::class)
+
 package org.eidora
 
 import android.app.Application
@@ -21,6 +28,21 @@ class EidoraApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Compose diagnostic stack traces: on crashes inside Compose's own
+        // measure/layout/composition machinery (our own frames are absent from
+        // the stack, e.g. "layout state is not idle before measure starts"),
+        // this reconstructs the @Composable call hierarchy and attaches it as a
+        // suppressed DiagnosticComposeException, pointing at the actual
+        // offending composable instead of just framework internals.
+        // SourceInformation is the most detailed mode but has a real
+        // performance cost and needs non-minified source info, so debug builds
+        // only — never enabled for release. Must run before any composition is
+        // created, so this is the first thing in onCreate.
+        if (BuildConfig.DEBUG) {
+            androidx.compose.runtime.Composer.setDiagnosticStackTraceMode(
+                androidx.compose.runtime.ComposeStackTraceMode.SourceInformation,
+            )
+        }
         // Wire up the persistent rotating log file before anything logs, so the
         // app's own diagnostics survive logcat ring-buffer eviction.
         org.eidora.util.EidoraLog.init(this)
