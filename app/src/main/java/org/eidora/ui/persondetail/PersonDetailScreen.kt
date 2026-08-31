@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -605,6 +606,24 @@ private fun FaceActionsSheet(
     onDismiss: () -> Unit,
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    // action() (confirmFace/removeFace/ignoreFace/...) triggers a DB write that
+    // invalidates the PersonDetail grid's Paging flow, which recomposes the
+    // LazyVerticalGrid. If onDismiss() (closing this sheet) fires in the SAME
+    // click callback, that recomposition and the sheet's own dismiss/layout
+    // change can land in the same Compose frame — this is what caused the
+    // "layout state is not idle before measure starts" crash confirmed via
+    // Composer.setDiagnosticStackTraceMode's DiagnosticComposeException
+    // (pointed straight at PersonDetailScreen's LazyVerticalGrid). Deferring
+    // the dismiss to the next frame via withFrameNanos gives the grid's
+    // recomposition and the sheet's closing animation each their own frame
+    // instead of racing in one.
+    val scope = rememberCoroutineScope()
+    val deferredDismiss: () -> Unit = {
+        scope.launch {
+            withFrameNanos { }
+            onDismiss()
+        }
+    }
 
     if (showDeleteConfirm) {
         AlertDialog(
@@ -615,7 +634,7 @@ private fun FaceActionsSheet(
                 TextButton(onClick = {
                     showDeleteConfirm = false
                     onPermanentlyDelete()
-                    onDismiss()
+                    deferredDismiss()
                 }) { Text(stringResource(R.string.action_delete)) }
             },
             dismissButton = {
@@ -676,7 +695,7 @@ private fun FaceActionsSheet(
                     modifier =
                         Modifier.clickable(onClick = {
                             action()
-                            if (!isDestructive) onDismiss()
+                            if (!isDestructive) deferredDismiss()
                         }),
                 )
             }
