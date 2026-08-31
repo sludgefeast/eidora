@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Sebastian (Eidora contributors)
 
-// NOTE: setDiagnosticStackTraceMode is marked experimental in the Compose
-// runtime (opt-in required). ExperimentalComposeRuntimeApi is the marker as of
-// the compose-bom used here; if GitHub Actions reports a different marker
-// name or "unresolved reference", swap it for whatever the compiler error
-// names.
-@file:OptIn(androidx.compose.runtime.ExperimentalComposeRuntimeApi::class)
+// NOTE: setDiagnosticStackTraceMode/ComposeStackTraceMode live in
+// androidx.compose.runtime.tooling, confirmed against the official AndroidX
+// class index (developer.android.com/reference/kotlin/androidx/compose/
+// runtime/tooling/ComposeStackTraceMode) — NOT androidx.compose.runtime,
+// which caused the first "Unresolved reference" build failure. The opt-in
+// marker for that package is ComposeToolingApi (also confirmed from the same
+// index), not ExperimentalComposeRuntimeApi (that one lives in
+// androidx.compose.runtime and marks different, unrelated APIs).
+@file:OptIn(androidx.compose.runtime.tooling.ComposeToolingApi::class)
 
 package org.eidora
 
@@ -40,7 +43,7 @@ class EidoraApplication : Application() {
         // created, so this is the first thing in onCreate.
         if (BuildConfig.DEBUG) {
             androidx.compose.runtime.Composer.setDiagnosticStackTraceMode(
-                androidx.compose.runtime.ComposeStackTraceMode.SourceInformation,
+                androidx.compose.runtime.tooling.ComposeStackTraceMode.SourceInformation,
             )
         }
         // Wire up the persistent rotating log file before anything logs, so the
