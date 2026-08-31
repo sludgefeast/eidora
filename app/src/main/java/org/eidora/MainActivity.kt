@@ -393,10 +393,19 @@ fun EidoraApp() {
     var showClusteringDialog by remember { mutableStateOf(false) }
     var clusteringRejectSuggestions by remember { mutableStateOf(false) }
     var clusteringRemoveUnconfirmed by remember { mutableStateOf(false) }
+    // True while removeAllUnconfirmedFaces() runs. Kept local to this dialog's
+    // rememberCoroutineScope on purpose (unlike the reset above): here we want
+    // the dialog to stay open and show progress until the DB write finishes,
+    // then enqueue clustering — a "wait for it" step, not "fire and forget".
+    // If the user leaves the screen mid-operation, the scope is cancelled, but
+    // removeAllUnconfirmedFaces runs in one DB transaction (see FaceRepository),
+    // so that's a clean all-or-nothing abort, never a half-applied state.
+    var isRemovingUnconfirmed by remember { mutableStateOf(false) }
+    val clusteringDialogScope = rememberCoroutineScope()
 
     if (showClusteringDialog) {
         AlertDialog(
-            onDismissRequest = { showClusteringDialog = false },
+            onDismissRequest = { if (!isRemovingUnconfirmed) showClusteringDialog = false },
             title = { Text(stringResource(R.string.action_start_clustering)) },
             text = {
                 Column {
@@ -408,6 +417,7 @@ fun EidoraApp() {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = clusteringRejectSuggestions,
+                            enabled = !isRemovingUnconfirmed,
                             onCheckedChange = { clusteringRejectSuggestions = it },
                         )
                         Text(
@@ -418,6 +428,7 @@ fun EidoraApp() {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = clusteringRemoveUnconfirmed,
+                            enabled = !isRemovingUnconfirmed,
                             onCheckedChange = { clusteringRemoveUnconfirmed = it },
                         )
                         Text(
@@ -425,20 +436,68 @@ fun EidoraApp() {
                             modifier = Modifier.padding(start = 4.dp),
                         )
                     }
+                    if (isRemovingUnconfirmed) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 12.dp),
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Text(
+                                stringResource(R.string.clustering_removing_unconfirmed_progress),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(start = 12.dp),
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    showClusteringDialog = false
-                    SyncPipeline.enqueueClustering(
-                        context,
-                        rejectSuggestions = clusteringRejectSuggestions,
-                        removeUnconfirmed = clusteringRemoveUnconfirmed,
-                    )
-                }) { Text(stringResource(R.string.action_start)) }
+                TextButton(
+                    enabled = !isRemovingUnconfirmed,
+                    onClick = {
+                        // "Remove unconfirmed" is a plain DB write with no ML
+                        // work, so it doesn't need the worker's power gate — run
+                        // it here, off the UI thread, before enqueueing
+                        // clustering. It can take a few seconds on a large
+                        // library, hence the progress row and disabled controls
+                        // rather than blocking the UI thread.
+                        if (clusteringRemoveUnconfirmed) {
+                            isRemovingUnconfirmed = true
+                            clusteringDialogScope.launch {
+                                try {
+                                    val db = org.eidora.data.db.DatabaseProvider.getInstance(context)
+                                    val repo = org.eidora.data.repository.FaceRepository(context, db)
+                                    repo.removeAllUnconfirmedFaces()
+                                } catch (t: Throwable) {
+                                    org.eidora.util.EidoraLog.w(
+                                        "MainActivity",
+                                        "removeAllUnconfirmedFaces failed",
+                                        t,
+                                    )
+                                } finally {
+                                    isRemovingUnconfirmed = false
+                                    showClusteringDialog = false
+                                    SyncPipeline.enqueueClustering(
+                                        context,
+                                        rejectSuggestions = clusteringRejectSuggestions,
+                                    )
+                                }
+                            }
+                        } else {
+                            showClusteringDialog = false
+                            SyncPipeline.enqueueClustering(
+                                context,
+                                rejectSuggestions = clusteringRejectSuggestions,
+                            )
+                        }
+                    },
+                ) { Text(stringResource(R.string.action_start)) }
             },
             dismissButton = {
-                TextButton(onClick = { showClusteringDialog = false }) {
+                TextButton(
+                    enabled = !isRemovingUnconfirmed,
+                    onClick = { showClusteringDialog = false },
+                ) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },

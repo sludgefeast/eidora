@@ -84,6 +84,37 @@ class FaceRepository(
     }
 
     /**
+     * Removes all unconfirmed faces (name == null) from EVERY named person in
+     * one call — the batch counterpart to [removeUnconfirmedFaces]. Used by the
+     * "remove unconfirmed faces" clustering-dialog option, which the UI now
+     * runs immediately on confirm rather than deferring it into the worker (see
+     * the per-person overload's call sites for the single-person case, e.g.
+     * PersonDetail's "remove unconfirmed" action).
+     *
+     * Intentionally only touches faces on NAMED persons — suggestion persons
+     * (name == null) are a separate concern, handled by [rejectAllSuggestions]
+     * when the "reject suggestions" option is checked. Runs in one DB
+     * transaction so the UI sees a single consistent update rather than a
+     * flicker per person; each person's centroid is still recomputed
+     * individually since [recomputeCentroid] is per-person.
+     */
+    suspend fun removeAllUnconfirmedFaces() {
+        db.withTransaction {
+            val namedPersons = personDao.getAll().filter { it.name != null }
+            namedPersons.forEach { person ->
+                val unconfirmed =
+                    faceDao
+                        .findByPersonId(person.id)
+                        .filter { it.name == null }
+                if (unconfirmed.isEmpty()) return@forEach
+                unconfirmed.forEach { face -> faceDao.updatePersonId(face.id, null) }
+                recomputeCentroid(person.id)
+                deletePersonIfOrphaned(person.id)
+            }
+        }
+    }
+
+    /**
      * Removes all unconfirmed faces (name == null) from the given person.
      * They move back to Unknown and will be re-clustered on the next run.
      */

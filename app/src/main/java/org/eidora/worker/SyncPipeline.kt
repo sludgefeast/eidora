@@ -215,19 +215,22 @@ object SyncPipeline {
     /**
      * Enqueues a manual clustering run.
      * @param rejectSuggestions delete all existing unnamed suggestions first
-     * @param removeUnconfirmed remove unconfirmed faces from named persons first
+     *
+     * Note: "remove unconfirmed faces from named persons" is a plain DB cleanup
+     * with no need for the worker's power gate, so it is no longer a worker
+     * option — the caller runs [org.eidora.data.repository.FaceRepository
+     * .removeAllUnconfirmedFaces] itself, immediately, before calling this.
      */
     fun enqueueClustering(
         context: Context,
         rejectSuggestions: Boolean = false,
-        removeUnconfirmed: Boolean = false,
     ) {
         WorkManager
             .getInstance(context)
             .enqueueUniqueWork(
                 UNIQUE_CLUSTERING_NAME,
                 ExistingWorkPolicy.KEEP,
-                ClusteringWorker.buildRequest(rejectSuggestions, removeUnconfirmed),
+                ClusteringWorker.buildRequest(rejectSuggestions),
             )
     }
 

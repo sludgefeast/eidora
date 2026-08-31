@@ -201,7 +201,7 @@ class ClusteringWorker(
 
             reportProgress(0, applicationContext.getString(org.eidora.R.string.notif_preparing))
 
-            runPreCleaning(db, personDao)
+            runPreCleaning(db)
 
             val config = loadClusteringConfig()
             // Note: auto-confirm (writing names automatically) is intentionally
@@ -868,22 +868,12 @@ class ClusteringWorker(
     }
 
     /** Optional pre-clustering cleanup requested via input data. */
-    private suspend fun runPreCleaning(
-        db: org.eidora.data.db.EidoraDatabase,
-        personDao: org.eidora.data.db.PersonDao,
-    ) {
+    private suspend fun runPreCleaning(db: org.eidora.data.db.EidoraDatabase) {
         val rejectSuggestions = inputData.getBoolean(KEY_REJECT_SUGGESTIONS, false)
-        val removeUnconfirmed = inputData.getBoolean(KEY_REMOVE_UNCONFIRMED, false)
-        if (!rejectSuggestions && !removeUnconfirmed) return
+        if (!rejectSuggestions) return
         val repo = org.eidora.data.repository.FaceRepository(applicationContext, db)
-        if (rejectSuggestions) {
-            EidoraLog.i(TAG, "Pre-clustering: rejecting all suggestions")
-            repo.rejectAllSuggestions()
-        }
-        if (removeUnconfirmed) {
-            EidoraLog.i(TAG, "Pre-clustering: removing unconfirmed faces from persons")
-            personDao.getAll().forEach { person -> repo.removeUnconfirmedFaces(person.id) }
-        }
+        EidoraLog.i(TAG, "Pre-clustering: rejecting all suggestions")
+        repo.rejectAllSuggestions()
     }
 
     private suspend fun loadClusteringConfig(): org.eidora.data.settings.ClusteringConfig =
@@ -1155,17 +1145,12 @@ class ClusteringWorker(
 
     companion object {
         const val KEY_REJECT_SUGGESTIONS = "reject_suggestions"
-        const val KEY_REMOVE_UNCONFIRMED = "remove_unconfirmed"
 
-        fun buildRequest(
-            rejectSuggestions: Boolean = false,
-            removeUnconfirmed: Boolean = false,
-        ): OneTimeWorkRequest =
+        fun buildRequest(rejectSuggestions: Boolean = false): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<ClusteringWorker>()
                 .setInputData(
                     workDataOf(
                         KEY_REJECT_SUGGESTIONS to rejectSuggestions,
-                        KEY_REMOVE_UNCONFIRMED to removeUnconfirmed,
                     ),
                 ).setBackoffCriteria(BackoffPolicy.LINEAR, 30_000L, java.util.concurrent.TimeUnit.MILLISECONDS)
                 .build()
