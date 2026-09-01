@@ -60,7 +60,7 @@
     <string name="setting_edge_threshold">Edge threshold</string>
     <string name="setting_edge_threshold_description">Cosine distance below which two faces are linked in clustering.</string>
     <string name="setting_cluster_match_threshold">Cluster match threshold</string>
-    <string name="setting_cluster_match_threshold_description">Cosine distance below which a whole cluster is assigned to an existing person.</string>
+    <string name="setting_cluster_match_threshold_description">Cosine distance below which a new residue cluster is merged into an existing (unnamed) suggestion instead of becoming a separate one. Never assigns to a named person — that only happens per-face in Phase A.</string>
     <string name="setting_individual_match_threshold">Individual match threshold</string>
     <string name="setting_individual_match_threshold_description">Cosine distance below which a single face is assigned to an existing person (pre-clustering step).</string>
     <string name="setting_min_cluster_size">Minimum cluster size</string>

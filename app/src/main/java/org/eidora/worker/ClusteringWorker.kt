@@ -110,6 +110,33 @@ private const val REFERENCE_QUALITY_FLOOR = 0.35f
 private const val PURITY_RATIO_MAX = 0.6f
 
 /**
+ * Absolute ceiling on a cluster's internal spread (mean distance of members to
+ * the cluster centroid) for it to count as pure, independent of any other
+ * cluster to compare against. This is what makes the purity check meaningful
+ * when a run produces only one (or very few) residue clusters — the case that
+ * slipped through before: a single giant Chinese-Whispers cluster built from
+ * bridge-face transitivity (see eidora-recognition-first.md) has no neighbour
+ * to be "relatively" pure against, so the old relative-only check waved it
+ * through regardless of how internally mixed it actually was. Same cosine
+ * scale as CENTROID_SUBCLUSTER_DIST (a real single-look group) — a genuinely
+ * coherent cluster should look about as tight as one person's look centroid.
+ */
+private const val ABSOLUTE_SPREAD_MAX = CENTROID_SUBCLUSTER_DIST
+
+/**
+ * Hard cap on how large a fraction of the entire currently-unknown pool a
+ * single residue cluster may be and still be eligible as "pure", regardless
+ * of its measured spread. A cluster this dominant is far more likely a
+ * transitivity artifact (many bridge faces chaining most of the residue
+ * together) than a genuinely coherent group of one person's faces — a low
+ * spread on a cluster that size is more likely a coincidence of averaging
+ * over many faces than real homogeneity. This is what stops a single
+ * ~97%-of-residue cluster (as seen in the field: 15894/16361) from ever being
+ * treated as pure, even if ABSOLUTE_SPREAD_MAX happened to be satisfied.
+ */
+private const val MAX_CLUSTER_SHARE_OF_UNKNOWN = 0.10f
+
+/**
  * Fraction of currently-unknown faces the largest pure clusters should cover as
  * suggestions in one run. The rest wait for later runs. Relative, so it scales
  * with library size and with each round's progress.
@@ -497,19 +524,46 @@ class ClusteringWorker(
                     )
                 }
 
-            // Purity via a silhouette-like ratio: a cluster is pure when its
-            // internal spread (a) is small relative to the distance to the nearest
-            // OTHER cluster's centroid (b). ratio = a / b; low ratio = well
-            // separated = pure. This is threshold-free (no calibrated constant).
+            // Purity: a cluster is pure when it is internally consistent. Two
+            // complementary tests, since either alone has a blind spot:
+            //
+            // 1. RELATIVE (silhouette-like): spread (a) small relative to the
+            //    distance to the nearest OTHER cluster's centroid (b). Good at
+            //    catching two clusters that overlap/should be one — but only
+            //    means anything when there IS another cluster to compare
+            //    against.
+            // 2. ABSOLUTE: spread must also be below a fixed ceiling on its
+            //    own. This is what makes the check meaningful when there is
+            //    only one cluster (or few) — the old code treated "nothing to
+            //    compare against" as "therefore pure", which let a single
+            //    giant, internally incoherent Chinese-Whispers cluster (built
+            //    from bridge-face transitivity, see eidora-recognition-first.md)
+            //    sail through unpurity-checked and get auto-assigned wholesale.
+            //    ABSOLUTE_SPREAD_MAX is calibrated against the same cosine
+            //    scale as CENTROID_SUBCLUSTER_DIST (a real single-look group).
+            //
+            // A cluster must pass BOTH: within-cluster coherence (2) is a
+            // precondition regardless of what else exists; separation from
+            // neighbours (1) is an extra bar when there's something to compare.
+            //
+            // Independently of spread: a cluster that swallows an outsized
+            // share of the entire unknown pool is treated as impure regardless
+            // of its spread value. A low spread on a cluster that size is far
+            // more likely a coincidence of the averaging than genuine
+            // homogeneity across that many faces — see MAX_CLUSTER_SHARE_OF_UNKNOWN.
+            //
             // O(clusters²) on centroids only; capped for safety on huge counts.
             val pureClusterIds: Set<Int> =
                 if (infos.size > MAX_CLUSTERS_FOR_PURITY) {
                     EidoraLog.w(TAG, "Too many clusters (${infos.size}) for purity check; skipping it")
                     infos.map { it.clusterId }.toSet()
                 } else {
+                    val shareCap = (unknownFacesAll.size.coerceAtLeast(1) * MAX_CLUSTER_SHARE_OF_UNKNOWN)
                     infos
                         .filter { ci ->
-                            if (ci.spread <= 1e-6f) return@filter true // single-tight cluster
+                            if (ci.size > shareCap) return@filter false
+                            val absoluteOk = ci.spread <= ABSOLUTE_SPREAD_MAX
+                            if (!absoluteOk) return@filter false
                             var nearestOther = Float.MAX_VALUE
                             infos.forEach { other ->
                                 if (other.clusterId != ci.clusterId) {
@@ -517,7 +571,9 @@ class ClusteringWorker(
                                     if (d < nearestOther) nearestOther = d
                                 }
                             }
-                            if (nearestOther == Float.MAX_VALUE) return@filter true // only one cluster
+                            // No other cluster to compare against: absolute
+                            // check (already passed above) is the whole test.
+                            if (nearestOther == Float.MAX_VALUE) return@filter true
                             (ci.spread / nearestOther) < PURITY_RATIO_MAX
                         }.map { it.clusterId }
                         .toSet()
@@ -569,38 +625,25 @@ class ClusteringWorker(
                                 }
                         }
                     val clusterCentroid = EmbeddingModel.weightedCentroid(memberPairs)
-
-                    var bestPerson: PersonEntity? = null
-                    var bestDistance = config.clusterMatchThreshold
                     val clusterMedian =
                         members
                             .mapNotNull { candidateTakenAt[it.faceRegionId] }
                             .sorted()
                             .let { if (it.isEmpty()) null else it[it.size / 2] }
 
-                    personData.forEach { (personId, pd) ->
-                        try {
-                            // Compare cluster centroid against each person embedding (NN)
-                            val bestFaceDist =
-                                bestDistanceToPerson(
-                                    clusterCentroid,
-                                    clusterMedian,
-                                    pd,
-                                    timeWeight,
-                                ) ?: return@forEach
-                            if (bestFaceDist < bestDistance) {
-                                bestDistance = bestFaceDist
-                                bestPerson = personDao.findById(personId)
-                            }
-                        } catch (t: Throwable) {
-                            EidoraLog.w(TAG, "Error comparing person $personId", t)
-                        }
-                    }
-
+                    // Residue clusters NEVER get matched against named persons
+                    // here. Recognition-first design: only Phase A's per-face
+                    // kNN vote may attach a face to a named person, and only as
+                    // an unconfirmed suggestion. Matching a whole cluster's
+                    // single averaged centroid against a person was the bug
+                    // that let one dominant, transitivity-built residue
+                    // cluster (15894/16361 faces in the field) get wholesale
+                    // assigned to a named person on one lucky average — see
+                    // eidora-recognition-first.md. A cluster here only ever
+                    // becomes, or merges into, a suggestion (unnamed) person;
+                    // the user names it explicitly.
                     val targetPerson: PersonEntity =
-                        bestPerson ?: run {
-                            // No named person matched – check existing suggestions before
-                            // creating a new one. This avoids duplicate suggestion clusters.
+                        run {
                             var bestSuggestion: PersonEntity? = null
                             var bestSuggestionDist = config.clusterMatchThreshold
                             existingSuggestions.forEach { sd ->
@@ -986,45 +1029,6 @@ class ClusteringWorker(
             }
             onProgress(((index + 1) * 100) / persons.size.coerceAtLeast(1))
         }
-    }
-
-    /**
-     * Smallest adjusted distance between a query embedding and any of a person's
-     * stored faces. Each candidate face's cosine distance is reduced by a
-     * temporal bonus (closer in time = more likely the same person), weighted by
-     * the face's quality and a confirm boost. Returns null if the person has no
-     * faces. This is the shared nearest-neighbour rule used by both Phase 1
-     * (individual matching) and Phase 3 (cluster assignment), so the two stay
-     * consistent.
-     */
-    private fun bestDistanceToPerson(
-        queryEmbedding: FloatArray,
-        queryTakenAt: Long?,
-        person: PersonData,
-        timeWeight: Float,
-    ): Float? {
-        // Match against the person's look/era CENTROIDS, not individual faces.
-        // Taking the minimum over every stored face let a single outlier match
-        // pull in foreign faces on one lucky near hit (observed: hundreds of
-        // wrong assignments over a large unknown set). A centroid averages a
-        // whole look, so a candidate must resemble the person's actual
-        // appearance, not just happen to sit near one stray face. Several
-        // centroids still cover different looks/ages.
-        if (person.centroids.isEmpty()) return null
-
-        // Nearest centroid by cosine distance. The temporal bonus still applies,
-        // using the person's closest-in-time confirmed face as the reference so
-        // near-in-time candidates keep their (smaller) advantage.
-        val nearestCentroid =
-            person.centroids.minOf { c -> EmbeddingModel.cosineDistance(queryEmbedding, c.centroid) }
-
-        // Temporal bonus: strongest when the candidate is close in time to any of
-        // the person's faces. Kept from the old logic so time still helps, but it
-        // can only *lower* the distance, never invent a match on its own.
-        val bonus =
-            person.faces.maxOf { pf -> temporalBonus(queryTakenAt, pf.takenAt, timeWeight) }
-
-        return (nearestCentroid - bonus).coerceAtLeast(0f)
     }
 
     /**
