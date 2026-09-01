@@ -82,6 +82,22 @@ private const val VOTE_K = 5
 private const val VOTE_PURITY_MIN = 0.60f
 
 /**
+ * Absolute ceiling on the WINNING neighbour's raw cosine distance (before the
+ * temporal penalty is added). VOTE_PURITY_MIN alone only measures how much
+ * a person dominates the k neighbours that already survived VOTE_TAU_ABS — if
+ * a person happens to contribute several close-together look centroids, ALL k
+ * neighbours can be that one person, making the vote share 1.0 regardless of
+ * how visually close the match actually is. This is the same blind spot the
+ * cluster purity check had (see MAX_CLUSTER_SHARE_OF_UNKNOWN /
+ * ABSOLUTE_SPREAD_MAX above) — relative dominance was mistaken for absolute
+ * confidence. The winner must ALSO clear this absolute bar on its own,
+ * regardless of what else was or wasn't nearby. Same cosine scale as
+ * CENTROID_SUBCLUSTER_DIST — a genuine match should look about as close as one
+ * person's own look centroids are to each other.
+ */
+private const val VOTE_ABS_DIST_MAX = CENTROID_SUBCLUSTER_DIST
+
+/**
  * Reference-set quality floor (digiKam FIQA idea). Confirmed faces below this
  * quality never become kNN reference points — poor crops are the most common
  * source of outlier/bridge matches. They can still be matched *as* candidates;
@@ -89,6 +105,21 @@ private const val VOTE_PURITY_MIN = 0.60f
  * is a conservative start.
  */
 private const val REFERENCE_QUALITY_FLOOR = 0.35f
+
+/**
+ * Maximum the temporal PENALTY may add to a cosine distance in the Phase A
+ * vote (classifyByVote / temporalPenalty). Time was originally a BONUS
+ * (subtracted from distance) — that let a same-day photo of the WRONG person
+ * buy its way under the match threshold on timing alone, regardless of visual
+ * similarity (two faces taken the same day, e.g. at a family event with
+ * several people photographed together, got nearly the full bonus). The fix
+ * inverts the direction entirely: a large time gap only ever makes a visually
+ * similar face LESS likely to be accepted, it never makes one MORE likely.
+ * Ordinary same-event/same-week photos get zero penalty either way. Same
+ * fraction of VOTE_TAU_ABS as before so it scales if tau is retuned, but now
+ * added instead of subtracted.
+ */
+private const val VOTE_TEMPORAL_PENALTY_MAX = VOTE_TAU_ABS * 0.10f
 
 /*
  * How far above the (strict) auto-assign threshold a face may still be offered
@@ -166,7 +197,7 @@ private class PersonEmbedding(
  * kNN vote needs. The centroid is the quality-weighted mean of a group of the
  * person's confirmed faces that share a look; [weight] is the group size times
  * its mean quality (so a well-supported look counts for more in the vote); and
- * [medianTakenAt] is the group's median capture time for the temporal bonus.
+ * [medianTakenAt] is the group's median capture time for the temporal penalty.
  */
 private class SubClusterCentroid(
     val centroid: FloatArray,
@@ -832,7 +863,7 @@ class ClusteringWorker(
      *
      * Each returned centroid carries the metadata the kNN vote needs: a weight
      * (group size × mean quality, so well-supported looks count more) and the
-     * group's median capture time (for the temporal bonus).
+     * group's median capture time (for the temporal penalty).
      */
     private fun buildPersonCentroids(faces: List<PersonEmbedding>): List<SubClusterCentroid> {
         val confirmed =
@@ -1065,14 +1096,21 @@ class ClusteringWorker(
      * Classifies one unknown face against the reference pool via a k-nearest-
      * neighbour vote (the recognition-first core). See eidora-recognition-first.md.
      *
-     * 1. Distance to each reference = cosine distance minus a temporal bonus
-     *    (the bonus can only lower it, never invent a match).
+     * 1. Distance to each reference = cosine distance plus a temporal penalty
+     *    (the penalty can only raise it, never manufacture a match).
      * 2. Absolute gate: references beyond [VOTE_TAU_ABS] never vote.
      * 3. Keep the [VOTE_K] nearest survivors.
      * 4. Relative gate (digiKam's second bound): drop any survivor farther than
      *    dMin / [VOTE_REL_FACTOR] — this kills far-away "bridge" neighbours.
      * 5. Vote by person, weighted by (1 - distance) × reference weight.
-     * 6. Winner stands only if its share ≥ [VOTE_PURITY_MIN]; otherwise Unknown.
+     * 6. Winner stands only if BOTH: its vote share ≥ [VOTE_PURITY_MIN]
+     *    (relative dominance among the neighbours that survived) AND its best
+     *    RAW cosine distance (bonus excluded) is ≤ [VOTE_ABS_DIST_MAX]
+     *    (absolute confidence on its own). Share alone isn't enough: if a
+     *    person happens to contribute several nearby look centroids, all k
+     *    neighbours can be that one person, giving share = 1.0 regardless of
+     *    how close the match actually is — same blind spot the cluster purity
+     *    check had before it required both a relative AND absolute bound.
      *
      * Returns [VoteResult.Assign] with the winning person id (to be stored as an
      * UNCONFIRMED suggestion), or [VoteResult.Unknown] to leave the face alone.
@@ -1085,15 +1123,21 @@ class ClusteringWorker(
     ): VoteResult {
         if (pool.isEmpty()) return VoteResult.Unknown
 
-        // Step 1-2: distance with temporal bonus, absolute gate.
-        // Keep (personId, distance, weight) for survivors only.
-        data class Neighbour(val personId: String, val distance: Float, val weight: Float)
+        // Step 1-2: distance with temporal PENALTY (never a bonus), absolute
+        // gate. rawDistance (penalty excluded) is kept alongside the
+        // penalty-adjusted distance: the adjusted one decides ranking/voting,
+        // the raw one gates the final absolute-confidence check in step 6.
+        // The penalty can only push distance UP (making a large time gap less
+        // likely to match), never down — visual similarity alone must clear
+        // every threshold; time can only make a borderline case worse, not
+        // manufacture a match that similarity didn't support.
+        data class Neighbour(val personId: String, val distance: Float, val rawDistance: Float, val weight: Float)
         val survivors = ArrayList<Neighbour>(pool.size)
         for (r in pool) {
             val cosD = EmbeddingModel.cosineDistance(queryEmbedding, r.centroid)
-            val bonus = temporalBonus(queryTakenAt, r.medianTakenAt, timeWeight)
-            val d = (cosD - bonus).coerceAtLeast(0f)
-            if (d <= VOTE_TAU_ABS) survivors.add(Neighbour(r.personId, d, r.weight))
+            val penalty = temporalPenalty(queryTakenAt, r.medianTakenAt, timeWeight)
+            val d = cosD + penalty
+            if (d <= VOTE_TAU_ABS) survivors.add(Neighbour(r.personId, d, cosD, r.weight))
         }
         if (survivors.isEmpty()) return VoteResult.Unknown
 
@@ -1119,32 +1163,47 @@ class ClusteringWorker(
 
         val winner = voteByPerson.maxByOrNull { it.value } ?: return VoteResult.Unknown
         val share = winner.value / totalVote
+        val winnerVoters = voters.filter { it.personId == winner.key }
+        val bestRawDist = winnerVoters.minOf { it.rawDistance }
+        val bestDist = winnerVoters.minOf { it.distance }
 
-        // Step 6: purity gate.
+        // Step 6: two independent purity gates — both must pass.
+        // Relative: does the winner dominate the neighbours that survived?
         if (share < VOTE_PURITY_MIN) return VoteResult.Unknown
-        val bestDist = voters.filter { it.personId == winner.key }.minOf { it.distance }
+        // Absolute: is the winner's closest match actually close, on its own,
+        // ignoring the temporal penalty? Closes the blind spot where several
+        // nearby look centroids from one person make share = 1.0 trivially.
+        if (bestRawDist > VOTE_ABS_DIST_MAX) return VoteResult.Unknown
         return VoteResult.Assign(personId = winner.key, bestDistance = bestDist)
     }
 
     /**
-     * Returns a temporal bonus in [0..maxBonus] that is highest when the two
-     * timestamps are close together. Uses a Gaussian with half-width = 3 years.
-     * Subtracting this from cosine distance makes temporally close faces
-     * effectively "more similar".
+     * Returns a temporal PENALTY in [0..maxPenalty] to ADD to a cosine
+     * distance — never a bonus to subtract. A large time gap between two
+     * photos makes a visually similar face LESS likely to be a match (people
+     * change over time; siblings/relatives can look alike mainly within a
+     * shared life stage), so this can only push a distance up, making an
+     * uncertain match less likely — it must never pull a distance down to
+     * manufacture a match that visual similarity alone didn't support. Zero
+     * within [freeWindowDays] (ordinary photos from the same event/trip/week
+     * are not penalised at all), then grows smoothly over
+     * [growthWindowDays] and saturates at maxPenalty for very large gaps.
      */
-    private fun temporalBonus(
+    private fun temporalPenalty(
         takenAtA: Long?,
         takenAtB: Long?,
         weight: Float,
-        maxBonus: Float = 0.15f,
+        maxPenalty: Float = VOTE_TEMPORAL_PENALTY_MAX,
+        freeWindowDays: Float = 30f,
+        growthWindowDays: Float = 365f,
     ): Float {
         if (weight <= 0f || takenAtA == null || takenAtB == null) return 0f
         if (takenAtA <= 0L || takenAtB <= 0L) return 0f
         val deltaMs = kotlin.math.abs(takenAtA - takenAtB).toFloat()
-        val deltaYears = deltaMs / (365.25f * 24 * 3600 * 1000)
-        val sigma = 3.0f // Gaussian half-width in years
-        val gaussian = kotlin.math.exp(-(deltaYears * deltaYears) / (2f * sigma * sigma))
-        return maxBonus * weight * gaussian
+        val deltaDays = deltaMs / (24f * 3600 * 1000)
+        if (deltaDays <= freeWindowDays) return 0f
+        val progress = ((deltaDays - freeWindowDays) / growthWindowDays).coerceIn(0f, 1f)
+        return maxPenalty * weight * progress
     }
 
     companion object {
