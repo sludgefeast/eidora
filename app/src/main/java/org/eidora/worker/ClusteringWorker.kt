@@ -31,10 +31,18 @@ private const val MAX_EMBEDDING_WAIT_ATTEMPTS = 10
  * threshold on its own.
  */
 // Cosine-distance radius for grouping a person's confirmed faces into
-// look/era sub-clusters (see buildPersonCentroids). Faces within this of an
-// existing group join it; otherwise a new centroid is started. Tighter than
-// the match thresholds so each centroid stays a coherent single look.
-private const val CENTROID_SUBCLUSTER_DIST = 0.5f
+// look/era sub-clusters (see buildPersonCentroids). A face joins an existing
+// group only if it is within this of EVERY member already in that group
+// (complete-link, not single-link — see buildPersonCentroids for why).
+// Previously 0.5, the SAME value as VOTE_TAU_ABS/VOTE_ABS_DIST_MAX despite the
+// old comment here claiming it was already tighter — it wasn't, and combined
+// with single-link grouping this let a chain of borderline-similar confirmed
+// faces merge into one averaged centroid that no longer resembled any single
+// look (observed: unassigned faces jumped from 706 to 7565 across otherwise
+// near-identical runs after a reference face set changed, see the 7565-vs-706
+// field log). Tightened well below the match thresholds so a sub-cluster
+// centroid only ever represents faces that are genuinely alike.
+private const val CENTROID_SUBCLUSTER_DIST = 0.25f
 
 // ---------------------------------------------------------------------------
 // Phase A (Recognition) — kNN-vote parameters
@@ -849,11 +857,14 @@ class ClusteringWorker(
 
     /**
      * Groups a person's CONFIRMED faces into visual sub-clusters and reduces each
-     * to one quality-weighted centroid. Uses simple single-link agglomerative
-     * grouping: starting from each confirmed face, faces within
-     * [CENTROID_SUBCLUSTER_DIST] cosine distance of an existing group join it,
-     * otherwise start a new group. This yields a handful of centroids (one per
-     * look/era) rather than one blurred average or every individual face.
+     * to one quality-weighted centroid. Uses complete-link agglomerative
+     * grouping: a face joins an existing group only if it is within
+     * [CENTROID_SUBCLUSTER_DIST] cosine distance of EVERY member already in
+     * that group, otherwise it starts a new group. This yields a handful of
+     * centroids (one per look/era) rather than one blurred average or every
+     * individual face — and unlike single-link, no chain of borderline
+     * similarities can smuggle unrelated faces into the same group (see the
+     * constant's doc for the field incident this fixed).
      *
      * Only confirmed faces are used — unconfirmed suggestions could be wrong and
      * would poison the centroid. Faces below [REFERENCE_QUALITY_FLOOR] are also
@@ -871,17 +882,31 @@ class ClusteringWorker(
         if (confirmed.isEmpty()) return emptyList()
 
         // Each group holds the indices of its member faces.
+        //
+        // COMPLETE-LINK, not single-link: a face joins an existing group only
+        // if it is within CENTROID_SUBCLUSTER_DIST of EVERY member already in
+        // that group, not just the nearest one. Single-link chains faces
+        // transitively (A-B close, B-C close => A,C grouped even if A and C
+        // themselves are far apart) — the same weakness Chinese Whispers has
+        // in Phase B.1, just operating here on one person's own confirmed
+        // faces. That let a chain of borderline-similar faces merge into one
+        // averaged centroid that represented no single look well, which is
+        // what caused the reference pool to degrade unpredictably when the
+        // confirmed face set changed slightly (see CENTROID_SUBCLUSTER_DIST
+        // doc). Complete-link is stricter — a group only grows when the new
+        // face is close to the group's full existing membership — so no
+        // similarity chain can smuggle in a face that doesn't actually
+        // resemble the others.
         val groups = mutableListOf<MutableList<Int>>()
         for ((i, face) in confirmed.withIndex()) {
             var placed = false
             for (group in groups) {
-                // Single-link: join the group if close to ANY of its members.
-                val close =
-                    group.any { j ->
+                val closeToAll =
+                    group.all { j ->
                         EmbeddingModel.cosineDistance(face.embedding, confirmed[j].embedding) <=
                             CENTROID_SUBCLUSTER_DIST
                     }
-                if (close) {
+                if (closeToAll) {
                     group.add(i)
                     placed = true
                     break
